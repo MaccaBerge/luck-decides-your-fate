@@ -1,0 +1,31 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# App data / secrets
+data/
+.env
+
+# Frontend
+node_modules/
+dist/
+
+# Validation screenshots
+*.png
+
+.DS_Store
+
+# SQLite files anywhere (incl. WAL/SHM)
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+
+# Logs and test output
+*.log
+coverage/
+test-results/
+playwright-report/
+.vitest/
