@@ -10,6 +10,7 @@ from starlette.requests import HTTPConnection
 from app.auth import SessionStore
 from app.config import Settings
 from app.realtime.manager import ConnectionManager
+from app.services.rate_limit import LoginRateLimiter
 from app.services.state import RuntimeRegistry
 
 
@@ -17,6 +18,7 @@ from app.services.state import RuntimeRegistry
 class AppContext:
     settings: Settings
     sessions: SessionStore
+    login_limiter: LoginRateLimiter
     manager: ConnectionManager = field(default_factory=ConnectionManager)
     runtime: RuntimeRegistry = field(default_factory=RuntimeRegistry)
     rng: secrets.SystemRandom = field(default_factory=secrets.SystemRandom)

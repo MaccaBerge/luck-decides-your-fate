@@ -4,10 +4,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request, Response
 
 from app.auth import COOKIE_NAME, SESSION_TTL_SECONDS, require_admin, session_token
+from app.client_ip import get_client_ip
 from app.context import AppContext, ctx_dep
 from app.db import repository as repo
 from app.db.rows import GameRow
-from app.errors import game_not_found, invalid_password, validation_error
+from app.errors import game_not_found, invalid_password, too_many_attempts, validation_error
 from app.models import (
     AdminGameState,
     CreateLinkRequest,
@@ -54,8 +55,15 @@ async def load_link(game_id: str) -> GameRow:
 
 # ---------------------------------------------------------------- session
 @router.post("/login")
-async def login(body: LoginRequest, response: Response, ctx: AppContext = Depends(ctx_dep)) -> dict:
+async def login(
+    body: LoginRequest, request: Request, response: Response, ctx: AppContext = Depends(ctx_dep)
+) -> dict:
+    ip = get_client_ip(request)
+    retry_after = ctx.login_limiter.retry_after(ip)
+    if retry_after is not None:
+        raise too_many_attempts(retry_after)
     if not ctx.sessions.check_password(body.password):
+        ctx.login_limiter.record_failure(ip)
         raise invalid_password()
     token = ctx.sessions.create()
     response.set_cookie(

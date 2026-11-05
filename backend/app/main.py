@@ -28,6 +28,7 @@ from app.errors import install_error_handlers
 from app.routes import admin, games, static, ws
 from app.services import views
 from app.services.cleanup import cleanup_loop
+from app.services.rate_limit import LoginRateLimiter
 
 log = logging.getLogger("app")
 
@@ -56,7 +57,13 @@ def create_app(settings: Settings | None = None, *, run_cleanup: bool = True) ->
     if settings is None:
         settings = load_settings()
 
-    ctx = AppContext(settings=settings, sessions=SessionStore(settings.admin_password))
+    ctx = AppContext(
+        settings=settings,
+        sessions=SessionStore(settings.admin_password),
+        login_limiter=LoginRateLimiter(
+            settings.login_rate_limit_attempts, settings.login_rate_limit_window_seconds
+        ),
+    )
     ctx.manager.set_dashboard_builder(lambda: views.dashboard_payload(ctx))
 
     @asynccontextmanager
