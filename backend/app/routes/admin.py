@@ -1,13 +1,19 @@
 """Admin REST API (§8.2). Never calls mark_opened; rule changes never reach player sockets."""
 from __future__ import annotations
 
+import asyncio
+import os
+
 from fastapi import APIRouter, Depends, Request, Response
+from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 
 from app.auth import COOKIE_NAME, SESSION_TTL_SECONDS, require_admin, session_token
+from app.client_ip import get_client_ip
 from app.context import AppContext, ctx_dep
 from app.db import repository as repo
 from app.db.rows import GameRow
-from app.errors import game_not_found, invalid_password, validation_error
+from app.errors import game_not_found, invalid_password, too_many_attempts, validation_error
 from app.models import (
     AdminGameState,
     CreateLinkRequest,
@@ -16,6 +22,7 @@ from app.models import (
     UpdateLinkRequest,
 )
 from app.services import serializers as ser
+from app.services.backup import backup_filename, create_snapshot
 from app.services import views
 
 router = APIRouter(prefix="/api/admin")
@@ -54,8 +61,15 @@ async def load_link(game_id: str) -> GameRow:
 
 # ---------------------------------------------------------------- session
 @router.post("/login")
-async def login(body: LoginRequest, response: Response, ctx: AppContext = Depends(ctx_dep)) -> dict:
+async def login(
+    body: LoginRequest, request: Request, response: Response, ctx: AppContext = Depends(ctx_dep)
+) -> dict:
+    ip = get_client_ip(request)
+    retry_after = ctx.login_limiter.retry_after(ip)
+    if retry_after is not None:
+        raise too_many_attempts(retry_after)
     if not ctx.sessions.check_password(body.password):
+        ctx.login_limiter.record_failure(ip)
         raise invalid_password()
     token = ctx.sessions.create()
     response.set_cookie(
@@ -83,6 +97,18 @@ async def logout(request: Request, ctx: AppContext = Depends(ctx_dep)) -> Respon
 @protected.get("/me")
 async def me() -> dict:
     return {"authenticated": True}
+
+
+# ---------------------------------------------------------------- backup
+@protected.get("/backup")
+async def backup(ctx: AppContext = Depends(ctx_dep)) -> FileResponse:
+    path = await asyncio.to_thread(create_snapshot, ctx.settings.database_path)
+    return FileResponse(
+        path,
+        media_type="application/vnd.sqlite3",
+        filename=backup_filename(),
+        background=BackgroundTask(os.unlink, path),
+    )
 
 
 # ---------------------------------------------------------------- dashboard + links

@@ -14,16 +14,33 @@ from typing import AsyncIterator
 from fastapi import APIRouter, FastAPI
 
 from app.auth import SessionStore
-from app.config import ConfigError, Settings, load_settings
+from app.config import (
+    MIN_RECOMMENDED_PASSWORD_LENGTH,
+    ConfigError,
+    Settings,
+    config_summary,
+    load_settings,
+)
 from app.context import AppContext
 from app.db import repository as repo
 from app.db.connection import init_db
 from app.errors import install_error_handlers
+from app.middleware import ResponseHeadersMiddleware
 from app.routes import admin, games, static, ws
 from app.services import views
 from app.services.cleanup import cleanup_loop
+from app.services.rate_limit import LoginRateLimiter
 
 log = logging.getLogger("app")
+
+
+def _configure_logging() -> None:
+    """Uvicorn only configures its own loggers, so `app.*` needs a handler to reach the logs."""
+    if not log.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+        log.addHandler(handler)
+    log.setLevel(logging.INFO)
 
 
 def _attach(app: FastAPI, router: APIRouter) -> None:
@@ -41,11 +58,23 @@ def create_app(settings: Settings | None = None, *, run_cleanup: bool = True) ->
     if settings is None:
         settings = load_settings()
 
-    ctx = AppContext(settings=settings, sessions=SessionStore(settings.admin_password))
+    ctx = AppContext(
+        settings=settings,
+        sessions=SessionStore(settings.admin_password),
+        login_limiter=LoginRateLimiter(
+            settings.login_rate_limit_attempts, settings.login_rate_limit_window_seconds
+        ),
+    )
     ctx.manager.set_dashboard_builder(lambda: views.dashboard_payload(ctx))
 
     @asynccontextmanager
-    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        log.info(config_summary(settings, frontend_served=app.state.frontend_dist is not None))
+        if len(settings.admin_password) < MIN_RECOMMENDED_PASSWORD_LENGTH:
+            log.warning(
+                "ADMIN_PASSWORD is shorter than %d characters; use a longer one in production",
+                MIN_RECOMMENDED_PASSWORD_LENGTH,
+            )
         await init_db(settings.database_path)
         finished = await repo.finish_dangling_spins()
         if finished:
@@ -62,7 +91,7 @@ def create_app(settings: Settings | None = None, *, run_cleanup: bool = True) ->
             await ctx.manager.shutdown()
 
     app = FastAPI(
-        title="Spin the Wheel",
+        title="Luck Decides Your Fate",
         redirect_slashes=False,
         lifespan=lifespan,
         docs_url=None,
@@ -71,14 +100,16 @@ def create_app(settings: Settings | None = None, *, run_cleanup: bool = True) ->
     )
     app.state.ctx = ctx
     install_error_handlers(app)
+    app.add_middleware(ResponseHeadersMiddleware, secure=settings.cookie_secure)
 
-    for router in (games.router, admin.router, admin.protected, ws.router):
+    for router in (games.router, admin.router, admin.protected, ws.router, static.router):
         _attach(app, router)
     static.mount_static(app, settings.frontend_dist)  # LAST: API + WS routes take precedence
     return app
 
 
 def _create_default_app() -> FastAPI:
+    _configure_logging()
     try:
         return create_app()
     except ConfigError as exc:

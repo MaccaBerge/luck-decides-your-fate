@@ -30,6 +30,12 @@ async def connect() -> AsyncIterator[aiosqlite.Connection]:
         await db.close()
 
 
+async def ping() -> None:
+    """Trivial query for the health check. Raises if the database is unavailable."""
+    async with connect() as db:
+        await db.execute("SELECT 1")
+
+
 async def init_db(db_path: str) -> None:
     """Create parent dir, run schema.sql, remember db_path for the repository."""
     global _db_path

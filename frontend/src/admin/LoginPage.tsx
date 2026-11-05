@@ -1,23 +1,36 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { KeyRound, Loader2 } from "lucide-react";
 import * as adminApi from "./adminApi";
 import { errorMessage, errorStatus } from "./adminApi";
+import { ApiError } from "../lib/api";
 import { btnPrimary, card, ErrorText, input } from "./components/ui";
 
 export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [lockedSeconds, setLockedSeconds] = useState(0);
+
+  // While rate limited the button stays disabled; it unlocks when Retry-After has passed.
+  useEffect(() => {
+    if (lockedSeconds <= 0) return;
+    const timer = setTimeout(() => {
+      setLockedSeconds(0);
+      setError("");
+    }, lockedSeconds * 1000);
+    return () => clearTimeout(timer);
+  }, [lockedSeconds]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!password) return;
+    if (!password || lockedSeconds > 0) return;
     setBusy(true);
     setError("");
     try {
       await adminApi.login(password);
       onLoggedIn();
     } catch (err) {
+      if (err instanceof ApiError && err.status === 429) setLockedSeconds(err.retryAfter ?? 60);
       setError(errorStatus(err) === 401 ? "Wrong password" : errorMessage(err));
       setBusy(false);
     }
@@ -41,7 +54,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
           onChange={(e) => setPassword(e.target.value)}
         />
         <ErrorText>{error}</ErrorText>
-        <button type="submit" className={`${btnPrimary} w-full`} disabled={busy || !password}>
+        <button type="submit" className={`${btnPrimary} w-full`} disabled={busy || !password || lockedSeconds > 0}>
           {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
           Log in
         </button>

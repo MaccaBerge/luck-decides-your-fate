@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
+import { readPref } from "./storage";
 
 export type Theme = "light" | "dark";
-const KEY = "theme";
+const KEY = "ldyf:theme";
+const LEGACY_KEY = "theme";
 
 function stored(): Theme | null {
-  try {
-    const v = localStorage.getItem(KEY);
-    return v === "dark" || v === "light" ? v : null;
-  } catch {
-    return null;
-  }
+  const v = readPref(KEY, LEGACY_KEY);
+  return v === "dark" || v === "light" ? v : null;
 }
 function system(): Theme {
   return typeof matchMedia !== "undefined" && matchMedia("(prefers-color-scheme: dark)").matches

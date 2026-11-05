@@ -56,11 +56,22 @@ Production: `npm run build`, then uvicorn serves `frontend/dist` (SPA fallback) 
 - `lib/` (`types.ts`, `api.ts`, `ws.ts`): shared clients; `ws.ts` auto-reconnects except after close codes 4401/4404 or `game_deleted`.
 - `components/wheel/Wheel.tsx`: canvas wheel. While animating it draws from the `spin.wheel_entry_ids` snapshot (the server's remove-winner update can arrive before the animation ends). A spin received more than 1.5 s after `started_at` jumps to its final position, and a `setTimeout` backs up `requestAnimationFrame` so spins finish in background/headless tabs. Deduped by `spin_id` (the WS `spin_started` usually beats the HTTP 202). StrictMode is intentionally off.
 - `admin/`: the whole controller, loaded only via `lazy(() => import("./admin/AdminApp"))` in `App.tsx`, mounted at `/admin/*` with relative nested routes. Never import from `src/admin` elsewhere, and never put admin paths in `src/lib`; the main bundle must not contain `/api/admin` or `/ws/admin`.
-- The friend-facing page title is always "Spin the Wheel"; nothing in the friend UI may hint at rigging. The UI never re-implements name matching (the admin highlights X via the server's `rule_status.matched_entry_ids`).
+- Page titles: `Wheel · Luck Decides Your Fate` on every game page (public and admin-link alike), `Luck Decides Your Fate` everywhere else. Nothing in the friend UI may hint at rigging. The UI never re-implements name matching (the admin highlights X via the server's `rule_status.matched_entry_ids`).
 - Exact accessible names and `data-testid`s (e.g. "Spin the wheel", `winner-name`, `rule-status`, `link-status`, `live-games-count`) are relied on by E2E browser tests; keep them stable.
 
 **Extensibility:** `game_type` (always `"wheel"` today) and the `mode` enum exist so that new games (a new animation on the same "outcome first" contract) and new rule types can be added without changing the spin flow.
 
+
+## Production
+
+- Railway behind Cloudflare (runbook: `docs/deployment.md`). **1 replica, 1 Uvicorn worker, always**: sockets, spin locks, admin sessions and the login rate limiter are in memory.
+- The database lives on a Railway volume at `/data`. The image runs as non-root; Railway needs `RAILWAY_RUN_UID=0` because its volumes are owned by root.
+- Merging to `main` deploys. A deploy restarts the container: sockets get close code 1012 and reconnect, and the admin logs in again.
+- Never commit secrets. `ADMIN_PASSWORD` is only ever set in the environment.
+- Never run the smoke scripts against production.
+- CI (`.github/workflows/ci.yml`) runs on PRs and pushes to `main`: `backend` (pytest), `frontend` (typecheck, test, build), then `docker-smoke` (builds the image and runs both smoke scripts against the container). It needs no repository secrets.
+- `/admin` must stay out of `robots.txt`, since that file is public. The admin area uses an `X-Robots-Tag` header instead (`app/middleware.py`).
+- API additions since v1 are listed in `docs/api-changes-v1.1.md`.
 
 ## Git & GitHub rules
 - Never commit directly to `main`. Start every task on a new branch:

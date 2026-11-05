@@ -19,6 +19,9 @@ MISSING_PASSWORD_MESSAGE = (
 )
 
 
+MIN_RECOMMENDED_PASSWORD_LENGTH = 16
+
+
 class ConfigError(RuntimeError):
     """Raised when required configuration is missing or invalid."""
 
@@ -26,19 +29,30 @@ class ConfigError(RuntimeError):
 @dataclass(frozen=True)
 class Settings:
     admin_password: str
-    database_path: str = "./data/app.db"
+    database_path: str = "./data/luckdecidesyourfate.db"
     game_ttl_days: int = 7
     cookie_secure: bool = False
     spin_duration_ms_min: int = 4500
     spin_duration_ms_max: int = 7000
     frontend_dist: str = "../frontend/dist"
+    login_rate_limit_attempts: int = 5
+    login_rate_limit_window_seconds: int = 60
+
+
+_TRUE_VALUES = {"true", "1", "yes"}
+_FALSE_VALUES = {"false", "0", "no"}
 
 
 def _env_bool(name: str, default: bool) -> bool:
     raw = os.environ.get(name)
     if raw is None or raw.strip() == "":
         return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
+    value = raw.strip().lower()
+    if value in _TRUE_VALUES:
+        return True
+    if value in _FALSE_VALUES:
+        return False
+    raise ConfigError(f"ERROR: {name} must be one of true/false/1/0/yes/no, got {raw!r}")
 
 
 def _env_int(name: str, default: int) -> int:
@@ -49,6 +63,13 @@ def _env_int(name: str, default: int) -> int:
         return int(raw)
     except ValueError as exc:
         raise ConfigError(f"ERROR: {name} must be an integer, got {raw!r}") from exc
+
+
+def _env_positive_int(name: str, default: int) -> int:
+    value = _env_int(name, default)
+    if value <= 0:
+        raise ConfigError(f"ERROR: {name} must be greater than 0, got {value}")
+    return value
 
 
 def load_settings() -> Settings:
@@ -66,10 +87,22 @@ def load_settings() -> Settings:
         )
     return Settings(
         admin_password=password,
-        database_path=os.environ.get("DATABASE_PATH") or "./data/app.db",
+        database_path=os.environ.get("DATABASE_PATH") or "./data/luckdecidesyourfate.db",
         game_ttl_days=_env_int("GAME_TTL_DAYS", 7),
         cookie_secure=_env_bool("COOKIE_SECURE", False),
         spin_duration_ms_min=spin_min,
         spin_duration_ms_max=spin_max,
         frontend_dist=os.environ.get("FRONTEND_DIST") or "../frontend/dist",
+        login_rate_limit_attempts=_env_positive_int("LOGIN_RATE_LIMIT_ATTEMPTS", 5),
+        login_rate_limit_window_seconds=_env_positive_int("LOGIN_RATE_LIMIT_WINDOW_SECONDS", 60),
+    )
+
+
+def config_summary(settings: Settings, *, frontend_served: bool) -> str:
+    """One startup log line. Must never contain a secret."""
+    return (
+        f"config: db={settings.database_path} "
+        f"cookie_secure={'true' if settings.cookie_secure else 'false'} "
+        f"ttl_days={settings.game_ttl_days} "
+        f"frontend={'yes' if frontend_served else 'no'}"
     )

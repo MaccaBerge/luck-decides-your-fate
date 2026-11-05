@@ -3,11 +3,14 @@ import type { ApiErrorBody, PublicGameState, SpinStarted } from "./types";
 export class ApiError extends Error {
   status: number;
   code: string;
-  constructor(status: number, code: string, message: string) {
+  /** Seconds from the Retry-After header, when the server sent one. */
+  retryAfter?: number;
+  constructor(status: number, code: string, message: string, retryAfter?: number) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -36,10 +39,12 @@ export async function request<T>(method: string, path: string, body?: unknown): 
   }
   if (!res.ok) {
     const err = (data as ApiErrorBody | undefined)?.error;
+    const retryAfter = Number(res.headers.get("Retry-After"));
     throw new ApiError(
       res.status,
       err?.code ?? "http_error",
       err?.message ?? `Request failed (${res.status})`,
+      retryAfter > 0 ? retryAfter : undefined,
     );
   }
   return data as T;

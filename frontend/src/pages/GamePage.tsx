@@ -9,6 +9,7 @@ import { connectGameSocket } from "../lib/ws";
 import { useTheme } from "../lib/theme";
 import { loadSoundPref, saveSoundPref, unlockAudio } from "../lib/sound";
 import { setLastGameId } from "../lib/storage";
+import { BRAND_TITLE, GAME_TITLE } from "../lib/brand";
 import Wheel from "../components/wheel/Wheel";
 import { GameToolbar } from "../components/game/GameToolbar";
 import { EntryPanel } from "../components/game/EntryPanel";
@@ -73,6 +74,13 @@ export default function GamePage() {
     setStatus("Spinning…");
     setActiveSpin(s);
   }, []);
+
+  useEffect(() => {
+    document.title = notFound ? BRAND_TITLE : GAME_TITLE;
+    return () => {
+      document.title = BRAND_TITLE;
+    };
+  }, [notFound]);
 
   // Reset when the game id changes.
   useEffect(() => {

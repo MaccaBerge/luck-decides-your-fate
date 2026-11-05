@@ -9,12 +9,25 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
+from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 from starlette.responses import FileResponse, Response
 
 from app.config import BACKEND_DIR
+
+
+router = APIRouter()
+
+# /admin is deliberately not listed: this file is public and would reveal the controller.
+# The admin area gets an X-Robots-Tag header instead (app.middleware).
+ROBOTS_TXT = "User-agent: *\nDisallow: /g/\n"
+
+
+@router.api_route("/robots.txt", methods=["GET", "HEAD"], response_class=PlainTextResponse)
+async def robots() -> str:
+    return ROBOTS_TXT
 
 
 def resolve_dist(frontend_dist: str) -> Path | None:

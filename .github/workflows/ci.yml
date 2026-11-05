@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      ADMIN_PASSWORD: ci-test-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: pytest tests/core tests/server -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
+
+  docker-smoke:
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build the image
+        run: docker build -t luck-decides-your-fate .
+      - name: Start the container
+        run: |
+          docker run -d --name ldyf -p 8000:8000 \
+            -e PORT=8000 \
+            -e ADMIN_PASSWORD=testpass \
+            -e SPIN_DURATION_MS_MIN=300 \
+            -e SPIN_DURATION_MS_MAX=400 \
+            -e DATABASE_PATH=/data/ci.db \
+            luck-decides-your-fate
+      - name: Wait for the health check
+        run: |
+          for _ in $(seq 1 30); do
+            if [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/health)" = "200" ]; then
+              echo "healthy"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "the container did not become healthy within 30 s"
+          exit 1
+      - name: Install smoke test dependencies
+        run: pip install httpx websockets
+      - name: API smoke test
+        run: bash backend/scripts/smoke_api.sh
+      - name: Realtime smoke test
+        run: python backend/scripts/smoke_realtime.py
+      - name: Container logs
+        if: failure()
+        run: docker logs ldyf

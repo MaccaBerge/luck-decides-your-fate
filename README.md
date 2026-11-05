@@ -1,4 +1,4 @@
-# Spin the Wheel
+# Luck Decides Your Fate
 
 A spin-the-wheel name picker (React + TypeScript frontend, FastAPI backend, SQLite) with a
 private admin controller at `/admin`.
@@ -66,14 +66,12 @@ paths still return the JSON error envelope.
 ### Docker
 
 ```bash
-docker build -t spin-the-wheel .
-docker run -p 8000:8000 -e ADMIN_PASSWORD=change-me -v wheel-data:/data spin-the-wheel
+docker build -t luck-decides-your-fate .
+docker run -p 8000:8000 -e ADMIN_PASSWORD=change-me -v wheel-data:/data luck-decides-your-fate
 ```
 
-The image stores the database at `/data/app.db`. Mount a volume there (for example a Railway or
-Fly.io volume). The container listens on `$PORT` (default 8000). Set `COOKIE_SECURE=true` when the
-site is served over HTTPS. Always run **one** worker and one instance: WebSocket presence, spin
-locks and admin sessions live in process memory.
+The image runs as a non-root user and stores the database at `/data/luckdecidesyourfate.db`. See
+[Deployment](#deployment) for production.
 
 ## Environment variables
 
@@ -81,13 +79,15 @@ Real environment variables take precedence over `backend/.env`.
 
 | Var | Default | Notes |
 |---|---|---|
-| `ADMIN_PASSWORD` | (none) | **Required.** The app exits at startup with a clear message if it is missing. |
-| `DATABASE_PATH` | `./data/app.db` | SQLite file. Its parent directory is created automatically. |
+| `ADMIN_PASSWORD` | (none) | **Required.** The app exits at startup with a clear message if it is missing, and logs a warning if it is shorter than 16 characters. |
+| `DATABASE_PATH` | `./data/luckdecidesyourfate.db` | SQLite file. Its parent directory is created automatically. |
 | `GAME_TTL_DAYS` | `7` | Public games idle this long are deleted (checked hourly). Admin links are never deleted automatically. |
-| `COOKIE_SECURE` | `false` | `true` adds `Secure` to the admin cookie (HTTPS). |
+| `COOKIE_SECURE` | `false` | `true/false/1/0/yes/no`; anything else stops startup. `true` adds `Secure` to the admin cookie and sends HSTS. |
 | `SPIN_DURATION_MS_MIN` | `4500` | Spin animation length range. |
 | `SPIN_DURATION_MS_MAX` | `7000` | |
-| `FRONTEND_DIST` | `../frontend/dist` | Relative paths are resolved against `backend/`. Served if it contains `index.html`. |
+| `FRONTEND_DIST` | `../frontend/dist` | Relative paths are resolved against `backend/`. Served if it contains `index.html`. The Dockerfile sets this. |
+| `LOGIN_RATE_LIMIT_ATTEMPTS` | `5` | Failed admin logins per client IP before it gets a 429. |
+| `LOGIN_RATE_LIMIT_WINDOW_SECONDS` | `60` | Length of the failed-login window. |
 
 ## Validation
 
@@ -128,6 +128,64 @@ npm run typecheck && npm run test && npm run build
 ```bash
 cd backend
 ADMIN_PASSWORD=x .venv/bin/python -c "from app.main import app; [print(sorted(getattr(r, 'methods', None) or ['WS']), r.path) for r in app.routes]"
+```
+
+## Deployment
+
+Production runs on Railway behind Cloudflare. **[docs/deployment.md](docs/deployment.md)** is the
+step-by-step runbook.
+
+```
+luckdecideyourfate.com ─┐
+www.luckdecideyourfate.com ─┼─ Cloudflare 301 redirect (keeps path + query) ─┐
+www.luckdecidesyourfate.com ─┘                                               ▼
+                                     luckdecidesyourfate.com ──HTTPS──► Cloudflare DNS ──► Railway
+                                                                                     │
+                                                                  one Docker container (1 replica)
+                                                                  FastAPI + built React frontend
+                                                                                     │
+                                                                  Railway volume mounted at /data
+                                                                  (/data/luckdecidesyourfate.db)
+```
+
+**Always run exactly 1 replica with 1 Uvicorn worker.** Live sockets, spin locks, admin sessions
+and the login rate limiter all live in memory. Every redeploy restarts the container: sockets
+reconnect by themselves, and the admin has to log in again.
+
+Production variables (see [Environment variables](#environment-variables) for all of them):
+
+| Var | Value |
+|---|---|
+| `ADMIN_PASSWORD` | long random string |
+| `COOKIE_SECURE` | `true` |
+| `DATABASE_PATH` | `/data/luckdecidesyourfate.db` |
+| `GAME_TTL_DAYS` | `7` |
+| `RAILWAY_RUN_UID` | `0` (Railway only: its volumes are owned by root) |
+
+Don't set `SPIN_DURATION_*` or `PORT` in production. Railway provides `PORT`.
+
+### Build and run the image locally
+
+```bash
+docker build -t luck-decides-your-fate .
+mkdir -p test-artifacts/dockerdata
+docker run -d --name ldyf -p 8000:8000 \
+  -e PORT=8000 -e ADMIN_PASSWORD=testpass \
+  -e SPIN_DURATION_MS_MIN=300 -e SPIN_DURATION_MS_MAX=400 \
+  -e DATABASE_PATH=/data/test.db -v "$(pwd)/test-artifacts/dockerdata:/data" \
+  luck-decides-your-fate
+```
+
+### Smoke test the container
+
+Use the short spin durations above and a fresh database, because the scripts check exact counts.
+Never run these against production: they expect short spins and leave test data behind.
+
+```bash
+cd backend
+BASE=http://localhost:8000 bash scripts/smoke_api.sh
+BASE=http://localhost:8000 ADMIN_PASSWORD=testpass .venv/bin/python scripts/smoke_realtime.py
+docker rm -f ldyf
 ```
 
 ## API overview

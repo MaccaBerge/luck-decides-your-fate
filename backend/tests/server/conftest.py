@@ -4,10 +4,10 @@ from pathlib import Path
 
 # Must be set before app.main is imported anywhere (it builds a default app at import time).
 os.environ.setdefault("ADMIN_PASSWORD", "testpass")
-os.environ.setdefault("DATABASE_PATH", str(Path(tempfile.gettempdir()) / "rigged-wheel-import.db"))
+os.environ.setdefault("DATABASE_PATH", str(Path(tempfile.gettempdir()) / "ldyf-import.db"))
 os.environ["SPIN_DURATION_MS_MIN"] = "50"
 os.environ["SPIN_DURATION_MS_MAX"] = "80"
-os.environ["FRONTEND_DIST"] = str(Path(tempfile.gettempdir()) / "rigged-wheel-no-dist")
+os.environ["FRONTEND_DIST"] = str(Path(tempfile.gettempdir()) / "ldyf-no-dist")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

@@ -10,11 +10,14 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
 class ApiError(Exception):
-    def __init__(self, status: int, code: str, message: str) -> None:
+    def __init__(
+        self, status: int, code: str, message: str, headers: dict[str, str] | None = None
+    ) -> None:
         super().__init__(message)
         self.status = status
         self.code = code
         self.message = message
+        self.headers = headers
 
 
 def game_not_found() -> ApiError:
@@ -43,6 +46,15 @@ def unauthorized() -> ApiError:
 
 def invalid_password() -> ApiError:
     return ApiError(401, "invalid_password", "Wrong password")
+
+
+def too_many_attempts(retry_after: int) -> ApiError:
+    return ApiError(
+        429,
+        "too_many_attempts",
+        "Too many login attempts. Try again later.",
+        headers={"Retry-After": str(retry_after)},
+    )
 
 
 def validation_error(message: str) -> ApiError:
@@ -89,7 +101,7 @@ def describe_validation_error(errors: list[dict[str, Any]]) -> str:
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ApiError)
     async def _api_error(_request: Request, exc: ApiError) -> JSONResponse:
-        return error_response(exc.status, exc.code, exc.message)
+        return error_response(exc.status, exc.code, exc.message, headers=exc.headers)
 
     @app.exception_handler(RequestValidationError)
     async def _validation(_request: Request, exc: RequestValidationError) -> JSONResponse:
@@ -111,5 +123,15 @@ def install_error_handlers(app: FastAPI) -> None:
         return error_response(exc.status_code, code, message, headers=getattr(exc, "headers", None))
 
     @app.exception_handler(Exception)
-    async def _unhandled(_request: Request, _exc: Exception) -> JSONResponse:
-        return error_response(500, "internal_error", "Something went wrong")
+    async def _unhandled(request: Request, _exc: Exception) -> JSONResponse:
+        # This handler runs outside all middleware, so the headers are applied here.
+        from app.middleware import apply_response_headers
+
+        response = error_response(500, "internal_error", "Something went wrong")
+        apply_response_headers(
+            response.headers,
+            request.url.path,
+            500,
+            secure=request.app.state.ctx.settings.cookie_secure,
+        )
+        return response

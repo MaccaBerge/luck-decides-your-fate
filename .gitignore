@@ -29,3 +29,7 @@ coverage/
 test-results/
 playwright-report/
 .vitest/
+
+# Vitest cache and local container test data
+.vite/
+test-artifacts/
