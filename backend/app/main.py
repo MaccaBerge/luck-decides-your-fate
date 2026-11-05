@@ -25,6 +25,7 @@ from app.context import AppContext
 from app.db import repository as repo
 from app.db.connection import init_db
 from app.errors import install_error_handlers
+from app.middleware import ResponseHeadersMiddleware
 from app.routes import admin, games, static, ws
 from app.services import views
 from app.services.cleanup import cleanup_loop
@@ -99,8 +100,9 @@ def create_app(settings: Settings | None = None, *, run_cleanup: bool = True) ->
     )
     app.state.ctx = ctx
     install_error_handlers(app)
+    app.add_middleware(ResponseHeadersMiddleware)
 
-    for router in (games.router, admin.router, admin.protected, ws.router):
+    for router in (games.router, admin.router, admin.protected, ws.router, static.router):
         _attach(app, router)
     static.mount_static(app, settings.frontend_dist)  # LAST: API + WS routes take precedence
     return app

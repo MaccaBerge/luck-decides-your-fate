@@ -67,3 +67,12 @@ def new_link(admin, names_client=None, names=None, **body):
         r = (names_client or admin).post(f"/api/games/{gid}/entries", json={"names": names})
         assert r.status_code == 200, r.text
     return gid
+
+
+def make_dist(tmp_path: Path) -> Path:
+    """A minimal built frontend, so SPA routes and /assets are served."""
+    dist = tmp_path / "dist"
+    (dist / "assets").mkdir(parents=True)
+    (dist / "index.html").write_text("<!doctype html><title>App</title>")
+    (dist / "assets" / "index-abc.js").write_text("console.log(1)")
+    return dist
