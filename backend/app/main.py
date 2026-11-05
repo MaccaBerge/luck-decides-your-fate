@@ -100,7 +100,7 @@ def create_app(settings: Settings | None = None, *, run_cleanup: bool = True) ->
     )
     app.state.ctx = ctx
     install_error_handlers(app)
-    app.add_middleware(ResponseHeadersMiddleware)
+    app.add_middleware(ResponseHeadersMiddleware, secure=settings.cookie_secure)
 
     for router in (games.router, admin.router, admin.protected, ws.router, static.router):
         _attach(app, router)

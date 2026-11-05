@@ -123,5 +123,15 @@ def install_error_handlers(app: FastAPI) -> None:
         return error_response(exc.status_code, code, message, headers=getattr(exc, "headers", None))
 
     @app.exception_handler(Exception)
-    async def _unhandled(_request: Request, _exc: Exception) -> JSONResponse:
-        return error_response(500, "internal_error", "Something went wrong")
+    async def _unhandled(request: Request, _exc: Exception) -> JSONResponse:
+        # This handler runs outside all middleware, so the headers are applied here.
+        from app.middleware import apply_response_headers
+
+        response = error_response(500, "internal_error", "Something went wrong")
+        apply_response_headers(
+            response.headers,
+            request.url.path,
+            500,
+            secure=request.app.state.ctx.settings.cookie_secure,
+        )
+        return response
