@@ -1,7 +1,12 @@
 """Admin REST API (§8.2). Never calls mark_opened; rule changes never reach player sockets."""
 from __future__ import annotations
 
+import asyncio
+import os
+
 from fastapi import APIRouter, Depends, Request, Response
+from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 
 from app.auth import COOKIE_NAME, SESSION_TTL_SECONDS, require_admin, session_token
 from app.client_ip import get_client_ip
@@ -17,6 +22,7 @@ from app.models import (
     UpdateLinkRequest,
 )
 from app.services import serializers as ser
+from app.services.backup import backup_filename, create_snapshot
 from app.services import views
 
 router = APIRouter(prefix="/api/admin")
@@ -91,6 +97,18 @@ async def logout(request: Request, ctx: AppContext = Depends(ctx_dep)) -> Respon
 @protected.get("/me")
 async def me() -> dict:
     return {"authenticated": True}
+
+
+# ---------------------------------------------------------------- backup
+@protected.get("/backup")
+async def backup(ctx: AppContext = Depends(ctx_dep)) -> FileResponse:
+    path = await asyncio.to_thread(create_snapshot, ctx.settings.database_path)
+    return FileResponse(
+        path,
+        media_type="application/vnd.sqlite3",
+        filename=backup_filename(),
+        background=BackgroundTask(os.unlink, path),
+    )
 
 
 # ---------------------------------------------------------------- dashboard + links

@@ -14,3 +14,10 @@ Additions to the v1 contract (`docs/plan-v1.md` §8). Nothing from v1 changed sh
 | Code | When | Client behavior |
 |---|---|---|
 | `1012` | The server is shutting down (for example a redeploy). Replaces `1001`. | Non-fatal: reconnect with the normal backoff. Only `4401` and `4404` are final. |
+
+## New endpoints
+
+| Method | Path | Auth | Success |
+|---|---|---|---|
+| GET | `/api/admin/backup` | admin cookie (otherwise 401 envelope) | 200 `application/vnd.sqlite3`, a consistent database snapshot, with `Content-Disposition: attachment; filename="luckdecidesyourfate-YYYYMMDD-HHMMSS.db"` (UTC) |
+| GET | `/robots.txt` | none | 200 `text/plain` |

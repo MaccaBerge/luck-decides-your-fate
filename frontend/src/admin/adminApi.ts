@@ -1,4 +1,4 @@
-import { request } from "../lib/api";
+import { ApiError, request } from "../lib/api";
 import type { Mode } from "../lib/types";
 import type { AdminGameState, Dashboard } from "./adminTypes";
 
@@ -34,6 +34,34 @@ export const updateLink = (gameId: string, patch: UpdateLinkBody) =>
 
 export const deleteLink = (gameId: string) =>
   request<void>("DELETE", `/api/admin/links/${encodeURIComponent(gameId)}`);
+
+/** Fetch a database backup and hand it to the browser as a file download. */
+export async function downloadBackup(): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch("/api/admin/backup", { credentials: "same-origin" });
+  } catch {
+    throw new ApiError(0, "network_error", "Could not reach the server");
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => undefined);
+    throw new ApiError(
+      res.status,
+      body?.error?.code ?? "http_error",
+      body?.error?.message ?? `Request failed (${res.status})`,
+    );
+  }
+  const filename =
+    res.headers.get("Content-Disposition")?.match(/filename="([^"]+)"/)?.[1] ?? "backup.db";
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
 
 /** Parse a textarea (one name per line) into a clean target list. */
 export function parseNames(text: string): string[] {

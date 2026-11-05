@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Gamepad2, Loader2, Plus, SlidersHorizontal, Users } from "lucide-react";
+import { Download, Gamepad2, Loader2, Plus, SlidersHorizontal, Users } from "lucide-react";
 import type { Mode } from "../lib/types";
 import * as adminApi from "./adminApi";
 import { errorMessage, errorStatus, parseNames } from "./adminApi";
@@ -28,6 +28,7 @@ export default function DashboardPage() {
   const { onUnauthorized, logout } = useAdminAuth();
   const [dash, setDash] = useState<Dashboard | null>(null);
   const [error, setError] = useState("");
+  const [backingUp, setBackingUp] = useState(false);
 
   const handleError = useCallback(
     (err: unknown) => {
@@ -45,6 +46,18 @@ export default function DashboardPage() {
     if (e.type === "dashboard") setDash(e.dashboard);
   }, onUnauthorized);
 
+  async function downloadBackup() {
+    setBackingUp(true);
+    setError("");
+    try {
+      await adminApi.downloadBackup();
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setBackingUp(false);
+    }
+  }
+
   async function remove(id: string) {
     try {
       await adminApi.deleteLink(id);
@@ -61,7 +74,23 @@ export default function DashboardPage() {
           <Gamepad2 className="h-6 w-6 text-indigo-600 dark:text-indigo-400" aria-hidden />
           Controller
         </h1>
-        <LogoutButton onClick={logout} />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-label="Download backup"
+            className={btnSecondary}
+            disabled={backingUp}
+            onClick={downloadBackup}
+          >
+            {backingUp ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            ) : (
+              <Download className="h-4 w-4" aria-hidden />
+            )}
+            <span className="hidden sm:inline">Download backup</span>
+          </button>
+          <LogoutButton onClick={logout} />
+        </div>
       </header>
 
       <section className={`${card} flex items-center gap-3`}>
