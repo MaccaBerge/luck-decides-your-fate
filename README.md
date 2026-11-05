@@ -1,4 +1,4 @@
-# Spin the Wheel
+# Luck Decides Your Fate
 
 A spin-the-wheel name picker (React + TypeScript frontend, FastAPI backend, SQLite) with a
 private admin controller at `/admin`.
@@ -66,11 +66,11 @@ paths still return the JSON error envelope.
 ### Docker
 
 ```bash
-docker build -t spin-the-wheel .
-docker run -p 8000:8000 -e ADMIN_PASSWORD=change-me -v wheel-data:/data spin-the-wheel
+docker build -t luck-decides-your-fate .
+docker run -p 8000:8000 -e ADMIN_PASSWORD=change-me -v wheel-data:/data luck-decides-your-fate
 ```
 
-The image stores the database at `/data/app.db`. Mount a volume there (for example a Railway or
+The image stores the database at `/data/luckdecidesyourfate.db`. Mount a volume there (for example a Railway or
 Fly.io volume). The container listens on `$PORT` (default 8000). Set `COOKIE_SECURE=true` when the
 site is served over HTTPS. Always run **one** worker and one instance: WebSocket presence, spin
 locks and admin sessions live in process memory.
@@ -82,7 +82,7 @@ Real environment variables take precedence over `backend/.env`.
 | Var | Default | Notes |
 |---|---|---|
 | `ADMIN_PASSWORD` | (none) | **Required.** The app exits at startup with a clear message if it is missing. |
-| `DATABASE_PATH` | `./data/app.db` | SQLite file. Its parent directory is created automatically. |
+| `DATABASE_PATH` | `./data/luckdecidesyourfate.db` | SQLite file. Its parent directory is created automatically. |
 | `GAME_TTL_DAYS` | `7` | Public games idle this long are deleted (checked hourly). Admin links are never deleted automatically. |
 | `COOKIE_SECURE` | `false` | `true` adds `Secure` to the admin cookie (HTTPS). |
 | `SPIN_DURATION_MS_MIN` | `4500` | Spin animation length range. |

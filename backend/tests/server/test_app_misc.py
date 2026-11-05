@@ -56,14 +56,14 @@ def test_missing_admin_password_exits_with_message(tmp_path):
 def test_static_serving_and_spa_fallback(tmp_path):
     dist = tmp_path / "dist"
     (dist / "assets").mkdir(parents=True)
-    (dist / "index.html").write_text("<!doctype html><title>Spin the Wheel</title>")
+    (dist / "index.html").write_text("<!doctype html><title>Luck Decides Your Fate</title>")
     (dist / "assets" / "index-abc.js").write_text("console.log(1)")
     (dist / "favicon.svg").write_text("<svg/>")
     app = create_app(make_settings(tmp_path, frontend_dist=str(dist)), run_cleanup=False)
     with TestClient(app) as c:
         for path in ("/", "/g/abcdefgh", "/admin", "/admin/links/abcdefgh", "/nope/deep"):
             r = c.get(path)
-            assert r.status_code == 200 and "Spin the Wheel" in r.text, path
+            assert r.status_code == 200 and "Luck Decides Your Fate" in r.text, path
         assert c.get("/assets/index-abc.js").text == "console.log(1)"
         assert c.get("/assets/missing.js").status_code == 404
         assert c.get("/favicon.svg").text == "<svg/>"

@@ -62,7 +62,7 @@ def create_app(settings: Settings | None = None, *, run_cleanup: bool = True) ->
             await ctx.manager.shutdown()
 
     app = FastAPI(
-        title="Spin the Wheel",
+        title="Luck Decides Your Fate",
         redirect_slashes=False,
         lifespan=lifespan,
         docs_url=None,

@@ -26,7 +26,7 @@ export function GameToolbar(p: Props) {
           <span className="size-3 rounded-full bg-white shadow" />
         </span>
         <span className="hidden truncate text-xl font-black tracking-tight text-slate-900 min-[440px]:block dark:text-white">
-          Spin the Wheel
+          Luck Decides Your Fate
         </span>
       </div>
       <nav className="flex items-center gap-1.5 sm:gap-2" aria-label="Toolbar">

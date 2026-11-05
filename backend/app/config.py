@@ -26,7 +26,7 @@ class ConfigError(RuntimeError):
 @dataclass(frozen=True)
 class Settings:
     admin_password: str
-    database_path: str = "./data/app.db"
+    database_path: str = "./data/luckdecidesyourfate.db"
     game_ttl_days: int = 7
     cookie_secure: bool = False
     spin_duration_ms_min: int = 4500
@@ -66,7 +66,7 @@ def load_settings() -> Settings:
         )
     return Settings(
         admin_password=password,
-        database_path=os.environ.get("DATABASE_PATH") or "./data/app.db",
+        database_path=os.environ.get("DATABASE_PATH") or "./data/luckdecidesyourfate.db",
         game_ttl_days=_env_int("GAME_TTL_DAYS", 7),
         cookie_secure=_env_bool("COOKIE_SECURE", False),
         spin_duration_ms_min=spin_min,

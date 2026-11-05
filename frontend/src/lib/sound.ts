@@ -1,3 +1,5 @@
+import { readPref } from "./storage";
+
 // Tiny Web Audio synth: no files.
 let ctx: AudioContext | null = null;
 
@@ -51,13 +53,10 @@ export function playWin() {
   tone(1046.5, 0.4, 0.6, "sine", 0.08);
 }
 
-const SOUND_KEY = "soundEnabled";
+const SOUND_KEY = "ldyf:sound";
+const LEGACY_SOUND_KEY = "soundEnabled";
 export function loadSoundPref(): boolean {
-  try {
-    return localStorage.getItem(SOUND_KEY) !== "false";
-  } catch {
-    return true;
-  }
+  return readPref(SOUND_KEY, LEGACY_SOUND_KEY) !== "false";
 }
 export function saveSoundPref(on: boolean) {
   try {

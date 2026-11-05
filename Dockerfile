@@ -12,7 +12,7 @@ RUN npm run build
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    DATABASE_PATH=/data/app.db \
+    DATABASE_PATH=/data/luckdecidesyourfate.db \
     FRONTEND_DIST=/app/frontend/dist
 WORKDIR /app/backend
 COPY backend/requirements.txt ./
