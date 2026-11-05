@@ -30,6 +30,7 @@ USER app
 EXPOSE 8000
 # ADMIN_PASSWORD must be provided at runtime (the app exits with a clear message otherwise).
 # Single worker: live state (sockets, spin locks, admin sessions, rate limiter) is in memory.
-# Shell form so that PORT expands.
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 \
+# Shell form so that PORT expands; `exec` so that uvicorn replaces the shell as PID 1 and receives
+# SIGTERM. Without it the shell swallows the signal and the container gets killed mid-shutdown.
+CMD exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 \
     --proxy-headers --forwarded-allow-ips="*"
