@@ -1,12 +1,22 @@
 """Public REST API (§8.1). Responses are built only via app.services.serializers (no rig info)."""
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse, Response
 
 from app.context import AppContext, ctx_dep
 from app.db import repository as repo
+from app.db.connection import ping
 from app.db.rows import GameRow
-from app.errors import entries_limit, entry_not_found, game_not_found, validation_error
+from app.errors import (
+    entries_limit,
+    entry_not_found,
+    error_response,
+    game_not_found,
+    validation_error,
+)
 from app.models import (
     AddEntriesRequest,
     PublicGameState,
@@ -15,6 +25,8 @@ from app.models import (
     UpdateSettingsRequest,
 )
 from app.services import spins, views
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
@@ -55,8 +67,13 @@ async def _after_mutation(ctx: AppContext, game_id: str) -> PublicGameState:
 
 
 @router.get("/health")
-async def health() -> dict:
-    return {"status": "ok"}
+async def health() -> Response:
+    try:
+        await ping()
+    except Exception:  # noqa: BLE001
+        log.exception("health check: database unavailable")
+        return error_response(503, "unhealthy", "Database unavailable")
+    return JSONResponse({"status": "ok"})
 
 
 @router.post("/games", status_code=201, response_model=PublicGameState)

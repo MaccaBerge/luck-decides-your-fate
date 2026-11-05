@@ -7,3 +7,4 @@ Additions to the v1 contract (`docs/plan-v1.md` §8). Nothing from v1 changed sh
 | Code | HTTP | When |
 |---|---|---|
 | `too_many_attempts` | 429 | Admin login from an IP that has too many recent failures. Includes a `Retry-After` header in whole seconds. |
+| `unhealthy` | 503 | `GET /api/health` could not query the database. The 200 response is unchanged. |
