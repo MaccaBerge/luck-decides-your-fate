@@ -20,6 +20,9 @@ from fastapi import WebSocket
 
 log = logging.getLogger(__name__)
 
+# Close code on shutdown. Clients treat it as non-fatal and reconnect.
+SERVICE_RESTART = 1012
+
 SEND_TIMEOUT_S = 5.0
 DASHBOARD_MIN_INTERVAL_S = 0.25  # at most 4 dashboard pushes per second (coalesced)
 
@@ -119,7 +122,7 @@ class ConnectionManager:
         self._dashboards.clear()
         for ws in sockets:
             try:
-                await ws.close(code=1001)
+                await ws.close(code=SERVICE_RESTART)
             except Exception:  # noqa: BLE001
                 pass
 

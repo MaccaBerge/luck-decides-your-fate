@@ -179,3 +179,50 @@ def test_client_messages_are_ignored(client):
         p.send_json({"type": "spin"})
         client.post(f"/api/games/{gid}/shuffle")
         assert p.receive_json()["type"] == "state"
+
+
+def test_shutdown_closes_all_sockets_with_service_restart(tmp_path):
+    from fastapi.testclient import TestClient
+    from starlette.websockets import WebSocketDisconnect
+
+    from app.main import create_app
+
+    from .helpers import PASSWORD, make_settings
+
+    app = create_app(make_settings(tmp_path), run_cleanup=False)
+    with TestClient(app) as c:
+        gid = c.post("/api/games").json()["id"]
+        r = c.post("/api/admin/login", json={"password": PASSWORD})
+        cookie = {"Cookie": f"admin_session={r.cookies['admin_session']}"}
+        link = c.post("/api/admin/links", json={}, headers=cookie).json()["game"]["id"]
+        c.cookies.clear()
+        with c.websocket_connect(f"/ws/games/{gid}") as player, \
+                c.websocket_connect(f"/ws/admin/games/{link}", headers=cookie) as link_admin, \
+                c.websocket_connect("/ws/admin", headers=cookie) as dashboard:
+            player.receive_json()
+            link_admin.receive_json()
+            dashboard.receive_json()
+            c.portal.call(app.state.ctx.manager.shutdown)
+            for ws in (player, link_admin, dashboard):
+                try:
+                    while True:
+                        ws.receive_json()
+                except WebSocketDisconnect as exc:
+                    assert exc.code == 1012
+
+
+def test_shutdown_cancels_pending_spin_tasks(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+
+    from .helpers import make_settings, new_game
+
+    settings = make_settings(tmp_path, spin_duration_ms_min=60000, spin_duration_ms_max=60000)
+    app = create_app(settings, run_cleanup=False)
+    with TestClient(app) as c:
+        gid = new_game(c, ["A", "B"])
+        assert c.post(f"/api/games/{gid}/spin").status_code == 202
+        task = app.state.ctx.runtime.peek(gid).spin_task
+        assert task is not None and not task.done()
+    assert task.cancelled()
