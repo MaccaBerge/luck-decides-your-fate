@@ -62,6 +62,17 @@ Production: `npm run build`, then uvicorn serves `frontend/dist` (SPA fallback) 
 **Extensibility:** `game_type` (always `"wheel"` today) and the `mode` enum exist so that new games (a new animation on the same "outcome first" contract) and new rule types can be added without changing the spin flow.
 
 
+## Production
+
+- Railway behind Cloudflare (runbook: `docs/deployment.md`). **1 replica, 1 Uvicorn worker, always**: sockets, spin locks, admin sessions and the login rate limiter are in memory.
+- The database lives on a Railway volume at `/data`. The image runs as non-root; Railway needs `RAILWAY_RUN_UID=0` because its volumes are owned by root.
+- Merging to `main` deploys. A deploy restarts the container: sockets get close code 1012 and reconnect, and the admin logs in again.
+- Never commit secrets. `ADMIN_PASSWORD` is only ever set in the environment.
+- Never run the smoke scripts against production.
+- CI (`.github/workflows/ci.yml`) runs on PRs and pushes to `main`: `backend` (pytest), `frontend` (typecheck, test, build), then `docker-smoke` (builds the image and runs both smoke scripts against the container). It needs no repository secrets.
+- `/admin` must stay out of `robots.txt`, since that file is public. The admin area uses an `X-Robots-Tag` header instead (`app/middleware.py`).
+- API additions since v1 are listed in `docs/api-changes-v1.1.md`.
+
 ## Git & GitHub rules
 - Never commit directly to `main`. Start every task on a new branch:
   `feat/<short-name>`, `fix/<short-name>`, or `chore/<short-name>`.
