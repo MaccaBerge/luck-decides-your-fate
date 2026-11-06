@@ -3,11 +3,18 @@ import string
 
 _ALPHABET = string.ascii_lowercase + string.digits
 
-PALETTE: list[str] = [
-    # Ordered so neighbouring slices contrast, whatever the number of names.
-    "#D23C28", "#1A9E96", "#F2BE2E", "#3D4DB0", "#EC7A92", "#27804F",
-    "#EE8A1D", "#3F97E4", "#B83F96", "#8FB83A", "#7650B8", "#8A5638",
-]
+# Mirrored in frontend/src/lib/palette.ts.
+PALETTE: list[str] = ["#C9B8FF", "#FFC9A8", "#B5EAD7", "#DCD0FF", "#FFDCC6"]
+
+
+def next_color(position: int, previous: str | None, first: str | None) -> str:
+    """The palette colour for a new last slice, which touches both the previous and the first slice."""
+    start = position % len(PALETTE)
+    for offset in range(len(PALETTE)):
+        color = PALETTE[(start + offset) % len(PALETTE)]
+        if color != previous and color != first:
+            return color
+    return PALETTE[start]
 
 
 def _rand(n: int) -> str:

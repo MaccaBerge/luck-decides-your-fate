@@ -6,7 +6,7 @@ from typing import Any
 import aiosqlite
 
 from app.db.connection import connect
-from app.db.ids import PALETTE, new_entry_id, new_game_id
+from app.db.ids import new_entry_id, new_game_id, next_color
 from app.db.rows import EntryRow, GameRow, Mode, Origin, SpinRow
 from app.timeutil import utc_iso_days_ago, utc_now_iso
 
@@ -188,10 +188,23 @@ async def add_entries(game_id: str, names: list[str]) -> list[EntryRow]:
             "SELECT COALESCE(MAX(position), -1) FROM entries WHERE game_id = ?", (game_id,)
         ) as cur:
             (max_pos,) = await cur.fetchone()
+        async with db.execute(
+            "SELECT color FROM entries WHERE game_id = ? ORDER BY position LIMIT 1", (game_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            first = row[0] if row else None
+        async with db.execute(
+            "SELECT color FROM entries WHERE game_id = ? ORDER BY position DESC LIMIT 1", (game_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            previous = row[0] if row else None
         rows = []
         for i, name in enumerate(names):
             pos = max_pos + 1 + i
-            rows.append((new_entry_id(), game_id, name, PALETTE[pos % len(PALETTE)], pos, now))
+            color = next_color(pos, previous, first)
+            first = first or color
+            previous = color
+            rows.append((new_entry_id(), game_id, name, color, pos, now))
         await db.executemany(
             "INSERT INTO entries (id, game_id, name, color, position, is_active, created_at)"
             " VALUES (?, ?, ?, ?, ?, 1, ?)",
