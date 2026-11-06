@@ -4,15 +4,15 @@ import type { Mode } from "../../lib/types";
 import type { LinkStatus } from "../adminTypes";
 
 export const btn =
-  "inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50";
-export const btnPrimary = `${btn} bg-indigo-600 text-white hover:bg-indigo-500`;
-export const btnSecondary = `${btn} border border-slate-300 bg-white text-slate-800 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700`;
-export const btnDanger = `${btn} bg-red-600 text-white hover:bg-red-500`;
-export const btnGhostDanger = `${btn} text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/50`;
+  "inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50";
+export const btnPrimary = `${btn} bg-brass text-on-brass hover:brightness-105`;
+export const btnSecondary = `${btn} border border-line text-ink hover:bg-ink/10`;
+export const btnDanger = `${btn} bg-danger text-on-danger hover:opacity-90`;
+export const btnGhostDanger = `${btn} text-danger hover:bg-danger/15`;
 export const input =
-  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100";
+  "w-full rounded-md border border-line bg-transparent px-3 py-2 text-sm text-ink placeholder:text-muted";
 export const card =
-  "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-5";
+  "rounded-md bg-pad p-4 shadow-[0_2px_6px_rgb(0_0_0/0.12)] sm:p-5";
 
 export const MODE_LABEL: Record<Mode, string> = { fair: "Fair", always: "Always", never: "Never" };
 
@@ -35,10 +35,10 @@ export function ModeRadioGroup({
         return (
           <label
             key={m}
-            className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border px-2 py-2 text-sm font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-indigo-500 ${
+            className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border px-2 py-2 text-sm font-medium transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-(--focus) ${
               checked
-                ? "border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-950/60 dark:text-indigo-200"
-                : "border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                ? "border-ink bg-ink text-pad"
+                : "border-line text-ink hover:bg-ink/10"
             } ${disabled ? "opacity-60" : ""}`}
           >
             <input
@@ -48,7 +48,7 @@ export function ModeRadioGroup({
               checked={checked}
               disabled={disabled}
               onChange={() => onChange(m)}
-              className="h-4 w-4 accent-indigo-600"
+              className="h-4 w-4 accent-brass"
             />
             {MODE_LABEL[m]}
           </label>
@@ -61,18 +61,18 @@ export function ModeRadioGroup({
 const STATUS: Record<LinkStatus, { text: string; dot: string; pill: string }> = {
   created: {
     text: "Created",
-    dot: "bg-slate-50 ring-1 ring-slate-400",
-    pill: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
+    dot: "ring-1 ring-muted",
+    pill: "bg-ink/10 text-ink",
   },
   connected: {
     text: "Connected",
-    dot: "bg-emerald-500",
-    pill: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+    dot: "bg-brass",
+    pill: "bg-ink text-pad",
   },
   disconnected: {
     text: "Disconnected",
-    dot: "bg-slate-400",
-    pill: "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300",
+    dot: "bg-muted",
+    pill: "bg-ink/10 text-muted",
   },
 };
 
@@ -216,7 +216,7 @@ export function LogoutButton({ onClick }: { onClick: () => void }) {
 export function ErrorText({ children }: { children: ReactNode }) {
   if (!children) return null;
   return (
-    <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+    <p role="alert" className="text-sm text-danger">
       {children}
     </p>
   );

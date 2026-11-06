@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Download, Gamepad2, Loader2, Plus, SlidersHorizontal, Users } from "lucide-react";
+import { Download, Loader2, Plus, SlidersHorizontal, Users } from "lucide-react";
 import type { Mode } from "../lib/types";
 import * as adminApi from "./adminApi";
 import { errorMessage, errorStatus, parseNames } from "./adminApi";
@@ -70,10 +70,7 @@ export default function DashboardPage() {
   return (
     <div className="mx-auto w-full max-w-5xl space-y-5 px-4 py-5 sm:py-8">
       <header className="flex items-center justify-between gap-3">
-        <h1 className="flex items-center gap-2 text-xl font-semibold">
-          <Gamepad2 className="h-6 w-6 text-indigo-600 dark:text-indigo-400" aria-hidden />
-          Controller
-        </h1>
+        <h1 className="font-display text-2xl font-normal sm:text-[2rem]">Controller</h1>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -93,18 +90,12 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <section className={`${card} flex items-center gap-3`}>
-        <span className="relative flex h-3 w-3" aria-hidden>
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-          <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
-        </span>
-        <p className="text-base">
-          <span data-testid="live-games-count" className="text-2xl font-bold tabular-nums">
-            {dash ? dash.live_games : "–"}
-          </span>{" "}
-          games live right now
-        </p>
-      </section>
+      <p className="text-base">
+        <span data-testid="live-games-count" className="text-2xl font-bold tabular-nums">
+          {dash ? dash.live_games : "–"}
+        </span>{" "}
+        games live right now
+      </p>
 
       <ErrorText>{error}</ErrorText>
 
@@ -113,11 +104,11 @@ export default function DashboardPage() {
         <section className={`${card} min-w-0`}>
           <h2 className="mb-3 text-base font-semibold">Links</h2>
           {!dash ? (
-            <Loader2 className="h-5 w-5 animate-spin text-slate-400" aria-label="Loading links" />
+            <Loader2 className="h-5 w-5 animate-spin text-muted" aria-label="Loading links" />
           ) : dash.links.length === 0 ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400">No links yet. Create one to get started.</p>
+            <p className="text-sm text-muted">No links yet. Create one to get started.</p>
           ) : (
-            <ul className="divide-y divide-slate-200 dark:divide-slate-700">
+            <ul className="divide-y divide-line">
               {dash.links.map((l) => (
                 <LinkRow key={l.id} link={l} onDelete={() => remove(l.id)} />
               ))}
@@ -159,7 +150,7 @@ function CreateLinkForm({ onError }: { onError: (err: unknown) => void }) {
     <form onSubmit={submit} className={`${card} space-y-3 self-start`}>
       <h2 className="text-base font-semibold">New link</h2>
       <label className="block space-y-1">
-        <span className="text-sm text-slate-600 dark:text-slate-300">Label (private)</span>
+        <span className="text-sm text-muted">Label (private)</span>
         <input
           aria-label="Link label"
           className={input}
@@ -170,11 +161,11 @@ function CreateLinkForm({ onError }: { onError: (err: unknown) => void }) {
         />
       </label>
       <div className="space-y-1">
-        <span className="text-sm text-slate-600 dark:text-slate-300">Mode</span>
+        <span className="text-sm text-muted">Mode</span>
         <ModeRadioGroup name="create-mode" value={mode} onChange={setMode} />
       </div>
       <label className="block space-y-1">
-        <span className="text-sm text-slate-600 dark:text-slate-300">Target names, one per line, in priority order</span>
+        <span className="text-sm text-muted">Target names, one per line, in priority order</span>
         <textarea
           aria-label="Target names"
           className={`${input} min-h-24 resize-y`}
@@ -206,7 +197,7 @@ function LinkRow({ link, onDelete }: { link: LinkSummary; onDelete: () => Promis
           <span className="truncate font-medium">{title}</span>
           <StatusBadge status={link.status} />
         </div>
-        <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500 dark:text-slate-400">
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">
           <span className="truncate">
             {MODE_LABEL[link.mode]}
             {targetsText}

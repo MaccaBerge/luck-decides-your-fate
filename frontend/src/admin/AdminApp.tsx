@@ -39,7 +39,7 @@ export default function AdminApp() {
   if (auth === "checking") {
     content = (
       <div className="flex min-h-dvh items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-slate-400" aria-label="Loading" />
+        <Loader2 className="h-6 w-6 animate-spin text-muted" aria-label="Loading" />
       </div>
     );
   } else if (auth === "out") {
@@ -56,7 +56,7 @@ export default function AdminApp() {
 
   return (
     <AdminAuthContext.Provider value={ctx}>
-      <div className="min-h-dvh bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+      <div className="min-h-dvh bg-felt text-ink">
         {content}
       </div>
     </AdminAuthContext.Provider>

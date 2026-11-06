@@ -166,7 +166,7 @@ export default function LinkControlPage() {
       <div className="mx-auto w-full max-w-5xl space-y-5 px-4 py-5 sm:py-8">
         {header}
         <ErrorText>{error}</ErrorText>
-        <Loader2 className="h-6 w-6 animate-spin text-slate-400" aria-label="Loading link" />
+        <Loader2 className="h-6 w-6 animate-spin text-muted" aria-label="Loading link" />
       </div>
     );
   }
@@ -187,7 +187,7 @@ export default function LinkControlPage() {
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="min-w-0 truncate text-lg font-semibold">{title}</h1>
           <StatusBadge status={link.status} />
-          <span className="inline-flex items-center gap-1 text-sm text-slate-600 dark:text-slate-300">
+          <span className="inline-flex items-center gap-1 text-sm text-muted">
             <Users className="h-4 w-4" aria-hidden />
             <span data-testid="player-count" className="font-semibold tabular-nums">
               {link.player_count}
@@ -198,7 +198,7 @@ export default function LinkControlPage() {
         <div className="flex items-center gap-2">
           <code
             data-testid="link-url"
-            className="min-w-0 flex-1 truncate rounded-lg bg-slate-100 px-3 py-2 text-sm dark:bg-slate-800"
+            className="min-w-0 flex-1 truncate rounded-md bg-ink/5 px-3 py-2 text-sm"
             title={url}
           >
             {url}
@@ -214,7 +214,7 @@ export default function LinkControlPage() {
           <h2 className="text-base font-semibold">Rules</h2>
           <RuleStatusBanner status={rule_status} mode={link.mode} />
           <div className="space-y-1">
-            <span className="text-sm text-slate-600 dark:text-slate-300">Mode (applies immediately)</span>
+            <span className="text-sm text-muted">Mode (applies immediately)</span>
             <ModeRadioGroup
               name={`mode-${game.id}`}
               value={displayMode}
@@ -224,7 +224,7 @@ export default function LinkControlPage() {
           </div>
           <div className="space-y-2">
             <label className="block space-y-1">
-              <span className="text-sm text-slate-600 dark:text-slate-300">
+              <span className="text-sm text-muted">
                 Target names, one per line, in priority order
               </span>
               <textarea
@@ -250,7 +250,7 @@ export default function LinkControlPage() {
             </button>
           </div>
           <div className="space-y-1">
-            <span className="text-sm text-slate-600 dark:text-slate-300">Label (private)</span>
+            <span className="text-sm text-muted">Label (private)</span>
             <div className="flex gap-2">
               <input
                 aria-label="Link label"
@@ -285,7 +285,7 @@ export default function LinkControlPage() {
               ariaLabel={`Live wheel with ${active.length} names`}
             />
           </div>
-          <p className="text-center text-sm text-slate-600 dark:text-slate-300" aria-live="polite">
+          <p className="text-center text-sm text-muted" aria-live="polite">
             {game.current_spin
               ? "Spinning…"
               : game.last_result
@@ -295,7 +295,7 @@ export default function LinkControlPage() {
           <div>
             <h3 className="mb-2 text-sm font-semibold">Names ({active.length})</h3>
             {game.entries.length === 0 ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400">The wheel is empty.</p>
+              <p className="text-sm text-muted">The wheel is empty.</p>
             ) : (
               <ul className="flex flex-wrap gap-1.5">
                 {active.map((e) => {
@@ -305,8 +305,8 @@ export default function LinkControlPage() {
                       key={e.id}
                       className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm ${
                         isX
-                          ? "border-indigo-500 bg-indigo-100 font-semibold text-indigo-900 ring-1 ring-indigo-500 dark:bg-indigo-900/60 dark:text-indigo-100"
-                          : "border-slate-200 dark:border-slate-700"
+                          ? "border-brass bg-brass font-semibold text-on-brass"
+                          : "border-line"
                       }`}
                       title={isX ? "Target" : undefined}
                     >
@@ -319,7 +319,7 @@ export default function LinkControlPage() {
                 {inactive.map((e) => (
                   <li
                     key={e.id}
-                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-dashed border-slate-300 px-2.5 py-1 text-sm text-slate-400 line-through dark:border-slate-700 dark:text-slate-500"
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-dashed border-line px-2.5 py-1 text-sm text-muted line-through"
                   >
                     <span className="truncate">{e.name}</span>
                     <span className="sr-only"> (hidden)</span>
@@ -334,11 +334,11 @@ export default function LinkControlPage() {
       <section className={`${card} min-w-0`}>
         <h2 className="mb-3 text-base font-semibold">Spin history</h2>
         {spin_history.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">No spins yet.</p>
+          <p className="text-sm text-muted">No spins yet.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-slate-500 dark:text-slate-400">
+              <thead className="text-xs text-muted">
                 <tr>
                   <th className="py-1.5 pr-3 font-medium">Time</th>
                   <th className="py-1.5 pr-3 font-medium">Winner</th>
@@ -346,24 +346,24 @@ export default function LinkControlPage() {
                   <th className="py-1.5 font-medium">Rule applied</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+              <tbody className="divide-y divide-line">
                 {spin_history.map((s) => (
                   <tr key={s.spin_id}>
-                    <td className="py-1.5 pr-3 tabular-nums text-slate-600 dark:text-slate-300">
+                    <td className="py-1.5 pr-3 tabular-nums text-muted">
                       {clockTime(s.started_at)}
                     </td>
                     <td className="max-w-[8rem] truncate py-1.5 pr-3 font-medium">
                       {s.winner_name}
                       {s.finished_at === null && (
-                        <span className="ml-1 text-xs font-normal text-slate-500">(spinning)</span>
+                        <span className="ml-1 text-xs font-normal text-muted">(spinning)</span>
                       )}
                     </td>
                     <td className="py-1.5 pr-3">{MODE_LABEL[s.mode]}</td>
                     <td className="py-1.5">
                       {s.rule_applied ? (
-                        <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-label="Yes" />
+                        <Check className="h-4 w-4 text-ink" aria-label="Yes" />
                       ) : (
-                        <Minus className="h-4 w-4 text-slate-400" aria-label="No" />
+                        <Minus className="h-4 w-4 text-muted" aria-label="No" />
                       )}
                     </td>
                   </tr>
