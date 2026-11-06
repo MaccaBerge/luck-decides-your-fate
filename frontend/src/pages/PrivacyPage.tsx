@@ -30,7 +30,8 @@ export default function PrivacyPage() {
         </Section>
         <Section title="How long it's kept">
           Ordinary wheels are deleted after 7 days without activity. Wheels created from a link made by the operator
-          aren't deleted automatically; the operator removes them.
+          aren't deleted automatically; the operator removes them. Deleted wheels can remain in backups for up to about
+          14 days.
         </Section>
         <Section title="On your device">
           Your browser's local storage keeps your theme, your sound setting and your last wheel. The site uses no

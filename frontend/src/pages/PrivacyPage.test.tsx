@@ -22,6 +22,7 @@ describe("/privacy", () => {
   it("states who can see wheels and how long they are kept", () => {
     expect(text).toContain("The site's operator can view, change and delete wheels and their settings.");
     expect(text).toContain("deleted after 7 days without activity");
+    expect(text).toContain("remain in backups for up to about 14 days");
   });
 
   it("stays under 200 words and makes no claim about outcomes", () => {
