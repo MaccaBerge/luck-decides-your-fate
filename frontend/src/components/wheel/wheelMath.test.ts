@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { computeFinalRotation, flapperAngle, INK, mod, pegCount, sliceAtPointer, textColorFor } from "./wheelMath";
+import {
+  computeFinalRotation,
+  easeOutQuart,
+  type FlapperState,
+  INK,
+  mod,
+  pegClearance,
+  pegCount,
+  pegGrip,
+  sliceAtPointer,
+  stepFlapper,
+  textColorFor,
+} from "./wheelMath";
 
 describe("mod", () => {
   it("handles negatives", () => {
@@ -51,37 +63,74 @@ describe("computeFinalRotation", () => {
 });
 
 describe("pegCount", () => {
-  it("puts a peg on every slice boundary", () => {
-    for (let n = 1; n <= 100; n++) {
+  it("puts a peg on every slice boundary while slices are wide enough", () => {
+    for (let n = 1; n <= 48; n++) {
       expect(pegCount(n) % n).toBe(0);
       expect(pegCount(n)).toBeGreaterThanOrEqual(16);
     }
   });
+  it("stays readable on very full wheels", () => {
+    expect(pegCount(100)).toBe(48);
+  });
 });
 
-describe("flapperAngle", () => {
-  const spacing = 360 / 16;
-  it("is exactly upright when the wheel has stopped", () => {
-    expect(Math.abs(flapperAngle(spacing, 16, 0))).toBe(0);
-  });
-  it("hangs upright between pegs", () => {
-    expect(Math.abs(flapperAngle(spacing / 2, 16, 1))).toBe(0);
-  });
-  it("is pushed clockwise further as a peg crosses the top, then snaps back", () => {
-    const touching = flapperAngle(spacing - 1.5, 16, 1);
-    const atTop = flapperAngle(spacing, 16, 1);
-    const slipping = flapperAngle(spacing + 1.5, 16, 1);
-    expect(touching).toBeLessThan(0);
-    expect(atTop).toBeLessThan(touching);
-    expect(slipping).toBeLessThan(atTop);
-    expect(Math.abs(flapperAngle(spacing + 3, 16, 1))).toBe(0);
-  });
-  it("stays within its swing when pegs are denser than the contact window", () => {
-    for (let r = 0; r < 10; r += 0.1) {
-      const a = flapperAngle(r, 100, 1);
-      expect(a).toBeLessThanOrEqual(0);
-      expect(a).toBeGreaterThanOrEqual(-0.5);
+describe("flapper", () => {
+  /** A real spin at 60 fps, calling back after every frame. */
+  function spin(n: number, each: (s: FlapperState, rotation: number, t: number, grip: number) => void) {
+    const pegs = pegCount(n);
+    const state: FlapperState = { angle: 0, velocity: 0 };
+    const total = 2300;
+    const duration = 6000;
+    let previous = 0;
+    for (let ms = 16; ms <= duration; ms += 16) {
+      const t = ms / duration;
+      const rotation = total * easeOutQuart(t);
+      const grip = pegGrip((4 * Math.pow(1 - t, 3) * total) / duration);
+      stepFlapper(state, previous, rotation, pegs, 16, grip);
+      previous = rotation;
+      each(state, rotation, t, grip);
     }
+    return state;
+  }
+
+  for (const n of [2, 6, 8, 16, 40, 100]) {
+    it(`never passes through a peg with ${n} names`, () => {
+      const spacing = 360 / pegCount(n);
+      let checked = 0;
+      spin(n, (s, rotation, _t, grip) => {
+        if (grip < 1) return;
+        const past = mod(rotation, spacing);
+        for (let m = -2; m <= 1; m++) {
+          const needed = pegClearance(past + m * spacing, s.angle);
+          if (needed === null) continue;
+          checked++;
+          expect(s.angle).toBeGreaterThanOrEqual(needed - 1e-9);
+        }
+      });
+      expect(checked).toBeGreaterThan(0);
+    });
+  }
+
+  it("is pushed the way the wheel turns, but never swings flat", () => {
+    let most = 0;
+    spin(8, (s) => {
+      most = Math.max(most, s.angle);
+    });
+    expect(most).toBeGreaterThan(0.3);
+    expect(most).toBeLessThanOrEqual(0.85);
+  });
+
+  it("lets go of a peg and swings back slowly, overshooting before it settles", () => {
+    const s: FlapperState = { angle: 0.7, velocity: 0 };
+    const angleAfter = (ms: number) => {
+      for (let i = 0; i < ms / 4; i++) stepFlapper(s, 191.25, 191.25, 16, 4, 1);
+      return s.angle;
+    };
+    expect(angleAfter(60)).toBeGreaterThan(0.45); // no snap: most of the swing is still to come
+    let lowest = s.angle;
+    for (let i = 0; i < 20; i++) lowest = Math.min(lowest, angleAfter(20));
+    expect(lowest).toBeLessThan(0); // overshoots upright
+    expect(Math.abs(angleAfter(1200))).toBeLessThan(0.02); // and settles
   });
 });
 

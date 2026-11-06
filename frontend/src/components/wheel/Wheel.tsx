@@ -1,7 +1,24 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Entry, SpinStarted } from "../../lib/types";
 import { playTick, playWin } from "../../lib/sound";
-import { computeFinalRotation, easeOutQuart, flapperAngle, INK, mod, pegCount, sliceAtPointer, textColorFor } from "./wheelMath";
+import {
+  computeFinalRotation,
+  easeOutQuart,
+  FLAPPER_LENGTH,
+  FLAPPER_PIVOT_Y,
+  FLAPPER_SHOULDER,
+  FLAPPER_WIDTH,
+  type FlapperState,
+  INK,
+  mod,
+  PEG_RADIUS,
+  PEG_RING,
+  pegCount,
+  pegGrip,
+  sliceAtPointer,
+  stepFlapper,
+  textColorFor,
+} from "./wheelMath";
 
 export interface WheelProps {
   /** Full list; draws active ones in position order when idle. */
@@ -34,7 +51,6 @@ const BRASS = "#E3A81F";
 const BLANK_FACE = "#EEF1E8";
 const FLAPPER = "#F7F3E3";
 const LABEL_FONT = '"Schibsted Grotesk Variable", system-ui, sans-serif';
-const MAX_DRAWN_PEGS = 48;
 
 interface FittedLabel {
   text: string;
@@ -112,8 +128,11 @@ export default function Wheel({
   const pxRef = useRef(px);
   pxRef.current = px;
 
-  const rotationRef = useRef(0);
+  // Starts slightly turned, so a new wheel doesn't rest with a slice boundary under the flapper.
+  const rotationRef = useRef(11.25);
   const flapperRef = useRef(0);
+  const flapperSimRef = useRef<FlapperState>({ angle: 0, velocity: 0 });
+  const lastFrameRef = useRef({ time: 0, rotation: 0 });
   const labelCacheRef = useRef(new Map<string, FittedLabel>());
   const animRef = useRef<Anim | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -226,16 +245,18 @@ export default function Wheel({
       }
     }
 
-    // Pegs on the rim; they catch the flapper, and turn with the wheel.
+    // Pegs just inside the rim; they turn with the wheel and push the flapper aside.
     const pegs = pegCount(n);
-    const step = Math.ceil(pegs / MAX_DRAWN_PEGS);
-    const pegR = Math.max(1.5, Math.min(px * 0.0085, ((Ro - rimW / 2) * Math.PI * step) / pegs / 2.6));
-    for (let j = 0; j < pegs; j += step) {
+    const pegR = Math.max(1.5, px * PEG_RADIUS);
+    for (let j = 0; j < pegs; j++) {
       const a = (j / pegs) * Math.PI * 2 - Math.PI / 2;
       ctx.beginPath();
-      ctx.arc(Math.cos(a) * (Ro - rimW / 2), Math.sin(a) * (Ro - rimW / 2), pegR, 0, Math.PI * 2);
+      ctx.arc(Math.cos(a) * px * PEG_RING, Math.sin(a) * px * PEG_RING, pegR, 0, Math.PI * 2);
       ctx.fillStyle = BRASS;
       ctx.fill();
+      ctx.strokeStyle = WALNUT;
+      ctx.lineWidth = Math.max(1, px * 0.002);
+      ctx.stroke();
     }
     ctx.restore();
 
@@ -249,14 +270,13 @@ export default function Wheel({
     ctx.fillStyle = BRASS;
     ctx.fill();
 
-    // Flapper: the base is mounted above the rim, clear of the pegs, and only the narrow tip hangs
-    // down into their path. The tip marks the winning slice.
-    const pivotY = px * 0.026;
-    const fw = px * 0.04;
-    const fl = px * 0.072;
-    const shoulder = -fw * 0.42;
+    // Flapper: the base is mounted above the rim and only the narrow tip reaches the pegs. Canvas
+    // angles are clockwise-positive at the base, so a tip pushed clockwise is a negative rotation.
+    const fw = px * FLAPPER_WIDTH;
+    const fl = px * FLAPPER_LENGTH;
+    const shoulder = -px * FLAPPER_SHOULDER;
     ctx.save();
-    ctx.translate(c, pivotY);
+    ctx.translate(c, px * FLAPPER_PIVOT_Y);
     ctx.rotate(flapperRef.current);
     ctx.beginPath();
     ctx.moveTo(-fw / 2, shoulder);
@@ -304,11 +324,19 @@ export default function Wheel({
   const frame = useCallback(() => {
     const a = animRef.current;
     if (!a) return;
-    const t = Math.min(1, (performance.now() - a.start) / a.duration);
+    const now = performance.now();
+    const t = Math.min(1, (now - a.start) / a.duration);
     rotationRef.current = a.from + (a.to - a.from) * easeOutQuart(t);
     const pegs = pegCount(a.slices.length);
     const degPerMs = (4 * Math.pow(1 - t, 3) * (a.to - a.from)) / a.duration;
-    flapperRef.current = reducedMotion() ? 0 : flapperAngle(rotationRef.current, pegs, degPerMs);
+    if (!reducedMotion()) {
+      const last = lastFrameRef.current;
+      // A throttled tab can deliver a long gap between frames; don't simulate all of it.
+      stepFlapper(flapperSimRef.current, last.rotation, rotationRef.current, pegs, Math.min(50, now - last.time), pegGrip(degPerMs));
+      // Always exactly upright at the end, so the tip points at the winning slice.
+      flapperRef.current = -flapperSimRef.current.angle * Math.min(1, (1 - t) / 0.04);
+    }
+    lastFrameRef.current = { time: now, rotation: rotationRef.current };
     const idx = sliceAtPointer(rotationRef.current, pegs);
     if (idx !== lastTickSliceRef.current) {
       lastTickSliceRef.current = idx;
@@ -378,6 +406,8 @@ export default function Wheel({
       duration: Math.max(1, spin.duration_ms),
     };
     lastTickSliceRef.current = sliceAtPointer(from, pegCount(n));
+    flapperSimRef.current = { angle: 0, velocity: 0 };
+    lastFrameRef.current = { time: performance.now(), rotation: from };
     force((x) => x + 1);
     rafRef.current = requestAnimationFrame(frame);
     // Fallback: rAF is throttled/paused in background or headless tabs. Make sure the
