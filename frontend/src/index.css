@@ -1,17 +1,54 @@
+@import "@fontsource-variable/schibsted-grotesk/wght.css";
+@import "@fontsource/shrikhand/index.css";
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-@theme {
-  --font-sans: ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --animate-pop: pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+/* The page is a games table: felt underneath, a paper pad on top, brass as the one accent. */
+:root {
+  --felt: #dce5da;
+  --pad: #f7f8f3;
+  --ink: #13261f;
+  --muted: #51635a;
+  --line: #cbd6ca;
+  --brass: #e3a81f;
+  --on-brass: #13261f;
+  --focus: #13261f;
+  --danger: #b3261e;
+  --on-danger: #ffffff;
+}
+.dark {
+  --felt: #123a2e;
+  --pad: #1a4a3b;
+  --ink: #f3f5ea;
+  --muted: #afc7ba;
+  --line: #2f6050;
+  --brass: #edb52c;
+  --focus: #edb52c;
+  --danger: #ff9c8f;
+  --on-danger: #13261f;
+}
+
+@theme inline {
+  --font-sans: "Schibsted Grotesk Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Shrikhand", "Schibsted Grotesk Variable", system-ui, sans-serif;
+  --color-felt: var(--felt);
+  --color-pad: var(--pad);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-brass: var(--brass);
+  --color-on-brass: var(--on-brass);
+  --color-danger: var(--danger);
+  --color-on-danger: var(--on-danger);
+  --animate-pop: pop 0.3s cubic-bezier(0.2, 1.3, 0.4, 1) both;
   --animate-fade: fade 0.2s ease-out both;
   --animate-toast: toast 0.25s ease-out both;
 }
 
 @keyframes pop {
-  from { opacity: 0; transform: scale(0.85) translateY(8px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
 }
 @keyframes fade {
   from { opacity: 0; }
@@ -22,27 +59,38 @@
   to { opacity: 1; transform: translate(-50%, 0); }
 }
 
-html {
-  color-scheme: light;
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    overflow-x: hidden;
+    background-color: var(--felt);
+    color: var(--ink);
+    font-synthesis: none;
+  }
+  button:not(:disabled),
+  a,
+  label:has(input, [role="switch"]) {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
 }
-html.dark {
-  color-scheme: dark;
-}
-body {
-  margin: 0;
-  min-height: 100vh;
-  overflow-x: hidden;
-  background-color: #faf7ff;
-  background-image:
-    radial-gradient(circle at 10% 0%, rgba(236, 72, 153, 0.12), transparent 40%),
-    radial-gradient(circle at 90% 10%, rgba(139, 92, 246, 0.14), transparent 45%),
-    radial-gradient(circle at 50% 100%, rgba(6, 182, 212, 0.1), transparent 50%);
-  background-attachment: fixed;
-}
-html.dark body {
-  background-color: #0f0c1d;
-  background-image:
-    radial-gradient(circle at 10% 0%, rgba(236, 72, 153, 0.14), transparent 40%),
-    radial-gradient(circle at 90% 10%, rgba(139, 92, 246, 0.18), transparent 45%),
-    radial-gradient(circle at 50% 100%, rgba(6, 182, 212, 0.08), transparent 50%);
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
