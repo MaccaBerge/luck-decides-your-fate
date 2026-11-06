@@ -8,14 +8,16 @@ import { connectGameSocket } from "../lib/ws";
 import { useTheme } from "../lib/theme";
 import { loadSoundPref, saveSoundPref, unlockAudio } from "../lib/sound";
 import { setLastGameId } from "../lib/storage";
+import { planLoad, type SavedList } from "../lib/savedLists";
 import { SLICE_COLORS } from "../lib/palette";
 import { BRAND_TITLE, GAME_TITLE } from "../lib/brand";
 import Wheel from "../components/wheel/Wheel";
 import { GameToolbar } from "../components/game/GameToolbar";
-import { EntryPanel } from "../components/game/EntryPanel";
+import { EntryPanel, MAX_ENTRIES } from "../components/game/EntryPanel";
 import { PasteNamesDialog } from "../components/game/PasteNamesDialog";
 import { QrDialog } from "../components/game/QrDialog";
 import { ResultDialog } from "../components/game/ResultDialog";
+import { SavedListsDialog } from "../components/game/SavedListsDialog";
 import { Toast, type ToastMsg } from "../components/game/Toast";
 import { Loading } from "../components/game/Loading";
 import { PrivacyLink } from "../components/game/PrivacyLink";
@@ -49,6 +51,7 @@ export default function GamePage() {
   const [animating, setAnimating] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [pasteOpen, setPasteOpen] = useState(false);
+  const [savedListsOpen, setSavedListsOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [sound, setSound] = useState(loadSoundPref);
   const [toast, setToast] = useState<ToastMsg | null>(null);
@@ -233,6 +236,14 @@ export default function GamePage() {
     }
   };
 
+  const loadList = async (list: SavedList) => {
+    const { toAdd, leftOut } = planLoad(list.names, game.entries.map((e) => e.name), MAX_ENTRIES);
+    if (toAdd.length > 0 && !(await mutate(() => api.addEntries(game.id, toAdd)))) return false;
+    if (leftOut > 0) showToast(`${leftOut} ${leftOut === 1 ? "name" : "names"} didn't fit on the wheel`, "info");
+    else if (toAdd.length === 0) showToast("Those names are already on the wheel", "info");
+    return true;
+  };
+
   const toggleSound = () => {
     const next = !sound;
     setSound(next);
@@ -315,6 +326,7 @@ export default function GamePage() {
           disabled={spinning}
           onAdd={(names) => mutate(() => api.addEntries(game.id, names))}
           onOpenPaste={() => setPasteOpen(true)}
+          onOpenSavedLists={() => setSavedListsOpen(true)}
           onRename={(e, name) => onEntry(e, { name })}
           onColor={(e, color) => onEntry(e, { color })}
           onToggle={(e) => onEntry(e, { is_active: !e.is_active })}
@@ -333,6 +345,13 @@ export default function GamePage() {
         open={pasteOpen}
         onClose={() => setPasteOpen(false)}
         onSubmit={(names) => mutate(() => api.addEntries(game.id, names))}
+      />
+      <SavedListsDialog
+        open={savedListsOpen}
+        names={[...game.entries].sort((a, b) => a.position - b.position).map((e) => e.name)}
+        disabled={spinning}
+        onClose={() => setSavedListsOpen(false)}
+        onLoad={loadList}
       />
       <ResultDialog
         winner={result ? { name: result.name } : null}

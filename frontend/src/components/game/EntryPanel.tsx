@@ -10,6 +10,7 @@ interface Props {
   disabled: boolean;
   onAdd: (names: string[]) => Promise<boolean>;
   onOpenPaste: () => void;
+  onOpenSavedLists: () => void;
   onRename: (e: Entry, name: string) => void;
   onColor: (e: Entry, color: string) => void;
   onToggle: (e: Entry) => void;
@@ -19,7 +20,7 @@ interface Props {
   onRemoveWinnerChange: (v: boolean) => void;
 }
 
-const MAX_ENTRIES = 100;
+export const MAX_ENTRIES = 100;
 
 export function EntryPanel(p: Props) {
   const [name, setName] = useState("");
@@ -96,6 +97,9 @@ export function EntryPanel(p: Props) {
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={p.onOpenPaste} disabled={p.disabled || full} className={pillBtn}>
             Paste names
+          </button>
+          <button type="button" onClick={p.onOpenSavedLists} disabled={p.disabled} className={pillBtn}>
+            Saved lists
           </button>
           <button
             type="button"
