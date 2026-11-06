@@ -24,16 +24,20 @@ export function computeFinalRotation(
 /** Ease-out quartic. */
 export const easeOutQuart = (t: number) => 1 - Math.pow(1 - t, 4);
 
-/** Pick black or white text for a "#RRGGBB" background. */
-export function textColorFor(hex: string): string {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
-  if (!m) return "#ffffff";
-  const v = parseInt(m[1], 16);
+export const INK = "#1C1830";
+
+function luminance(hex: string): number {
+  const v = parseInt(hex.replace("#", ""), 16);
   const lin = (c: number) => {
     const x = c / 255;
     return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
   };
-  const L = 0.2126 * lin((v >> 16) & 255) + 0.7152 * lin((v >> 8) & 255) + 0.0722 * lin(v & 255);
-  // Prefer white (with shadow) unless the background is quite light.
-  return L > 0.42 ? "#1f1f1f" : "#ffffff";
+  return 0.2126 * lin((v >> 16) & 255) + 0.7152 * lin((v >> 8) & 255) + 0.0722 * lin(v & 255);
+}
+
+/** Whichever of ink or white has the higher contrast on a "#RRGGBB" background. */
+export function textColorFor(hex: string): string {
+  if (!/^#?[0-9a-f]{6}$/i.test(hex)) return "#ffffff";
+  const L = luminance(hex);
+  return 1.05 / (L + 0.05) >= (L + 0.05) / (luminance(INK) + 0.05) ? "#ffffff" : INK;
 }

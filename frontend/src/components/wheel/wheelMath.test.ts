@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { computeFinalRotation, mod, sliceAtPointer } from "./wheelMath";
+import { SLICE_COLORS } from "../../lib/palette";
+import { computeFinalRotation, INK, mod, sliceAtPointer, textColorFor } from "./wheelMath";
 
 describe("mod", () => {
   it("handles negatives", () => {
@@ -47,5 +48,24 @@ describe("computeFinalRotation", () => {
     const final = computeFinalRotation(123, 2, n, 0.37, 6);
     const local = mod(-final, 360);
     expect(local).toBeCloseTo((2 + 0.37) * s, 6);
+  });
+});
+
+describe("textColorFor", () => {
+  const contrast = (a: string, b: string) => {
+    const lum = (hex: string) => {
+      const v = parseInt(hex.slice(1), 16);
+      const lin = (c: number) => (c / 255 <= 0.03928 ? c / 255 / 12.92 : Math.pow((c / 255 + 0.055) / 1.055, 2.4));
+      return 0.2126 * lin((v >> 16) & 255) + 0.7152 * lin((v >> 8) & 255) + 0.0722 * lin(v & 255);
+    };
+    const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  it("gives readable labels on every default slice colour", () => {
+    for (const c of SLICE_COLORS) expect(contrast(c, textColorFor(c))).toBeGreaterThanOrEqual(4.5);
+  });
+  it("uses ink on light colours and white on dark ones", () => {
+    expect(textColorFor("#FFFFFF")).toBe(INK);
+    expect(textColorFor("#000000")).toBe("#ffffff");
   });
 });

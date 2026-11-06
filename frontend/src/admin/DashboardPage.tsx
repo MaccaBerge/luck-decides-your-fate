@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Download, Gamepad2, Loader2, Plus, SlidersHorizontal, Users } from "lucide-react";
+import { Download, Loader2, Plus, SlidersHorizontal, Users } from "lucide-react";
 import type { Mode } from "../lib/types";
 import * as adminApi from "./adminApi";
 import { errorMessage, errorStatus, parseNames } from "./adminApi";
@@ -11,17 +11,22 @@ import {
   btnPrimary,
   btnSecondary,
   card,
+  cardTitle,
   CopyButton,
   DeleteWithConfirm,
   ErrorText,
+  fieldLabel,
   input,
   linkTitle,
   LogoutButton,
   MODE_LABEL,
   ModeRadioGroup,
+  page,
   relativeTime,
   StatusBadge,
+  textarea,
   useNow,
+  Wordmark,
 } from "./components/ui";
 
 export default function DashboardPage() {
@@ -68,13 +73,12 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-5 px-4 py-5 sm:py-8">
-      <header className="flex items-center justify-between gap-3">
-        <h1 className="flex items-center gap-2 text-xl font-semibold">
-          <Gamepad2 className="h-6 w-6 text-indigo-600 dark:text-indigo-400" aria-hidden />
-          Controller
+    <div className={page}>
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <h1>
+          <Wordmark>Controller</Wordmark>
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             aria-label="Download backup"
@@ -82,42 +86,35 @@ export default function DashboardPage() {
             disabled={backingUp}
             onClick={downloadBackup}
           >
-            {backingUp ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            ) : (
-              <Download className="h-4 w-4" aria-hidden />
-            )}
+            {backingUp ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Download className="size-4" aria-hidden />}
             <span className="hidden sm:inline">Download backup</span>
           </button>
           <LogoutButton onClick={logout} />
         </div>
       </header>
 
-      <section className={`${card} flex items-center gap-3`}>
-        <span className="relative flex h-3 w-3" aria-hidden>
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-          <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
-        </span>
-        <p className="text-base">
-          <span data-testid="live-games-count" className="text-2xl font-bold tabular-nums">
+      <p className="flex items-center gap-2 text-sm text-ink-muted">
+        <span aria-hidden className="size-2 rounded-full bg-success-dot" />
+        <span>
+          <span data-testid="live-games-count" className="font-display text-[19px] font-semibold text-ink tabular-nums">
             {dash ? dash.live_games : "–"}
           </span>{" "}
           games live right now
-        </p>
-      </section>
+        </span>
+      </p>
 
       <ErrorText>{error}</ErrorText>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
         <CreateLinkForm onError={handleError} />
-        <section className={`${card} min-w-0`}>
-          <h2 className="mb-3 text-base font-semibold">Links</h2>
+        <section aria-label="Links" className={`${card} flex min-w-0 flex-col gap-3`}>
+          <h2 className={cardTitle}>Links</h2>
           {!dash ? (
-            <Loader2 className="h-5 w-5 animate-spin text-slate-400" aria-label="Loading links" />
+            <Loader2 className="size-5 animate-spin text-ink-muted" aria-label="Loading links" />
           ) : dash.links.length === 0 ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400">No links yet. Create one to get started.</p>
+            <p className="text-sm text-ink-muted">No links yet. Create one to get started.</p>
           ) : (
-            <ul className="divide-y divide-slate-200 dark:divide-slate-700">
+            <ul className="flex flex-col divide-y divide-divider">
               {dash.links.map((l) => (
                 <LinkRow key={l.id} link={l} onDelete={() => remove(l.id)} />
               ))}
@@ -156,10 +153,10 @@ function CreateLinkForm({ onError }: { onError: (err: unknown) => void }) {
   }
 
   return (
-    <form onSubmit={submit} className={`${card} space-y-3 self-start`}>
-      <h2 className="text-base font-semibold">New link</h2>
-      <label className="block space-y-1">
-        <span className="text-sm text-slate-600 dark:text-slate-300">Label (private)</span>
+    <form onSubmit={submit} className={`${card} flex flex-col gap-5`}>
+      <h2 className={cardTitle}>New link</h2>
+      <label className="flex flex-col gap-2.5">
+        <span className={fieldLabel}>Label (private)</span>
         <input
           aria-label="Link label"
           className={input}
@@ -169,15 +166,15 @@ function CreateLinkForm({ onError }: { onError: (err: unknown) => void }) {
           onChange={(e) => setLabel(e.target.value)}
         />
       </label>
-      <div className="space-y-1">
-        <span className="text-sm text-slate-600 dark:text-slate-300">Mode</span>
+      <div className="flex flex-col gap-2.5">
+        <span className={fieldLabel}>Mode</span>
         <ModeRadioGroup name="create-mode" value={mode} onChange={setMode} />
       </div>
-      <label className="block space-y-1">
-        <span className="text-sm text-slate-600 dark:text-slate-300">Target names, one per line, in priority order</span>
+      <label className="flex flex-col gap-2.5">
+        <span className={fieldLabel}>Target names, one per line, in priority order</span>
         <textarea
           aria-label="Target names"
-          className={`${input} min-h-24 resize-y`}
+          className={textarea}
           rows={3}
           placeholder={"Jonas\nJonny"}
           value={targets}
@@ -185,8 +182,8 @@ function CreateLinkForm({ onError }: { onError: (err: unknown) => void }) {
         />
       </label>
       <ErrorText>{error}</ErrorText>
-      <button type="submit" className={`${btnPrimary} w-full`} disabled={busy}>
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
+      <button type="submit" className={btnPrimary} disabled={busy}>
+        {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Plus className="size-4" aria-hidden />}
         Create link
       </button>
     </form>
@@ -200,19 +197,19 @@ function LinkRow({ link, onDelete }: { link: LinkSummary; onDelete: () => Promis
   const targetsText =
     link.mode !== "fair" && link.target_names.length > 0 ? `: ${link.target_names.join(", ")}` : "";
   return (
-    <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0 space-y-1">
+    <li className="flex flex-col gap-3 py-3.5 first:pt-1 last:pb-1 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="truncate font-medium">{title}</span>
+          <span className="truncate text-[15px] font-semibold">{title}</span>
           <StatusBadge status={link.status} />
         </div>
-        <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500 dark:text-slate-400">
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[13px] text-ink-muted">
           <span className="truncate">
             {MODE_LABEL[link.mode]}
             {targetsText}
           </span>
           <span className="inline-flex items-center gap-1">
-            <Users className="h-3 w-3" aria-hidden />
+            <Users className="size-3.5" aria-hidden />
             {link.player_count} {link.player_count === 1 ? "player" : "players"}
           </span>
           <span>{link.entry_count} names</span>
@@ -221,10 +218,10 @@ function LinkRow({ link, onDelete }: { link: LinkSummary; onDelete: () => Promis
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
         <Link to={`/admin/links/${link.id}`} aria-label={`Open controls for ${title}`} className={btnSecondary}>
-          <SlidersHorizontal className="h-4 w-4" aria-hidden />
+          <SlidersHorizontal className="size-4" aria-hidden />
           <span>Controls</span>
         </Link>
-        <CopyButton text={url} label={`Copy link for ${title}`} showText={false} />
+        <CopyButton text={url} label={`Copy link for ${title}`} showText={false} className={`${btnSecondary} w-11 !px-0`} />
         <DeleteWithConfirm label={`Delete link ${title}`} onConfirm={onDelete} compact />
       </div>
     </li>

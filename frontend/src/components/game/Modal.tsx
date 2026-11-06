@@ -50,7 +50,7 @@ export function Modal({ open, onClose, label, children, className = "" }: ModalP
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex animate-fade items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex animate-fade items-center justify-center bg-scrim p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -60,7 +60,7 @@ export function Modal({ open, onClose, label, children, className = "" }: ModalP
         role="dialog"
         aria-modal="true"
         aria-label={label}
-        className={`w-full max-w-md animate-pop rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-black/5 dark:bg-[#1c1830] dark:ring-white/10 ${className}`}
+        className={`w-full max-w-md animate-pop rounded-[28px] border border-border bg-surface p-7 text-ink ${className}`}
       >
         {children}
       </div>

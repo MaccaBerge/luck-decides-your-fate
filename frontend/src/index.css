@@ -1,17 +1,96 @@
+@import "@fontsource-variable/inter/wght.css";
+@import "@fontsource-variable/fredoka/wght.css";
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-@theme {
-  --font-sans: ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --animate-pop: pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1) both;
-  --animate-fade: fade 0.2s ease-out both;
-  --animate-toast: toast 0.25s ease-out both;
+:root {
+  --bg: #f6f6f4;
+  --surface: #ffffff;
+  --surface-muted: #fafaf9;
+  --surface-tint: #f4f2fa;
+  --border: #ececea;
+  --border-strong: #e4e4e7;
+  --divider: #f1f1ef;
+  --ink: #1c1830;
+  --ink-shadow: #000000;
+  --ink-muted: #6e6a80;
+  --primary: #5b3fd9;
+  --primary-shadow: #3e27a3;
+  --primary-strong: #4528b8;
+  --primary-soft: #eee9ff;
+  --primary-soft-ink: #2e2266;
+  --spin-glow: rgb(91 63 217 / 0.25);
+  --segment-shadow: rgb(45 35 80 / 0.14);
+  --success-soft: #ddf4ea;
+  --success-ink: #14532d;
+  --success-dot: #15803d;
+  --warn-soft: #fff4e0;
+  --warn-ink: #7a4b00;
+  --danger: #b3261e;
+  --on-danger: #ffffff;
+  --scrim: rgb(28 24 48 / 0.45);
+}
+.dark {
+  --bg: #121019;
+  --surface: #1b1824;
+  --surface-muted: #15131d;
+  --surface-tint: #221e2e;
+  --border: #2a2638;
+  --border-strong: #3a3550;
+  --divider: #25212f;
+  --ink: #f3f1fa;
+  --ink-shadow: #8f8aa3;
+  --ink-muted: #a8a3b8;
+  --primary: #6f54ea;
+  --primary-shadow: #4a34b8;
+  --primary-strong: #c4b6ff;
+  --primary-soft: #2a2348;
+  --primary-soft-ink: #e4ddff;
+  --spin-glow: rgb(111 84 234 / 0.3);
+  --segment-shadow: rgb(0 0 0 / 0.4);
+  --success-soft: #12352a;
+  --success-ink: #a7e9c9;
+  --success-dot: #34d399;
+  --warn-soft: #33260f;
+  --warn-ink: #ffd58a;
+  --danger: #ff9c8f;
+  --on-danger: #1c1830;
+  --scrim: rgb(0 0 0 / 0.6);
+}
+
+@theme inline {
+  --font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Fredoka Variable", "Inter Variable", system-ui, sans-serif;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-tint: var(--surface-tint);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-divider: var(--divider);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-ink: var(--primary-soft-ink);
+  --color-success-soft: var(--success-soft);
+  --color-success-ink: var(--success-ink);
+  --color-success-dot: var(--success-dot);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-ink: var(--warn-ink);
+  --color-danger: var(--danger);
+  --color-on-danger: var(--on-danger);
+  --color-scrim: var(--scrim);
+  --animate-pop: pop 0.18s ease-out both;
+  --animate-fade: fade 0.15s ease-out both;
+  --animate-toast: toast 0.2s ease-out both;
 }
 
 @keyframes pop {
-  from { opacity: 0; transform: scale(0.85) translateY(8px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
 }
 @keyframes fade {
   from { opacity: 0; }
@@ -22,27 +101,38 @@
   to { opacity: 1; transform: translate(-50%, 0); }
 }
 
-html {
-  color-scheme: light;
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    overflow-x: hidden;
+    background-color: var(--bg);
+    color: var(--ink);
+    font-size: 15px;
+  }
+  button:not(:disabled),
+  a,
+  label:has(input, [role="switch"]) {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
 }
-html.dark {
-  color-scheme: dark;
-}
-body {
-  margin: 0;
-  min-height: 100vh;
-  overflow-x: hidden;
-  background-color: #faf7ff;
-  background-image:
-    radial-gradient(circle at 10% 0%, rgba(236, 72, 153, 0.12), transparent 40%),
-    radial-gradient(circle at 90% 10%, rgba(139, 92, 246, 0.14), transparent 45%),
-    radial-gradient(circle at 50% 100%, rgba(6, 182, 212, 0.1), transparent 50%);
-  background-attachment: fixed;
-}
-html.dark body {
-  background-color: #0f0c1d;
-  background-image:
-    radial-gradient(circle at 10% 0%, rgba(236, 72, 153, 0.14), transparent 40%),
-    radial-gradient(circle at 90% 10%, rgba(139, 92, 246, 0.18), transparent 45%),
-    radial-gradient(circle at 50% 100%, rgba(6, 182, 212, 0.08), transparent 50%);
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

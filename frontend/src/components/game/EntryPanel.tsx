@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { ClipboardList, Plus, RotateCcw, Shuffle } from "lucide-react";
 import type { Entry } from "../../lib/types";
 import { EntryRow } from "./EntryRow";
 import { Switch } from "./Switch";
+import { card, darkBtn, pillBtn } from "./buttons";
 
 interface Props {
   entries: Entry[];
@@ -21,9 +21,6 @@ interface Props {
 
 const MAX_ENTRIES = 100;
 
-const toolBtn =
-  "inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-slate-200 disabled:hover:text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-violet-400/50 dark:hover:text-violet-300";
-
 export function EntryPanel(p: Props) {
   const [name, setName] = useState("");
   const sorted = [...p.entries].sort((a, b) => a.position - b.position);
@@ -38,85 +35,94 @@ export function EntryPanel(p: Props) {
     if (ok) setName("");
   };
 
-  const row = (e: Entry) => (
-    <EntryRow
-      key={e.id}
-      entry={e}
-      disabled={p.disabled}
-      onRename={(n) => p.onRename(e, n)}
-      onColor={(c) => p.onColor(e, c)}
-      onToggle={() => p.onToggle(e)}
-      onRemove={() => p.onRemove(e)}
-    />
-  );
-
   return (
-    <section
-      aria-label="Names"
-      className="flex min-h-0 flex-col rounded-[28px] bg-white/80 p-4 shadow-xl shadow-violet-900/5 ring-1 ring-black/5 backdrop-blur sm:p-5 dark:bg-white/[0.04] dark:shadow-black/30 dark:ring-white/10"
-    >
-      <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">Names</h2>
-        <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-          {active.length} on the wheel{inactive.length > 0 ? ` · ${inactive.length} hidden` : ""}
+    <aside aria-label="Names" className="flex min-w-0 flex-col gap-4">
+      <section className={`${card} flex min-h-0 flex-col gap-5 p-6`}>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-display text-[21px] font-semibold text-ink">Names</h2>
+          <span className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary-strong">
+            {active.length} on the wheel{inactive.length > 0 ? `, ${inactive.length} hidden` : ""}
+          </span>
+        </div>
+
+        <form
+          className="flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void add();
+          }}
+        >
+          <input
+            aria-label="New name"
+            placeholder="Add a name"
+            value={name}
+            maxLength={40}
+            disabled={p.disabled || full}
+            onChange={(e) => setName(e.target.value)}
+            className="h-11 min-w-0 flex-1 rounded-xl border border-border-strong bg-surface-muted px-3.5 text-[15px] text-ink placeholder:text-ink-muted disabled:opacity-60"
+          />
+          <button
+            type="submit"
+            aria-label="Add name"
+            disabled={p.disabled || full || !name.trim()}
+            // An empty input isn't an error state, so the button keeps its normal look.
+            className={`${darkBtn} ${p.disabled || full ? "" : "disabled:opacity-100 disabled:shadow-[0_3px_0_var(--ink-shadow)]"}`}
+          >
+            Add name
+          </button>
+        </form>
+
+        {sorted.length === 0 ? (
+          <p className="py-6 text-center text-sm text-ink-muted">No names yet. Add a few, or paste a whole list.</p>
+        ) : (
+          // Scrolling clips at the list's edge, so the padding leaves room for row buttons, hover tints and focus rings.
+          <ul className="-mx-4 -my-2 flex flex-col overflow-y-auto px-4 md:max-h-[calc(100dvh-29rem)] md:min-h-[150px]">
+            {[...active, ...inactive].map((e) => (
+              <EntryRow
+                key={e.id}
+                entry={e}
+                disabled={p.disabled}
+                onRename={(n) => p.onRename(e, n)}
+                onColor={(c) => p.onColor(e, c)}
+                onToggle={() => p.onToggle(e)}
+                onRemove={() => p.onRemove(e)}
+              />
+            ))}
+          </ul>
+        )}
+
+        {full && <p className="text-sm text-ink-muted">That's the maximum of {MAX_ENTRIES} names. Remove one to add another.</p>}
+
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={p.onOpenPaste} disabled={p.disabled || full} className={pillBtn}>
+            Paste names
+          </button>
+          <button
+            type="button"
+            onClick={p.onShuffle}
+            disabled={p.disabled || active.length < 2}
+            aria-label="Shuffle names"
+            className={pillBtn}
+          >
+            Shuffle names
+          </button>
+          <button
+            type="button"
+            onClick={p.onRestore}
+            disabled={p.disabled || inactive.length === 0}
+            aria-label="Restore all names"
+            className={pillBtn}
+          >
+            Restore all names
+          </button>
+        </div>
+      </section>
+
+      <label className={`${card} flex items-center justify-between gap-4 px-6 py-[18px]`}>
+        <span className="flex flex-col gap-0.5">
+          <span className="text-[15px] font-semibold text-ink">Remove winner after spin</span>
+          <span className="text-[13px] text-ink-muted">Last one standing loses</span>
         </span>
-      </div>
-
-      <form
-        className="flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void add();
-        }}
-      >
-        <input
-          aria-label="New name"
-          placeholder="Add a name…"
-          value={name}
-          maxLength={40}
-          disabled={p.disabled || full}
-          onChange={(e) => setName(e.target.value)}
-          className="min-w-0 flex-1 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/20 disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-white"
-        />
-        <button
-          type="submit"
-          aria-label="Add name"
-          disabled={p.disabled || full || !name.trim()}
-          className="grid size-11 shrink-0 place-items-center rounded-full bg-violet-600 text-white shadow-md shadow-violet-500/30 transition hover:bg-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Plus className="size-5" aria-hidden="true" />
-        </button>
-      </form>
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" onClick={p.onOpenPaste} disabled={p.disabled || full} className={toolBtn}>
-          <ClipboardList className="size-4" aria-hidden="true" />
-          Paste names
-        </button>
-        <button
-          type="button"
-          onClick={p.onShuffle}
-          disabled={p.disabled || active.length < 2}
-          aria-label="Shuffle names"
-          className={toolBtn}
-        >
-          <Shuffle className="size-4" aria-hidden="true" />
-          Shuffle
-        </button>
-        <button
-          type="button"
-          onClick={p.onRestore}
-          disabled={p.disabled || inactive.length === 0}
-          aria-label="Restore all names"
-          className={toolBtn}
-        >
-          <RotateCcw className="size-4" aria-hidden="true" />
-          Restore all
-        </button>
-      </div>
-
-      <label className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 dark:bg-white/5">
-        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Remove winner after spin</span>
         <Switch
           label="Remove winner after spin"
           checked={p.removeWinner}
@@ -124,27 +130,6 @@ export function EntryPanel(p: Props) {
           onChange={p.onRemoveWinnerChange}
         />
       </label>
-
-      <div className="mt-3 -mr-1 min-h-0 flex-1 overflow-y-auto pr-1 md:max-h-[calc(100vh-24rem)]">
-        {sorted.length === 0 ? (
-          <div className="rounded-2xl border-2 border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
-            No names yet. Add a few, or paste a whole list.
-          </div>
-        ) : (
-          <>
-            <ul className="space-y-0.5">{active.map(row)}</ul>
-            {inactive.length > 0 && (
-              <>
-                <p className="mt-4 mb-1 px-2 text-xs font-bold tracking-wider text-slate-400 uppercase">Hidden</p>
-                <ul className="space-y-0.5">{inactive.map(row)}</ul>
-              </>
-            )}
-          </>
-        )}
-      </div>
-      {full && (
-        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">That's the max of {MAX_ENTRIES} names.</p>
-      )}
-    </section>
+    </aside>
   );
 }

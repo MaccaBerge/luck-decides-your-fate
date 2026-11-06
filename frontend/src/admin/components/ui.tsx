@@ -1,20 +1,34 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Check, Copy, LogOut, Trash2, X } from "lucide-react";
+import { Check, Copy, Trash2, X } from "lucide-react";
 import type { Mode } from "../../lib/types";
 import type { LinkStatus } from "../adminTypes";
+import { card as sharedCard, pillBtn, primaryBtn, secondaryBtn, textBtn } from "../../components/game/buttons";
+import { WheelMark } from "../../components/game/WheelMark";
 
-export const btn =
-  "inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50";
-export const btnPrimary = `${btn} bg-indigo-600 text-white hover:bg-indigo-500`;
-export const btnSecondary = `${btn} border border-slate-300 bg-white text-slate-800 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700`;
-export const btnDanger = `${btn} bg-red-600 text-white hover:bg-red-500`;
-export const btnGhostDanger = `${btn} text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/50`;
+export const btnPrimary = primaryBtn;
+export const btnSecondary = secondaryBtn;
+export const btnPill = pillBtn;
+export const btnDanger = `${secondaryBtn} !border-danger !bg-danger !text-on-danger`;
+export const btnGhostDanger = `${textBtn} !text-danger hover:bg-danger/10`;
 export const input =
-  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100";
-export const card =
-  "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-5";
+  "h-11 w-full rounded-xl border border-border-strong bg-surface-muted px-3.5 text-[15px] text-ink placeholder:text-ink-muted";
+export const textarea =
+  "w-full resize-y rounded-[14px] border border-border-strong bg-surface-muted px-3.5 py-3 text-[15px] leading-normal text-ink placeholder:text-ink-muted";
+export const fieldLabel = "text-[13px] font-medium text-ink-muted";
+export const cardTitle = "font-display text-[19px] font-semibold";
+export const card = `${sharedCard} p-6`;
+export const page = "mx-auto flex w-full max-w-[1180px] flex-col gap-6 px-4 pt-7 pb-12 sm:px-6";
 
 export const MODE_LABEL: Record<Mode, string> = { fair: "Fair", always: "Always", never: "Never" };
+
+export function Wordmark({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <WheelMark />
+      <span className="font-display text-[19px] font-semibold">{children}</span>
+    </div>
+  );
+}
 
 export function ModeRadioGroup({
   name,
@@ -29,16 +43,16 @@ export function ModeRadioGroup({
 }) {
   const modes: Mode[] = ["fair", "always", "never"];
   return (
-    <div role="radiogroup" aria-label="Mode" className="grid grid-cols-3 gap-2">
+    <div role="radiogroup" aria-label="Mode" className="grid grid-cols-3 gap-1 rounded-full bg-surface-tint p-1">
       {modes.map((m) => {
         const checked = value === m;
         return (
           <label
             key={m}
-            className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border px-2 py-2 text-sm font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-indigo-500 ${
+            className={`relative flex h-[42px] items-center justify-center rounded-full has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary ${
               checked
-                ? "border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-950/60 dark:text-indigo-200"
-                : "border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                ? "bg-surface font-display text-base font-semibold text-primary-strong shadow-[0_2px_6px_var(--segment-shadow)]"
+                : "text-sm font-medium text-ink-muted hover:text-ink"
             } ${disabled ? "opacity-60" : ""}`}
           >
             <input
@@ -48,7 +62,7 @@ export function ModeRadioGroup({
               checked={checked}
               disabled={disabled}
               onChange={() => onChange(m)}
-              className="h-4 w-4 accent-indigo-600"
+              className="absolute inset-0 m-0 cursor-pointer appearance-none rounded-full opacity-0"
             />
             {MODE_LABEL[m]}
           </label>
@@ -59,30 +73,16 @@ export function ModeRadioGroup({
 }
 
 const STATUS: Record<LinkStatus, { text: string; dot: string; pill: string }> = {
-  created: {
-    text: "Created",
-    dot: "bg-slate-50 ring-1 ring-slate-400",
-    pill: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
-  },
-  connected: {
-    text: "Connected",
-    dot: "bg-emerald-500",
-    pill: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
-  },
-  disconnected: {
-    text: "Disconnected",
-    dot: "bg-slate-400",
-    pill: "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300",
-  },
+  created: { text: "Created", dot: "bg-ink-muted", pill: "bg-surface-tint text-ink-muted" },
+  connected: { text: "Connected", dot: "bg-success-dot", pill: "bg-success-soft text-success-ink" },
+  disconnected: { text: "Disconnected", dot: "bg-ink-muted", pill: "bg-surface-tint text-ink-muted" },
 };
 
 export function StatusBadge({ status }: { status: LinkStatus }) {
   const s = STATUS[status];
   return (
-    <span
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${s.pill}`}
-    >
-      <span aria-hidden className={`h-2 w-2 rounded-full ${s.dot}`} />
+    <span className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold ${s.pill}`}>
+      <span aria-hidden className={`size-2 rounded-full ${s.dot}`} />
       <span data-testid="link-status">{s.text}</span>
     </span>
   );
@@ -118,11 +118,13 @@ export function CopyButton({
   text,
   label,
   showText = true,
+  idleText = "Copy",
   className = btnSecondary,
 }: {
   text: string;
   label: string;
   showText?: boolean;
+  idleText?: string;
   className?: string;
 }) {
   const [state, setState] = useState<"idle" | "ok" | "fail">("idle");
@@ -139,8 +141,8 @@ export function CopyButton({
       className={className}
       onClick={async () => setState((await copyText(text)) ? "ok" : "fail")}
     >
-      {state === "ok" ? <Check className="h-4 w-4" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}
-      {showText && <span>{state === "ok" ? "Copied" : state === "fail" ? "Copy failed" : "Copy"}</span>}
+      {state === "ok" ? <Check className="size-4" aria-hidden /> : !showText && <Copy className="size-4" aria-hidden />}
+      {showText && <span>{state === "ok" ? "Copied" : state === "fail" ? "Copy failed" : idleText}</span>}
     </button>
   );
 }
@@ -206,8 +208,7 @@ export function DeleteWithConfirm({
 
 export function LogoutButton({ onClick }: { onClick: () => void }) {
   return (
-    <button type="button" className={btnSecondary} onClick={onClick}>
-      <LogOut className="h-4 w-4" aria-hidden />
+    <button type="button" className={textBtn} onClick={onClick}>
       Log out
     </button>
   );
@@ -216,7 +217,7 @@ export function LogoutButton({ onClick }: { onClick: () => void }) {
 export function ErrorText({ children }: { children: ReactNode }) {
   if (!children) return null;
   return (
-    <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+    <p role="alert" className="text-sm text-danger">
       {children}
     </p>
   );

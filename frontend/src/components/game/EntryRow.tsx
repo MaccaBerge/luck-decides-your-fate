@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Eye, EyeOff, Palette, Pencil, Trash2 } from "lucide-react";
+import { Eye, EyeOff, X } from "lucide-react";
 import type { Entry } from "../../lib/types";
+import { iconBtn } from "./buttons";
 
 interface Props {
   entry: Entry;
@@ -10,9 +11,6 @@ interface Props {
   onToggle: () => void;
   onRemove: () => void;
 }
-
-const iconBtn =
-  "grid size-9 shrink-0 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-violet-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white";
 
 export function EntryRow({ entry, disabled, onRename, onColor, onToggle, onRemove }: Props) {
   const [editing, setEditing] = useState(false);
@@ -43,21 +41,19 @@ export function EntryRow({ entry, disabled, onRename, onColor, onToggle, onRemov
   };
 
   return (
-    <li
-      className={`group flex items-center gap-1.5 rounded-2xl py-1 pr-1 pl-2 transition ${
-        entry.is_active ? "hover:bg-slate-50 dark:hover:bg-white/5" : "opacity-55"
-      }`}
-    >
-      <span className="relative shrink-0">
+    <li className="flex min-h-[50px] shrink-0 items-center border-b border-divider last:border-b-0">
+      <span className="relative -ml-3.5 shrink-0">
         <button
           type="button"
           aria-label={`Change color for ${entry.name}`}
           disabled={disabled}
           onClick={() => colorRef.current?.click()}
-          className="grid size-7 place-items-center rounded-full ring-2 ring-white shadow-sm transition hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:cursor-not-allowed dark:ring-white/10"
-          style={{ backgroundColor: entry.is_active ? entry.color : "#94a3b8" }}
+          className="grid size-11 place-items-center rounded-xl transition-colors enabled:hover:bg-surface-tint disabled:cursor-not-allowed"
         >
-          <Palette className="size-3.5 text-white/90 opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
+          <span
+            className={`size-3.5 rounded-full ${entry.is_active ? "" : "opacity-40 grayscale"}`}
+            style={{ backgroundColor: entry.color }}
+          />
         </button>
         <input
           ref={colorRef}
@@ -67,7 +63,7 @@ export function EntryRow({ entry, disabled, onRename, onColor, onToggle, onRemov
           value={entry.color.toLowerCase()}
           disabled={disabled}
           onChange={(e) => onColor(e.target.value.toUpperCase())}
-          className="pointer-events-none absolute inset-0 size-7 opacity-0"
+          className="pointer-events-none absolute inset-0 size-11 opacity-0"
         />
       </span>
 
@@ -86,23 +82,23 @@ export function EntryRow({ entry, disabled, onRename, onColor, onToggle, onRemov
               setEditing(false);
             }
           }}
-          className="min-w-0 flex-1 rounded-xl border border-violet-400 bg-white px-2.5 py-1.5 text-base text-slate-900 outline-none focus:ring-4 focus:ring-violet-500/20 dark:bg-white/5 dark:text-white"
+          className="h-9 min-w-0 flex-1 rounded-lg border border-border-strong bg-surface-muted px-2 text-[15px] font-medium text-ink"
         />
       ) : (
-        <span
-          className={`min-w-0 flex-1 truncate px-1 text-[15px] font-semibold ${
-            entry.is_active ? "text-slate-800 dark:text-slate-100" : "text-slate-500 line-through decoration-slate-400/60 dark:text-slate-400"
-          }`}
-          onDoubleClick={() => !disabled && startEdit()}
+        <button
+          type="button"
+          aria-label={`Edit ${entry.name}`}
           title={entry.name}
+          disabled={disabled}
+          onClick={startEdit}
+          className={`h-11 min-w-0 flex-1 truncate rounded-lg text-left text-[15px] font-medium decoration-ink-muted underline-offset-3 enabled:hover:underline disabled:cursor-default ${
+            entry.is_active ? "text-ink" : "text-ink-muted line-through"
+          }`}
         >
           {entry.name}
-        </span>
+        </button>
       )}
 
-      <button type="button" aria-label={`Edit ${entry.name}`} disabled={disabled} onClick={startEdit} className={iconBtn}>
-        <Pencil className="size-4" aria-hidden="true" />
-      </button>
       <button
         type="button"
         aria-label={`${entry.is_active ? "Hide" : "Show"} ${entry.name}`}
@@ -117,9 +113,9 @@ export function EntryRow({ entry, disabled, onRename, onColor, onToggle, onRemov
         aria-label={`Remove ${entry.name}`}
         disabled={disabled}
         onClick={onRemove}
-        className={`${iconBtn} hover:!bg-red-50 hover:!text-red-600 dark:hover:!bg-red-500/15 dark:hover:!text-red-400`}
+        className={`${iconBtn} -mr-3`}
       >
-        <Trash2 className="size-4" aria-hidden="true" />
+        <X className="size-4" aria-hidden="true" />
       </button>
     </li>
   );

@@ -58,7 +58,7 @@ describe("§11.8 accessible names", () => {
     expect(paste).toContain('aria-label="Names, one per line"');
     expect(paste).toContain(">Add names<");
     const res = renderToStaticMarkup(
-      <ResultDialog winner={{ name: "Anna", color: "#EF4444" }} showRemove removing={false} onClose={noop} onRemove={noop} />,
+      <ResultDialog winner={{ name: "Anna" }} showRemove removing={false} onClose={noop} onRemove={noop} />,
     );
     expect(res).toMatch(/role="dialog"[^>]*aria-label="Result"/);
     expect(res).toContain('data-testid="winner-name"');

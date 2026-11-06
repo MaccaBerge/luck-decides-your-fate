@@ -43,7 +43,7 @@ async def test_add_entries_positions_and_colors(db):
     assert [e.name for e in entries] == names
     for e in entries:
         assert re.fullmatch(r"en_[a-z0-9]{10}", e.id)
-        assert e.color == PALETTE[e.position % 12]
+        assert e.color in PALETTE
         assert e.is_active and e.game_id == g.id and ISO.match(e.created_at)
     assert await repo.list_entries(g.id) == entries
 
@@ -276,3 +276,13 @@ async def test_reinit_with_other_path(tmp_path):
     # init_db is idempotent on an existing DB
     await init_db(str(tmp_path / "a" / "one.db"))
     assert await repo.get_game(g.id) is not None
+
+
+async def test_new_entries_never_match_a_neighbouring_slice():
+    g = await repo.create_game(origin="public")
+    await repo.add_entries(g.id, [f"n{i}" for i in range(6)])
+    for extra in ("a", "b", "c", "d", "e", "f"):
+        entries = await repo.add_entries(g.id, [extra])
+        colors = [e.color for e in sorted(entries, key=lambda e: e.position)]
+        for i, color in enumerate(colors):
+            assert color != colors[(i + 1) % len(colors)], colors
