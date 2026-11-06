@@ -60,7 +60,7 @@ def test_missing_asset_is_not_cached(spa):
     assert r.headers["cache-control"] == "no-store"
 
 
-@pytest.mark.parametrize("path", ["/", "/g/abcdefgh", "/admin", "/admin/links/abcdefgh"])
+@pytest.mark.parametrize("path", ["/", "/g/abcdefgh", "/privacy", "/admin", "/admin/links/abcdefgh"])
 def test_index_html_is_no_cache(spa, path):
     r = spa.get(path)
     assert r.headers["content-type"].startswith("text/html")

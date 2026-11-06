@@ -17,6 +17,7 @@ import { PasteNamesDialog } from "../components/game/PasteNamesDialog";
 import { ResultDialog } from "../components/game/ResultDialog";
 import { Toast, type ToastMsg } from "../components/game/Toast";
 import { Loading } from "../components/game/Loading";
+import { PrivacyLink } from "../components/game/PrivacyLink";
 import NotFoundPage from "./NotFoundPage";
 
 interface Result {
@@ -319,6 +320,10 @@ export default function GamePage() {
           onRemoveWinnerChange={(v) => void mutate(() => api.updateSettings(game.id, { remove_winner: v }))}
         />
       </main>
+
+      <footer className="-mt-4 flex justify-center">
+        <PrivacyLink />
+      </footer>
 
       <PasteNamesDialog
         open={pasteOpen}
