@@ -60,14 +60,28 @@ describe("pegCount", () => {
 });
 
 describe("flapperAngle", () => {
+  const spacing = 360 / 16;
   it("is exactly upright when the wheel has stopped", () => {
-    expect(Math.abs(flapperAngle(123.4, 16, 0))).toBe(0);
+    expect(Math.abs(flapperAngle(spacing, 16, 0))).toBe(0);
   });
-  it("is dragged clockwise and grows through a peg's travel", () => {
-    const early = flapperAngle(2, 16, 1);
-    const late = flapperAngle(20, 16, 1);
-    expect(early).toBeLessThan(0);
-    expect(late).toBeLessThan(early);
+  it("hangs upright between pegs", () => {
+    expect(Math.abs(flapperAngle(spacing / 2, 16, 1))).toBe(0);
+  });
+  it("is pushed clockwise further as a peg crosses the top, then snaps back", () => {
+    const touching = flapperAngle(spacing - 1.5, 16, 1);
+    const atTop = flapperAngle(spacing, 16, 1);
+    const slipping = flapperAngle(spacing + 1.5, 16, 1);
+    expect(touching).toBeLessThan(0);
+    expect(atTop).toBeLessThan(touching);
+    expect(slipping).toBeLessThan(atTop);
+    expect(Math.abs(flapperAngle(spacing + 3, 16, 1))).toBe(0);
+  });
+  it("stays within its swing when pegs are denser than the contact window", () => {
+    for (let r = 0; r < 10; r += 0.1) {
+      const a = flapperAngle(r, 100, 1);
+      expect(a).toBeLessThanOrEqual(0);
+      expect(a).toBeGreaterThanOrEqual(-0.5);
+    }
   });
 });
 

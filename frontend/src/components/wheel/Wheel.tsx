@@ -249,12 +249,14 @@ export default function Wheel({
     ctx.fillStyle = BRASS;
     ctx.fill();
 
-    // Flapper: pivots on the rim at 12 o'clock, and its tip marks the winning slice.
-    const fw = Math.max(9, px * 0.042);
-    const fl = rimW / 2 + Math.max(14, px * 0.07);
+    // Flapper: the base is mounted above the rim, clear of the pegs, and only the narrow tip hangs
+    // down into their path. The tip marks the winning slice.
+    const pivotY = px * 0.026;
+    const fw = px * 0.04;
+    const fl = px * 0.072;
     const shoulder = -fw * 0.42;
     ctx.save();
-    ctx.translate(c, c - Ro + rimW / 2);
+    ctx.translate(c, pivotY);
     ctx.rotate(flapperRef.current);
     ctx.beginPath();
     ctx.moveTo(-fw / 2, shoulder);

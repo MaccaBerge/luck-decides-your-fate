@@ -30,14 +30,24 @@ export function pegCount(n: number): number {
   return n * Math.ceil(16 / n);
 }
 
+// Where a rim peg meets the flapper, in degrees of wheel travel around 12 o'clock.
+const PEG_CONTACT_DEG = 2.4; // the peg touches the flapper's edge this far before the top
+const PEG_RELEASE_DEG = 1.8; // and slips past its tip this far after it
+
 /**
- * Flapper angle in radians, negative = tip pushed clockwise by the passing peg. A peg drags the
- * tip until it slips past, then the tip snaps back. Amplitude follows wheel speed, so the flapper
- * is exactly upright when the wheel stops and always points at the winning slice.
+ * Flapper angle in radians, negative = tip pushed clockwise. Pegs move left to right across the
+ * top: each one catches the flapper, pushes it aside, then slips past so it snaps back upright.
+ * Amplitude follows wheel speed, so the flapper is exactly upright when the wheel stops and
+ * always points at the winning slice.
  */
-export function flapperAngle(rotation: number, pegs: number, degPerMs: number, maxRad = 0.38): number {
-  const phase = mod(rotation, 360 / pegs) / (360 / pegs);
-  return -maxRad * Math.min(1, Math.max(0, degPerMs) / 0.04) * phase * phase;
+export function flapperAngle(rotation: number, pegs: number, degPerMs: number, maxRad = 0.5): number {
+  const spacing = 360 / pegs;
+  const fit = Math.min(1, spacing / (PEG_CONTACT_DEG + PEG_RELEASE_DEG)); // dense pegs: always touching
+  const contact = PEG_CONTACT_DEG * fit;
+  const span = contact + PEG_RELEASE_DEG * fit;
+  const travel = mod(rotation + contact, spacing);
+  if (travel >= span) return 0;
+  return -maxRad * Math.min(1, Math.max(0, degPerMs) / 0.04) * (travel / span);
 }
 
 export const INK = "#13261F";
