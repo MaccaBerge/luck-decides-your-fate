@@ -5,6 +5,7 @@ import { EntryPanel } from "./EntryPanel";
 import { GameToolbar } from "./GameToolbar";
 import { PasteNamesDialog } from "./PasteNamesDialog";
 import { ResultDialog } from "./ResultDialog";
+import { SavedListsDialog } from "./SavedListsDialog";
 
 const noop = () => {};
 const entries: Entry[] = [
@@ -21,6 +22,7 @@ describe("§11.8 accessible names", () => {
         disabled={false}
         onAdd={async () => true}
         onOpenPaste={noop}
+        onOpenSavedLists={noop}
         onRename={noop}
         onColor={noop}
         onToggle={noop}
@@ -34,6 +36,7 @@ describe("§11.8 accessible names", () => {
       'aria-label="New name"',
       'aria-label="Add name"',
       ">Paste names<",
+      ">Saved lists<",
       'aria-label="Shuffle names"',
       'aria-label="Restore all names"',
       'role="switch"',
@@ -64,5 +67,11 @@ describe("§11.8 accessible names", () => {
     expect(res).toContain('data-testid="winner-name"');
     expect(res).toContain(">Close<");
     expect(res).toContain("Remove from wheel");
+    const saved = renderToStaticMarkup(
+      <SavedListsDialog open names={["Anna"]} disabled={false} onClose={noop} onLoad={async () => true} />,
+    );
+    expect(saved).toMatch(/role="dialog"[^>]*aria-label="Saved lists"/);
+    expect(saved).toContain('aria-label="List name"');
+    expect(saved).toContain(">Save list<");
   });
 });

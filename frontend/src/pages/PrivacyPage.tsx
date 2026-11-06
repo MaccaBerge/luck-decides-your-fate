@@ -33,8 +33,8 @@ export default function PrivacyPage() {
           aren't deleted automatically; the operator removes them.
         </Section>
         <Section title="On your device">
-          Your browser's local storage keeps your theme, your sound setting and your last wheel. The site uses no
-          advertising or tracking cookies.
+          Your browser's local storage keeps your theme, your sound setting, your last wheel and any name lists you
+          save. The site uses no advertising or tracking cookies.
         </Section>
         <Section title="Hosting">
           The site runs on Railway behind Cloudflare, whose systems process technical data such as IP addresses.
