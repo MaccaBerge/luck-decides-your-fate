@@ -1,10 +1,23 @@
-"""Consistent SQLite snapshots for the admin backup download."""
+"""Consistent SQLite snapshots, for the admin backup download and automatic backups."""
 from __future__ import annotations
 
 import os
+import re
 import sqlite3
 import tempfile
+from dataclasses import dataclass
 from datetime import datetime, timezone
+
+BACKUP_FILENAME_RE = re.compile(r"luckdecidesyourfate-\d{8}-\d{6}\.db")
+
+
+@dataclass
+class BackupStatus:
+    """What the admin dashboard shows about automatic backups."""
+
+    enabled: bool = False
+    last_success_at: str | None = None
+    last_error: str | None = None  # an exception class name, never its message
 
 
 def backup_filename(now: datetime | None = None) -> str:

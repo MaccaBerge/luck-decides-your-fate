@@ -58,7 +58,7 @@ async def dashboard(ctx: AppContext) -> Dashboard:
     for game in await repo.list_admin_links():
         entries = await repo.list_entries(game.id)
         links.append(link_summary(ctx, game, entries))
-    return ser.dashboard(ctx.manager.live_games(), links)
+    return ser.dashboard(ctx.manager.live_games(), links, ctx.backup_status)
 
 
 async def dashboard_payload(ctx: AppContext) -> dict:

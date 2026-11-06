@@ -5,7 +5,7 @@ Real environment variables always win over values in `.env` (``override=False``)
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -37,7 +37,24 @@ class Settings:
     frontend_dist: str = "../frontend/dist"
     login_rate_limit_attempts: int = 5
     login_rate_limit_window_seconds: int = 60
+    backup_s3_endpoint: str | None = field(default=None, repr=False)
+    backup_s3_bucket: str | None = field(default=None, repr=False)
+    backup_s3_access_key_id: str | None = field(default=None, repr=False)
+    backup_s3_secret_access_key: str | None = field(default=None, repr=False)
+    backup_interval_hours: int = 24
+    backup_keep: int = 14
 
+    @property
+    def backups_enabled(self) -> bool:
+        return self.backup_s3_endpoint is not None
+
+
+BACKUP_S3_VARS = (
+    "BACKUP_S3_ENDPOINT",
+    "BACKUP_S3_BUCKET",
+    "BACKUP_S3_ACCESS_KEY_ID",
+    "BACKUP_S3_SECRET_ACCESS_KEY",
+)
 
 _TRUE_VALUES = {"true", "1", "yes"}
 _FALSE_VALUES = {"false", "0", "no"}
@@ -72,6 +89,15 @@ def _env_positive_int(name: str, default: int) -> int:
     return value
 
 
+def _backup_s3_values() -> dict[str, str | None]:
+    """All four values, or none: a partial setup is a mistake, not a way to turn backups off."""
+    values = {name: (os.environ.get(name) or "").strip() or None for name in BACKUP_S3_VARS}
+    missing = [name for name, value in values.items() if value is None]
+    if missing and len(missing) < len(BACKUP_S3_VARS):
+        raise ConfigError(f"ERROR: backups need all of {', '.join(BACKUP_S3_VARS)}; missing {', '.join(missing)}")
+    return values
+
+
 def load_settings() -> Settings:
     """Load settings from the environment. Raises ConfigError if ADMIN_PASSWORD is missing."""
     load_dotenv(BACKEND_DIR / ".env", override=False)
@@ -85,6 +111,7 @@ def load_settings() -> Settings:
             "ERROR: SPIN_DURATION_MS_MIN must be > 0 and <= SPIN_DURATION_MS_MAX "
             f"(got {spin_min} / {spin_max})"
         )
+    backup_s3 = _backup_s3_values()
     return Settings(
         admin_password=password,
         database_path=os.environ.get("DATABASE_PATH") or "./data/luckdecidesyourfate.db",
@@ -95,6 +122,12 @@ def load_settings() -> Settings:
         frontend_dist=os.environ.get("FRONTEND_DIST") or "../frontend/dist",
         login_rate_limit_attempts=_env_positive_int("LOGIN_RATE_LIMIT_ATTEMPTS", 5),
         login_rate_limit_window_seconds=_env_positive_int("LOGIN_RATE_LIMIT_WINDOW_SECONDS", 60),
+        backup_s3_endpoint=backup_s3["BACKUP_S3_ENDPOINT"],
+        backup_s3_bucket=backup_s3["BACKUP_S3_BUCKET"],
+        backup_s3_access_key_id=backup_s3["BACKUP_S3_ACCESS_KEY_ID"],
+        backup_s3_secret_access_key=backup_s3["BACKUP_S3_SECRET_ACCESS_KEY"],
+        backup_interval_hours=_env_positive_int("BACKUP_INTERVAL_HOURS", 24),
+        backup_keep=_env_positive_int("BACKUP_KEEP", 14),
     )
 
 
@@ -104,5 +137,6 @@ def config_summary(settings: Settings, *, frontend_served: bool) -> str:
         f"config: db={settings.database_path} "
         f"cookie_secure={'true' if settings.cookie_secure else 'false'} "
         f"ttl_days={settings.game_ttl_days} "
-        f"frontend={'yes' if frontend_served else 'no'}"
+        f"frontend={'yes' if frontend_served else 'no'} "
+        f"backups={'on' if settings.backups_enabled else 'off'}"
     )

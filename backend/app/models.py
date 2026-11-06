@@ -106,9 +106,16 @@ class AdminGameState(BaseModel):
     spin_history: list[AdminSpinRecord]   # newest first, max 50
 
 
+class BackupStatusOut(BaseModel):
+    enabled: bool
+    last_success_at: str | None
+    last_error: str | None         # short and generic: never a URL or key
+
+
 class Dashboard(BaseModel):
     live_games: int                # games of ANY origin with >= 1 player socket
     links: list[LinkSummary]       # admin links only, newest created first
+    backup: BackupStatusOut
 
 
 class CreateLinkRequest(BaseModel):
