@@ -1,24 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Entry, SpinStarted } from "../../lib/types";
 import { playTick, playWin } from "../../lib/sound";
-import {
-  computeFinalRotation,
-  easeOutQuart,
-  FLAPPER_LENGTH,
-  FLAPPER_PIVOT_Y,
-  FLAPPER_SHOULDER,
-  FLAPPER_WIDTH,
-  type FlapperState,
-  INK,
-  mod,
-  PEG_RADIUS,
-  PEG_RING,
-  pegCount,
-  pegGrip,
-  sliceAtPointer,
-  stepFlapper,
-  textColorFor,
-} from "./wheelMath";
+import { SLICE_COLORS } from "../../lib/palette";
+import { computeFinalRotation, easeOutQuart, mod, sliceAtPointer, textColorFor } from "./wheelMath";
 
 export interface WheelProps {
   /** Full list; draws active ones in position order when idle. */
@@ -32,6 +16,8 @@ export interface WheelProps {
   size?: number;
   /** Default "Wheel with {n} names". */
   ariaLabel?: string;
+  /** Draw the centre dot. Off where a Spin button sits on top of the wheel. */
+  showHub?: boolean;
 }
 
 interface Slice {
@@ -40,17 +26,20 @@ interface Slice {
   color: string;
 }
 
-const FALLBACK_COLORS = [
-  "#D23C28", "#1A9E96", "#F2BE2E", "#3D4DB0", "#EC7A92", "#27804F",
-  "#EE8A1D", "#3F97E4", "#B83F96", "#8FB83A", "#7650B8", "#8A5638",
-];
+const LABEL_FONT = '"Fredoka Variable", system-ui, sans-serif';
 
-// The wheel is an object on the table: it looks the same in light and dark mode.
-const WALNUT = "#2F1E14";
-const BRASS = "#E3A81F";
-const BLANK_FACE = "#EEF1E8";
-const FLAPPER = "#F7F3E3";
-const LABEL_FONT = '"Schibsted Grotesk Variable", system-ui, sans-serif';
+/** Theme colours the canvas can't get from Tailwind. */
+function readTokens() {
+  const css = getComputedStyle(document.documentElement);
+  const token = (name: string) => css.getPropertyValue(name).trim();
+  return {
+    ring: token("--bg"),
+    surface: token("--surface"),
+    tint: token("--surface-tint"),
+    ink: token("--ink"),
+    primary: token("--primary"),
+  };
+}
 
 interface FittedLabel {
   text: string;
@@ -78,9 +67,9 @@ function fitLabel(
   const base = Math.max(10, Math.min(px * 0.05, R * s * 0.5));
   const floor = Math.min(base, Math.max(10, base * 0.65));
   // Room for a label of this size: from the rim in to where the slice gets narrower than the text.
-  const room = (size: number) => R - inset - Math.max(R * 0.34, (size * 1.05) / s);
+  const room = (size: number) => R - inset - Math.max(R * 0.3, (size * 1.05) / s);
   const width = (text: string, size: number) => {
-    ctx.font = `700 ${size}px ${LABEL_FONT}`;
+    ctx.font = `600 ${size}px ${LABEL_FONT}`;
     return ctx.measureText(text).width;
   };
   let size = base;
@@ -94,8 +83,6 @@ function fitLabel(
   cache.set(key, fitted);
   return fitted;
 }
-
-const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function activeSlices(entries: Entry[]): Slice[] {
   return entries
@@ -120,6 +107,7 @@ export default function Wheel({
   soundEnabled = false,
   size,
   ariaLabel,
+  showHub = true,
 }: WheelProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -128,11 +116,11 @@ export default function Wheel({
   const pxRef = useRef(px);
   pxRef.current = px;
 
-  // Starts slightly turned, so a new wheel doesn't rest with a slice boundary under the flapper.
+  // Starts slightly turned, so a new wheel doesn't rest with a slice boundary under the pointer.
   const rotationRef = useRef(11.25);
-  const flapperRef = useRef(0);
-  const flapperSimRef = useRef<FlapperState>({ angle: 0, velocity: 0 });
-  const lastFrameRef = useRef({ time: 0, rotation: 0 });
+  const tokensRef = useRef<ReturnType<typeof readTokens> | null>(null);
+  const showHubRef = useRef(showHub);
+  showHubRef.current = showHub;
   const labelCacheRef = useRef(new Map<string, FittedLabel>());
   const animRef = useRef<Anim | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -188,21 +176,16 @@ export default function Wheel({
     const list = slicesRef.current;
     const n = list.length;
     const c = px / 2;
-    const Ro = c - px * 0.035; // outer edge of the rim; the margin holds the table shadow
-    const rimW = Math.max(6, px * 0.032);
-    const R = Ro - rimW;
+    const u = px / 208; // one unit of the design's 200-unit wheel, with room for the pointer
+    const R = 90 * u;
     const rotation = (rotationRef.current * Math.PI) / 180;
+    const tokens = (tokensRef.current ??= readTokens());
 
-    // Rim, casting a shadow on the table
-    ctx.save();
+    // Soft ring outside the slices
     ctx.beginPath();
-    ctx.arc(c, c, Ro, 0, Math.PI * 2);
-    ctx.fillStyle = WALNUT;
-    ctx.shadowColor = "rgba(0,0,0,0.3)";
-    ctx.shadowBlur = px * 0.018;
-    ctx.shadowOffsetY = px * 0.008;
+    ctx.arc(c, c, 98 * u, 0, Math.PI * 2);
+    ctx.fillStyle = tokens.ring;
     ctx.fill();
-    ctx.restore();
 
     ctx.save();
     ctx.translate(c, c);
@@ -211,101 +194,74 @@ export default function Wheel({
     if (n === 0) {
       ctx.beginPath();
       ctx.arc(0, 0, R, 0, Math.PI * 2);
-      ctx.fillStyle = BLANK_FACE;
+      ctx.fillStyle = tokens.tint;
       ctx.fill();
     } else {
       const s = (Math.PI * 2) / n;
       for (let i = 0; i < n; i++) {
-        const a0 = i * s - Math.PI / 2;
-        const a1 = (i + 1) * s - Math.PI / 2;
         ctx.beginPath();
         ctx.moveTo(0, 0);
-        ctx.arc(0, 0, R, a0, a1);
+        ctx.arc(0, 0, R, i * s - Math.PI / 2, (i + 1) * s - Math.PI / 2);
         ctx.closePath();
         ctx.fillStyle = list[i].color;
         ctx.fill();
-        if (n > 1) {
-          ctx.strokeStyle = "rgba(19,38,31,0.45)";
-          ctx.lineWidth = Math.max(1, px * 0.003);
+      }
+      if (n > 1) {
+        ctx.strokeStyle = tokens.surface;
+        ctx.lineWidth = Math.max(1, Math.min(2.5 * u, R * s * 0.06));
+        ctx.lineCap = "round";
+        for (let i = 0; i < n; i++) {
+          const a = i * s - Math.PI / 2;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.cos(a) * R, Math.sin(a) * R);
           ctx.stroke();
         }
       }
-      const inset = R * 0.05;
+      const inset = R * 0.06;
       ctx.textBaseline = "middle";
+      ctx.textAlign = "right";
       for (let i = 0; i < n; i++) {
-        const mid = (i + 0.5) * s - Math.PI / 2;
         const { text, size } = fitLabel(ctx, labelCacheRef.current, list[i].name, px, n, R, inset);
-        ctx.font = `700 ${size}px ${LABEL_FONT}`;
+        ctx.font = `600 ${size}px ${LABEL_FONT}`;
         ctx.save();
-        ctx.rotate(mid);
-        ctx.textAlign = "right";
+        ctx.rotate((i + 0.5) * s - Math.PI / 2);
         ctx.fillStyle = textColorFor(list[i].color);
         ctx.fillText(text, R - inset, 0);
         ctx.restore();
       }
     }
+    ctx.restore();
 
-    // Pegs just inside the rim; they turn with the wheel and push the flapper aside.
-    const pegs = pegCount(n);
-    const pegR = Math.max(1.5, px * PEG_RADIUS);
-    for (let j = 0; j < pegs; j++) {
-      const a = (j / pegs) * Math.PI * 2 - Math.PI / 2;
-      ctx.beginPath();
-      ctx.arc(Math.cos(a) * px * PEG_RING, Math.sin(a) * px * PEG_RING, pegR, 0, Math.PI * 2);
-      ctx.fillStyle = BRASS;
-      ctx.fill();
-      ctx.strokeStyle = WALNUT;
-      ctx.lineWidth = Math.max(1, px * 0.002);
+    // Centre: a dot, or a plain backing for the Spin button, which goes translucent while disabled.
+    ctx.beginPath();
+    ctx.arc(c, c, 18 * u, 0, Math.PI * 2);
+    ctx.fillStyle = showHubRef.current ? tokens.primary : tokens.surface;
+    ctx.fill();
+    if (showHubRef.current) {
+      ctx.strokeStyle = tokens.surface;
+      ctx.lineWidth = 4 * u;
       ctx.stroke();
     }
-    ctx.restore();
 
-    // Hub: walnut collar and brass cap (the game page lays its Spin button over the cap).
+    // Pointer, fixed at 12 o'clock: its tip marks the winning slice.
     ctx.beginPath();
-    ctx.arc(c, c, px * 0.128, 0, Math.PI * 2);
-    ctx.fillStyle = WALNUT;
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(c, c, px * 0.115, 0, Math.PI * 2);
-    ctx.fillStyle = BRASS;
-    ctx.fill();
-
-    // Flapper: the base is mounted above the rim and only the narrow tip reaches the pegs. Canvas
-    // angles are clockwise-positive at the base, so a tip pushed clockwise is a negative rotation.
-    const fw = px * FLAPPER_WIDTH;
-    const fl = px * FLAPPER_LENGTH;
-    const shoulder = -px * FLAPPER_SHOULDER;
-    ctx.save();
-    ctx.translate(c, px * FLAPPER_PIVOT_Y);
-    ctx.rotate(flapperRef.current);
-    ctx.beginPath();
-    ctx.moveTo(-fw / 2, shoulder);
-    ctx.lineTo(fw / 2, shoulder);
-    ctx.lineTo(0, fl);
+    ctx.moveTo(c - 8 * u, c - 101 * u);
+    ctx.quadraticCurveTo(c, c - 103.5 * u, c + 8 * u, c - 101 * u);
+    ctx.lineTo(c, c - 86 * u);
     ctx.closePath();
-    ctx.fillStyle = FLAPPER;
-    ctx.strokeStyle = INK;
-    ctx.lineWidth = Math.max(1, px * 0.003);
+    ctx.fillStyle = tokens.ink;
+    ctx.strokeStyle = tokens.surface;
+    ctx.lineWidth = 1.5 * u;
     ctx.lineJoin = "round";
-    ctx.shadowColor = "rgba(0,0,0,0.3)";
-    ctx.shadowBlur = px * 0.006;
-    ctx.shadowOffsetY = px * 0.003;
-    ctx.fill();
-    ctx.shadowColor = "transparent";
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(0, 0, fw * 0.14, 0, Math.PI * 2);
-    ctx.fillStyle = BRASS;
     ctx.fill();
     ctx.stroke();
-    ctx.restore();
   }, []);
 
   const finish = useCallback(
     (a: Anim) => {
       if (animRef.current !== a) return;
       rotationRef.current = mod(a.to, 360);
-      flapperRef.current = 0;
       animRef.current = null;
       rafRef.current = null;
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -324,20 +280,9 @@ export default function Wheel({
   const frame = useCallback(() => {
     const a = animRef.current;
     if (!a) return;
-    const now = performance.now();
-    const t = Math.min(1, (now - a.start) / a.duration);
+    const t = Math.min(1, (performance.now() - a.start) / a.duration);
     rotationRef.current = a.from + (a.to - a.from) * easeOutQuart(t);
-    const pegs = pegCount(a.slices.length);
-    const degPerMs = (4 * Math.pow(1 - t, 3) * (a.to - a.from)) / a.duration;
-    if (!reducedMotion()) {
-      const last = lastFrameRef.current;
-      // A throttled tab can deliver a long gap between frames; don't simulate all of it.
-      stepFlapper(flapperSimRef.current, last.rotation, rotationRef.current, pegs, Math.min(50, now - last.time), pegGrip(degPerMs));
-      // Always exactly upright at the end, so the tip points at the winning slice.
-      flapperRef.current = -flapperSimRef.current.angle * Math.min(1, (1 - t) / 0.04);
-    }
-    lastFrameRef.current = { time: now, rotation: rotationRef.current };
-    const idx = sliceAtPointer(rotationRef.current, pegs);
+    const idx = sliceAtPointer(rotationRef.current, a.slices.length);
     if (idx !== lastTickSliceRef.current) {
       lastTickSliceRef.current = idx;
       if (soundRef.current && t < 1) playTick();
@@ -363,7 +308,7 @@ export default function Wheel({
       return {
         id,
         name: id === spin.winner_entry_id ? spin.winner_name : "",
-        color: FALLBACK_COLORS[i % FALLBACK_COLORS.length],
+        color: SLICE_COLORS[i % SLICE_COLORS.length],
       };
     });
     const n = snapshot.length;
@@ -405,9 +350,7 @@ export default function Wheel({
       start: performance.now(),
       duration: Math.max(1, spin.duration_ms),
     };
-    lastTickSliceRef.current = sliceAtPointer(from, pegCount(n));
-    flapperSimRef.current = { angle: 0, velocity: 0 };
-    lastFrameRef.current = { time: performance.now(), rotation: from };
+    lastTickSliceRef.current = sliceAtPointer(from, n);
     force((x) => x + 1);
     rafRef.current = requestAnimationFrame(frame);
     // Fallback: rAF is throttled/paused in background or headless tabs. Make sure the
@@ -433,6 +376,16 @@ export default function Wheel({
   useEffect(() => {
     if (!rafRef.current) draw();
   }, [sig, px, draw]);
+
+  // The ring, separators and pointer follow the theme.
+  useEffect(() => {
+    const mo = new MutationObserver(() => {
+      tokensRef.current = null;
+      if (!rafRef.current) draw();
+    });
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => mo.disconnect();
+  }, [draw]);
 
   // Canvas text doesn't reflow, so redraw once the label font has arrived.
   useEffect(() => {
