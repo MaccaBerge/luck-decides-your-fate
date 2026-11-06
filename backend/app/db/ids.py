@@ -4,8 +4,9 @@ import string
 _ALPHABET = string.ascii_lowercase + string.digits
 
 PALETTE: list[str] = [
-    "#EF4444", "#F97316", "#F59E0B", "#84CC16", "#22C55E", "#14B8A6",
-    "#06B6D4", "#3B82F6", "#6366F1", "#8B5CF6", "#D946EF", "#EC4899",
+    # Ordered so neighbouring slices contrast, whatever the number of names.
+    "#D23C28", "#1A9E96", "#F2BE2E", "#3D4DB0", "#EC7A92", "#27804F",
+    "#EE8A1D", "#3F97E4", "#B83F96", "#8FB83A", "#7650B8", "#8A5638",
 ]
 
 

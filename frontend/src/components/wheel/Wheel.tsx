@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Entry, SpinStarted } from "../../lib/types";
 import { playTick, playWin } from "../../lib/sound";
-import { computeFinalRotation, easeOutQuart, mod, sliceAtPointer, textColorFor } from "./wheelMath";
+import { computeFinalRotation, easeOutQuart, flapperAngle, INK, mod, pegCount, sliceAtPointer, textColorFor } from "./wheelMath";
 
 export interface WheelProps {
   /** Full list; draws active ones in position order when idle. */
@@ -24,9 +24,62 @@ interface Slice {
 }
 
 const FALLBACK_COLORS = [
-  "#EF4444", "#F97316", "#F59E0B", "#84CC16", "#22C55E", "#14B8A6",
-  "#06B6D4", "#3B82F6", "#6366F1", "#8B5CF6", "#D946EF", "#EC4899",
+  "#D23C28", "#1A9E96", "#F2BE2E", "#3D4DB0", "#EC7A92", "#27804F",
+  "#EE8A1D", "#3F97E4", "#B83F96", "#8FB83A", "#7650B8", "#8A5638",
 ];
+
+// The wheel is an object on the table: it looks the same in light and dark mode.
+const WALNUT = "#2F1E14";
+const BRASS = "#E3A81F";
+const BLANK_FACE = "#EEF1E8";
+const FLAPPER = "#F7F3E3";
+const LABEL_FONT = '"Schibsted Grotesk Variable", system-ui, sans-serif';
+const MAX_DRAWN_PEGS = 48;
+
+interface FittedLabel {
+  text: string;
+  size: number;
+}
+
+/**
+ * Largest size at which a name stays clear of the hub and of its neighbours (slices narrow toward
+ * the centre, so a longer label needs a smaller font), truncating only at the smallest size.
+ * Cached: this runs for every slice on every animation frame.
+ */
+function fitLabel(
+  ctx: CanvasRenderingContext2D,
+  cache: Map<string, FittedLabel>,
+  name: string,
+  px: number,
+  n: number,
+  R: number,
+  inset: number,
+): FittedLabel {
+  const key = `${px}|${n}|${name}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const s = (Math.PI * 2) / n;
+  const base = Math.max(10, Math.min(px * 0.05, R * s * 0.5));
+  const floor = Math.min(base, Math.max(10, base * 0.65));
+  // Room for a label of this size: from the rim in to where the slice gets narrower than the text.
+  const room = (size: number) => R - inset - Math.max(R * 0.34, (size * 1.05) / s);
+  const width = (text: string, size: number) => {
+    ctx.font = `700 ${size}px ${LABEL_FONT}`;
+    return ctx.measureText(text).width;
+  };
+  let size = base;
+  while (size > floor && width(name, size) > room(size)) size = Math.max(floor, size - 1);
+  let text = name;
+  if (width(text, size) > room(size)) {
+    while (text.length > 1 && width(text + "…", size) > room(size)) text = text.slice(0, -1);
+    text = text.trimEnd() + "…";
+  }
+  const fitted = { text, size };
+  cache.set(key, fitted);
+  return fitted;
+}
+
+const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function activeSlices(entries: Entry[]): Slice[] {
   return entries
@@ -60,6 +113,8 @@ export default function Wheel({
   pxRef.current = px;
 
   const rotationRef = useRef(0);
+  const flapperRef = useRef(0);
+  const labelCacheRef = useRef(new Map<string, FittedLabel>());
   const animRef = useRef<Anim | null>(null);
   const rafRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -114,29 +169,30 @@ export default function Wheel({
     const list = slicesRef.current;
     const n = list.length;
     const c = px / 2;
-    const pointerH = Math.max(14, px * 0.07);
-    const R = c - Math.max(6, px * 0.025);
-    const dark = document.documentElement.classList.contains("dark");
+    const Ro = c - px * 0.035; // outer edge of the rim; the margin holds the table shadow
+    const rimW = Math.max(6, px * 0.032);
+    const R = Ro - rimW;
+    const rotation = (rotationRef.current * Math.PI) / 180;
 
-    // Rim
+    // Rim, casting a shadow on the table
     ctx.save();
     ctx.beginPath();
-    ctx.arc(c, c, R + Math.max(3, px * 0.014), 0, Math.PI * 2);
-    ctx.fillStyle = dark ? "#1e1b2e" : "#ffffff";
-    ctx.shadowColor = "rgba(0,0,0,0.25)";
-    ctx.shadowBlur = px * 0.04;
-    ctx.shadowOffsetY = px * 0.01;
+    ctx.arc(c, c, Ro, 0, Math.PI * 2);
+    ctx.fillStyle = WALNUT;
+    ctx.shadowColor = "rgba(0,0,0,0.3)";
+    ctx.shadowBlur = px * 0.018;
+    ctx.shadowOffsetY = px * 0.008;
     ctx.fill();
     ctx.restore();
 
     ctx.save();
     ctx.translate(c, c);
-    ctx.rotate((rotationRef.current * Math.PI) / 180);
+    ctx.rotate(rotation);
 
     if (n === 0) {
       ctx.beginPath();
       ctx.arc(0, 0, R, 0, Math.PI * 2);
-      ctx.fillStyle = dark ? "#2a2640" : "#ede9fe";
+      ctx.fillStyle = BLANK_FACE;
       ctx.fill();
     } else {
       const s = (Math.PI * 2) / n;
@@ -150,76 +206,77 @@ export default function Wheel({
         ctx.fillStyle = list[i].color;
         ctx.fill();
         if (n > 1) {
-          ctx.strokeStyle = "rgba(255,255,255,0.55)";
-          ctx.lineWidth = Math.max(1, px * 0.004);
+          ctx.strokeStyle = "rgba(19,38,31,0.45)";
+          ctx.lineWidth = Math.max(1, px * 0.003);
           ctx.stroke();
         }
       }
-      // Labels
-      const fontSize = Math.max(10, Math.min(px * 0.06, (R * s * 0.55) / 1.1, px * 0.065));
-      ctx.font = `700 ${fontSize}px ui-rounded, "Nunito", system-ui, sans-serif`;
+      const inset = R * 0.05;
       ctx.textBaseline = "middle";
-      ctx.textAlign = "right";
-      const maxW = R * 0.68;
       for (let i = 0; i < n; i++) {
         const mid = (i + 0.5) * s - Math.PI / 2;
-        let label = list[i].name;
-        if (ctx.measureText(label).width > maxW) {
-          while (label.length > 1 && ctx.measureText(label + "…").width > maxW) label = label.slice(0, -1);
-          label = label.trimEnd() + "…";
-        }
+        const { text, size } = fitLabel(ctx, labelCacheRef.current, list[i].name, px, n, R, inset);
+        ctx.font = `700 ${size}px ${LABEL_FONT}`;
+        const flip = Math.cos(mid + rotation) < 0;
         ctx.save();
-        ctx.rotate(mid);
-        const fg = textColorFor(list[i].color);
-        ctx.fillStyle = fg;
-        if (fg === "#ffffff") {
-          ctx.shadowColor = "rgba(0,0,0,0.35)";
-          ctx.shadowBlur = 3;
-          ctx.shadowOffsetY = 1;
-        }
-        ctx.fillText(label, R - fontSize * 0.7, 0);
+        ctx.rotate(flip ? mid + Math.PI : mid);
+        ctx.textAlign = flip ? "left" : "right";
+        ctx.fillStyle = textColorFor(list[i].color);
+        ctx.fillText(text, flip ? -(R - inset) : R - inset, 0);
         ctx.restore();
       }
     }
-    ctx.restore();
 
-    // Hub
-    const hubR = Math.max(10, px * 0.075);
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(c, c, hubR, 0, Math.PI * 2);
-    ctx.fillStyle = dark ? "#1e1b2e" : "#ffffff";
-    ctx.shadowColor = "rgba(0,0,0,0.3)";
-    ctx.shadowBlur = px * 0.02;
-    ctx.fill();
-    ctx.restore();
-    ctx.beginPath();
-    ctx.arc(c, c, hubR * 0.45, 0, Math.PI * 2);
-    ctx.fillStyle = "#8b5cf6";
-    ctx.fill();
-
-    if (n === 0) {
-      ctx.fillStyle = dark ? "#a5a1c2" : "#7c6fae";
-      ctx.font = `600 ${Math.max(12, px * 0.045)}px system-ui, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("Add some names", c, c + hubR + px * 0.08);
+    // Pegs on the rim; they catch the flapper, and turn with the wheel.
+    const pegs = pegCount(n);
+    const step = Math.ceil(pegs / MAX_DRAWN_PEGS);
+    const pegR = Math.max(1.5, Math.min(px * 0.0085, ((Ro - rimW / 2) * Math.PI * step) / pegs / 2.6));
+    for (let j = 0; j < pegs; j += step) {
+      const a = (j / pegs) * Math.PI * 2 - Math.PI / 2;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * (Ro - rimW / 2), Math.sin(a) * (Ro - rimW / 2), pegR, 0, Math.PI * 2);
+      ctx.fillStyle = BRASS;
+      ctx.fill();
     }
+    ctx.restore();
 
-    // Pointer (12 o'clock, fixed)
-    const pw = pointerH * 0.75;
-    const top = Math.max(1, px * 0.004);
-    ctx.save();
+    // Hub: walnut collar and brass cap (the game page lays its Spin button over the cap).
     ctx.beginPath();
-    ctx.moveTo(c - pw / 2, top);
-    ctx.lineTo(c + pw / 2, top);
-    ctx.lineTo(c, top + pointerH);
-    ctx.closePath();
-    ctx.fillStyle = dark ? "#f8fafc" : "#1f1b2e";
-    ctx.shadowColor = "rgba(0,0,0,0.35)";
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetY = 2;
+    ctx.arc(c, c, px * 0.128, 0, Math.PI * 2);
+    ctx.fillStyle = WALNUT;
     ctx.fill();
+    ctx.beginPath();
+    ctx.arc(c, c, px * 0.115, 0, Math.PI * 2);
+    ctx.fillStyle = BRASS;
+    ctx.fill();
+
+    // Flapper: pivots on the rim at 12 o'clock, and its tip marks the winning slice.
+    const fw = Math.max(9, px * 0.042);
+    const fl = rimW / 2 + Math.max(14, px * 0.07);
+    const shoulder = -fw * 0.42;
+    ctx.save();
+    ctx.translate(c, c - Ro + rimW / 2);
+    ctx.rotate(flapperRef.current);
+    ctx.beginPath();
+    ctx.moveTo(-fw / 2, shoulder);
+    ctx.lineTo(fw / 2, shoulder);
+    ctx.lineTo(0, fl);
+    ctx.closePath();
+    ctx.fillStyle = FLAPPER;
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = Math.max(1, px * 0.003);
+    ctx.lineJoin = "round";
+    ctx.shadowColor = "rgba(0,0,0,0.3)";
+    ctx.shadowBlur = px * 0.006;
+    ctx.shadowOffsetY = px * 0.003;
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, fw * 0.14, 0, Math.PI * 2);
+    ctx.fillStyle = BRASS;
+    ctx.fill();
+    ctx.stroke();
     ctx.restore();
   }, []);
 
@@ -227,6 +284,7 @@ export default function Wheel({
     (a: Anim) => {
       if (animRef.current !== a) return;
       rotationRef.current = mod(a.to, 360);
+      flapperRef.current = 0;
       animRef.current = null;
       rafRef.current = null;
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -247,7 +305,10 @@ export default function Wheel({
     if (!a) return;
     const t = Math.min(1, (performance.now() - a.start) / a.duration);
     rotationRef.current = a.from + (a.to - a.from) * easeOutQuart(t);
-    const idx = sliceAtPointer(rotationRef.current, a.slices.length);
+    const pegs = pegCount(a.slices.length);
+    const degPerMs = (4 * Math.pow(1 - t, 3) * (a.to - a.from)) / a.duration;
+    flapperRef.current = reducedMotion() ? 0 : flapperAngle(rotationRef.current, pegs, degPerMs);
+    const idx = sliceAtPointer(rotationRef.current, pegs);
     if (idx !== lastTickSliceRef.current) {
       lastTickSliceRef.current = idx;
       if (soundRef.current && t < 1) playTick();
@@ -315,7 +376,7 @@ export default function Wheel({
       start: performance.now(),
       duration: Math.max(1, spin.duration_ms),
     };
-    lastTickSliceRef.current = sliceAtPointer(from, n);
+    lastTickSliceRef.current = sliceAtPointer(from, pegCount(n));
     force((x) => x + 1);
     rafRef.current = requestAnimationFrame(frame);
     // Fallback: rAF is throttled/paused in background or headless tabs. Make sure the
@@ -342,12 +403,17 @@ export default function Wheel({
     if (!rafRef.current) draw();
   }, [sig, px, draw]);
 
+  // Canvas text doesn't reflow, so redraw once the label font has arrived.
   useEffect(() => {
-    const mo = new MutationObserver(() => {
+    let alive = true;
+    void document.fonts?.load(`700 16px ${LABEL_FONT}`).then(() => {
+      if (!alive) return;
+      labelCacheRef.current.clear();
       if (!rafRef.current) draw();
     });
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-    return () => mo.disconnect();
+    return () => {
+      alive = false;
+    };
   }, [draw]);
 
   const n = slices.length;

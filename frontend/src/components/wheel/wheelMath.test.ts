@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeFinalRotation, mod, sliceAtPointer } from "./wheelMath";
+import { computeFinalRotation, flapperAngle, INK, mod, pegCount, sliceAtPointer, textColorFor } from "./wheelMath";
 
 describe("mod", () => {
   it("handles negatives", () => {
@@ -47,5 +47,46 @@ describe("computeFinalRotation", () => {
     const final = computeFinalRotation(123, 2, n, 0.37, 6);
     const local = mod(-final, 360);
     expect(local).toBeCloseTo((2 + 0.37) * s, 6);
+  });
+});
+
+describe("pegCount", () => {
+  it("puts a peg on every slice boundary", () => {
+    for (let n = 1; n <= 100; n++) {
+      expect(pegCount(n) % n).toBe(0);
+      expect(pegCount(n)).toBeGreaterThanOrEqual(16);
+    }
+  });
+});
+
+describe("flapperAngle", () => {
+  it("is exactly upright when the wheel has stopped", () => {
+    expect(Math.abs(flapperAngle(123.4, 16, 0))).toBe(0);
+  });
+  it("is dragged clockwise and grows through a peg's travel", () => {
+    const early = flapperAngle(2, 16, 1);
+    const late = flapperAngle(20, 16, 1);
+    expect(early).toBeLessThan(0);
+    expect(late).toBeLessThan(early);
+  });
+});
+
+describe("textColorFor", () => {
+  const contrast = (a: string, b: string) => {
+    const lum = (hex: string) => {
+      const v = parseInt(hex.slice(1), 16);
+      const lin = (c: number) => (c / 255 <= 0.03928 ? c / 255 / 12.92 : Math.pow((c / 255 + 0.055) / 1.055, 2.4));
+      return 0.2126 * lin((v >> 16) & 255) + 0.7152 * lin((v >> 8) & 255) + 0.0722 * lin(v & 255);
+    };
+    const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  it("gives readable labels on every default slice colour", () => {
+    const palette = ["#D23C28", "#1A9E96", "#F2BE2E", "#3D4DB0", "#EC7A92", "#27804F", "#EE8A1D", "#3F97E4", "#B83F96", "#8FB83A", "#7650B8", "#8A5638"];
+    for (const c of palette) expect(contrast(c, textColorFor(c))).toBeGreaterThanOrEqual(4.5);
+  });
+  it("uses ink on light colours and white on dark ones", () => {
+    expect(textColorFor("#FFFFFF")).toBe(INK);
+    expect(textColorFor("#000000")).toBe("#ffffff");
   });
 });
