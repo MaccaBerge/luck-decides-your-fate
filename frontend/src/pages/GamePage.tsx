@@ -14,6 +14,7 @@ import Wheel from "../components/wheel/Wheel";
 import { GameToolbar } from "../components/game/GameToolbar";
 import { EntryPanel } from "../components/game/EntryPanel";
 import { PasteNamesDialog } from "../components/game/PasteNamesDialog";
+import { QrDialog } from "../components/game/QrDialog";
 import { ResultDialog } from "../components/game/ResultDialog";
 import { Toast, type ToastMsg } from "../components/game/Toast";
 import { Loading } from "../components/game/Loading";
@@ -47,6 +48,7 @@ export default function GamePage() {
   const [animating, setAnimating] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [pasteOpen, setPasteOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const [sound, setSound] = useState(loadSoundPref);
   const [toast, setToast] = useState<ToastMsg | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -207,13 +209,14 @@ export default function GamePage() {
     if (ok) setResult(null);
   };
 
+  const wheelUrl = `${location.origin}/g/${game.id}`;
+
   const copyLink = async () => {
-    const url = `${location.origin}/g/${game.id}`;
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(wheelUrl);
       showToast("Link copied", "info");
     } catch {
-      showToast(url, "info");
+      showToast(wheelUrl, "info");
     }
   };
 
@@ -266,6 +269,7 @@ export default function GamePage() {
         onToggleTheme={toggleTheme}
         onNewWheel={() => void newWheel()}
         onCopyLink={() => void copyLink()}
+        onShowQr={() => setQrOpen(true)}
         newBusy={newBusy}
       />
 
@@ -331,6 +335,14 @@ export default function GamePage() {
         removing={removing}
         onClose={() => setResult(null)}
         onRemove={() => void removeWinner()}
+      />
+      <QrDialog
+        url={qrOpen ? wheelUrl : null}
+        onClose={() => setQrOpen(false)}
+        onError={() => {
+          setQrOpen(false);
+          showToast("Could not create the QR code");
+        }}
       />
       <Toast toast={toast} />
     </div>

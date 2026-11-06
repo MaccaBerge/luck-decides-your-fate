@@ -4,6 +4,7 @@ import type { Entry } from "../../lib/types";
 import { EntryPanel } from "./EntryPanel";
 import { GameToolbar } from "./GameToolbar";
 import { PasteNamesDialog } from "./PasteNamesDialog";
+import { QrDialog } from "./QrDialog";
 import { ResultDialog } from "./ResultDialog";
 
 const noop = () => {};
@@ -48,9 +49,9 @@ describe("§11.8 accessible names", () => {
   });
   it("toolbar", () => {
     const html = renderToStaticMarkup(
-      <GameToolbar soundEnabled dark={false} onToggleSound={noop} onToggleTheme={noop} onNewWheel={noop} onCopyLink={noop} newBusy={false} />,
+      <GameToolbar soundEnabled dark={false} onToggleSound={noop} onToggleTheme={noop} onNewWheel={noop} onCopyLink={noop} onShowQr={noop} newBusy={false} />,
     );
-    for (const l of ["Toggle sound", "Toggle dark mode", "New wheel", "Copy link"]) expect(html).toContain(`aria-label="${l}"`);
+    for (const l of ["Toggle sound", "Toggle dark mode", "New wheel", "Copy link", "Show QR code"]) expect(html).toContain(`aria-label="${l}"`);
   });
   it("dialogs", () => {
     const paste = renderToStaticMarkup(<PasteNamesDialog open onClose={noop} onSubmit={async () => true} />);
@@ -64,5 +65,9 @@ describe("§11.8 accessible names", () => {
     expect(res).toContain('data-testid="winner-name"');
     expect(res).toContain(">Close<");
     expect(res).toContain("Remove from wheel");
+    const qr = renderToStaticMarkup(<QrDialog url="https://example.test/g/abc" onClose={noop} onError={noop} />);
+    expect(qr).toMatch(/role="dialog"[^>]*aria-label="QR code"/);
+    expect(qr).toContain("Scan to join this wheel");
+    expect(qr).toContain(">Close<");
   });
 });
