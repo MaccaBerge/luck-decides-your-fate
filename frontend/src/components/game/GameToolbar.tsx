@@ -1,4 +1,6 @@
 import { Link as LinkIcon, Moon, Plus, Sun, Volume2, VolumeX } from "lucide-react";
+import { secondaryBtn } from "./buttons";
+import { WheelMark } from "./WheelMark";
 
 interface Props {
   soundEnabled: boolean;
@@ -10,42 +12,35 @@ interface Props {
   newBusy: boolean;
 }
 
-const base =
-  "inline-flex h-10 min-w-10 items-center justify-center rounded-lg px-2 text-sm font-semibold transition-colors hover:bg-ink/10 disabled:opacity-60";
-const control = `${base} text-ink sm:px-3`;
-const toggle = `${base} text-muted hover:text-ink`;
+const square = `${secondaryBtn} w-11 !px-0`;
+const labelled = `${secondaryBtn} max-sm:px-3`;
 
 export function GameToolbar(p: Props) {
   return (
-    <header className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 pt-4 sm:pt-5">
-      <h1 className="max-w-[8.5em] font-display text-[1.45rem] leading-[1.05] font-normal tracking-[0.012em] text-ink min-[520px]:max-w-none sm:text-[2rem]">
-        Luck Decides Your Fate
-      </h1>
-      <nav className="flex shrink-0 items-center sm:gap-1" aria-label="Toolbar">
-        <button type="button" aria-label="New wheel" onClick={p.onNewWheel} disabled={p.newBusy} className={control}>
-          <Plus className="size-[18px] sm:hidden" aria-hidden="true" />
-          <span className="hidden sm:inline">New wheel</span>
+    <header className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex items-center gap-2.5">
+        <WheelMark />
+        <span className="font-display text-[19px] font-semibold text-ink">Luck Decides Your Fate</span>
+      </div>
+      <nav className="flex flex-wrap items-center gap-2" aria-label="Toolbar">
+        <button type="button" aria-label="New wheel" onClick={p.onNewWheel} disabled={p.newBusy} className={labelled}>
+          <Plus className="size-4" aria-hidden="true" />
+          New wheel
         </button>
-        <button type="button" aria-label="Copy link" onClick={p.onCopyLink} className={control}>
-          <LinkIcon className="size-[18px] sm:hidden" aria-hidden="true" />
-          <span className="hidden sm:inline">Copy link</span>
+        <button type="button" aria-label="Copy link" onClick={p.onCopyLink} className={labelled}>
+          <LinkIcon className="size-4" aria-hidden="true" />
+          Copy link
         </button>
         <button
           type="button"
           aria-label="Toggle sound"
           aria-pressed={p.soundEnabled}
           onClick={p.onToggleSound}
-          className={toggle}
+          className={square}
         >
           {p.soundEnabled ? <Volume2 className="size-[18px]" aria-hidden="true" /> : <VolumeX className="size-[18px]" aria-hidden="true" />}
         </button>
-        <button
-          type="button"
-          aria-label="Toggle dark mode"
-          aria-pressed={p.dark}
-          onClick={p.onToggleTheme}
-          className={toggle}
-        >
+        <button type="button" aria-label="Toggle dark mode" aria-pressed={p.dark} onClick={p.onToggleTheme} className={square}>
           {p.dark ? <Sun className="size-[18px]" aria-hidden="true" /> : <Moon className="size-[18px]" aria-hidden="true" />}
         </button>
       </nav>

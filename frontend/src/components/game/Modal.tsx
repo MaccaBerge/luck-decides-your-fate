@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 interface ModalProps {
   open: boolean;
@@ -6,11 +6,10 @@ interface ModalProps {
   label: string;
   children: ReactNode;
   className?: string;
-  style?: CSSProperties;
 }
 
 /** Accessible modal dialog: role="dialog", aria-modal, Escape + backdrop close, focus trap-lite. */
-export function Modal({ open, onClose, label, children, className = "", style }: ModalProps) {
+export function Modal({ open, onClose, label, children, className = "" }: ModalProps) {
   const ref = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -51,7 +50,7 @@ export function Modal({ open, onClose, label, children, className = "", style }:
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex animate-fade items-center justify-center bg-[#0b1f19]/60 p-4"
+      className="fixed inset-0 z-50 flex animate-fade items-center justify-center bg-scrim p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -61,8 +60,7 @@ export function Modal({ open, onClose, label, children, className = "", style }:
         role="dialog"
         aria-modal="true"
         aria-label={label}
-        style={style}
-        className={`w-full animate-pop rounded-md shadow-[0_12px_40px_rgb(0_0_0/0.35)] ${className || "max-w-md bg-pad p-6 text-ink"}`}
+        className={`w-full max-w-md animate-pop rounded-[28px] border border-border bg-surface p-7 text-ink ${className}`}
       >
         {children}
       </div>

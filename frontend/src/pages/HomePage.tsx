@@ -42,7 +42,7 @@ export default function HomePage() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
         <p className="text-lg font-semibold">Couldn't set up your wheel.</p>
-        <p className="text-sm text-muted">{error}</p>
+        <p className="text-sm text-ink-muted">{error}</p>
         <button
           type="button"
           onClick={() => void go()}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { primaryBtn, quietBtn } from "./buttons";
+import { pillBtn, primaryBtn } from "./buttons";
 import { Modal } from "./Modal";
 
 interface Props {
@@ -31,8 +31,8 @@ export function PasteNamesDialog({ open, onClose, onSubmit }: Props) {
 
   return (
     <Modal open={open} onClose={close} label="Paste names">
-      <h2 className="text-xl font-bold">Paste names</h2>
-      <p className="mt-0.5 mb-4 text-sm text-muted">Put one name on each line.</p>
+      <h2 className="font-display text-[21px] font-semibold">Paste names</h2>
+      <p className="mt-0.5 mb-4 text-sm text-ink-muted">Put one name on each line.</p>
       <textarea
         aria-label="Names, one per line"
         data-autofocus
@@ -40,20 +40,20 @@ export function PasteNamesDialog({ open, onClose, onSubmit }: Props) {
         onChange={(e) => setText(e.target.value)}
         rows={8}
         placeholder={"Anna\nJonas\nPer\nKari"}
-        className="w-full resize-y rounded-md border border-line bg-transparent px-3 py-2.5 text-base text-ink placeholder:text-muted"
+        className="w-full resize-y rounded-[14px] border border-border-strong bg-surface-muted px-3.5 py-3 text-[15px] leading-normal text-ink placeholder:text-ink-muted"
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submit();
         }}
       />
       <div className="mt-4 flex items-center justify-between gap-3">
-        <span className="text-sm text-muted">
+        <span className="text-sm text-ink-muted">
           {names.length} {names.length === 1 ? "name" : "names"}
         </span>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={close}
-            className={quietBtn}
+            className={pillBtn}
           >
             Cancel
           </button>

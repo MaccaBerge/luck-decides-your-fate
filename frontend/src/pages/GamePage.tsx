@@ -8,6 +8,7 @@ import { connectGameSocket } from "../lib/ws";
 import { useTheme } from "../lib/theme";
 import { loadSoundPref, saveSoundPref, unlockAudio } from "../lib/sound";
 import { setLastGameId } from "../lib/storage";
+import { SLICE_COLORS } from "../lib/palette";
 import { BRAND_TITLE, GAME_TITLE } from "../lib/brand";
 import Wheel from "../components/wheel/Wheel";
 import { GameToolbar } from "../components/game/GameToolbar";
@@ -21,11 +22,11 @@ import NotFoundPage from "./NotFoundPage";
 interface Result {
   spin: SpinStarted;
   name: string;
-  color: string;
 }
 
-function fireConfetti(winnerColor: string) {
-  const colors = [winnerColor, winnerColor, "#E3A81F", "#F7F3E3"];
+function fireConfetti() {
+  const primary = getComputedStyle(document.documentElement).getPropertyValue("--primary").trim();
+  const colors = [...SLICE_COLORS, primary];
   const reduce = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (reduce) return;
   void confetti({ particleCount: 140, spread: 80, origin: { y: 0.6 }, colors, zIndex: 70 });
@@ -45,7 +46,6 @@ export default function GamePage() {
   const [activeSpin, setActiveSpin] = useState<SpinStarted | null>(null);
   const [animating, setAnimating] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
-  const [status, setStatus] = useState("");
   const [pasteOpen, setPasteOpen] = useState(false);
   const [sound, setSound] = useState(loadSoundPref);
   const [toast, setToast] = useState<ToastMsg | null>(null);
@@ -55,8 +55,6 @@ export default function GamePage() {
 
   const seenSpinIds = useRef<Set<number>>(new Set());
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const gameRef = useRef<PublicGameState | null>(null);
-  gameRef.current = game;
 
   const showToast = useCallback((text: string, kind: ToastMsg["kind"] = "error") => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -70,7 +68,6 @@ export default function GamePage() {
     seenSpinIds.current.add(s.spin_id);
     setResult(null);
     setAnimating(true);
-    setStatus("Spinning…");
     setActiveSpin(s);
   }, []);
 
@@ -88,7 +85,6 @@ export default function GamePage() {
     setActiveSpin(null);
     setAnimating(false);
     setResult(null);
-    setStatus("");
     seenSpinIds.current = new Set();
   }, [gameId]);
 
@@ -150,10 +146,8 @@ export default function GamePage() {
 
   const handleSpinComplete = useCallback((s: SpinStarted) => {
     setAnimating(false);
-    const entry = gameRef.current?.entries.find((e) => e.id === s.winner_entry_id);
-    setResult({ spin: s, name: s.winner_name, color: entry?.color ?? "#3D4DB0" });
-    setStatus(`Winner: ${s.winner_name}`);
-    fireConfetti(entry?.color ?? "#3D4DB0");
+    setResult({ spin: s, name: s.winner_name });
+    fireConfetti();
   }, []);
 
   const mutate = useCallback(
@@ -245,21 +239,26 @@ export default function GamePage() {
   const onEntry = (e: Entry, patch: { name?: string; color?: string; is_active?: boolean }) =>
     void mutate(() => api.updateEntry(game.id, e.id, patch));
 
-  // Hidden while spinning: the server's state can name the winner before the wheel lands.
-  const caption = spinning
-    ? null
-    : active.length === 0
-      ? "Add at least two names to spin"
-      : active.length === 1
-        ? game.last_result
-          ? `${active[0].name} is the last one standing`
-          : "Add one more name to spin"
-        : game.last_result
-          ? `Last spin: ${game.last_result.winner_name}`
-          : null;
+  // Never names a winner while spinning: the server's state can name it before the wheel lands.
+  const caption = spinning ? (
+    "Spinning…"
+  ) : active.length === 0 ? (
+    "Add at least two names to spin"
+  ) : active.length === 1 ? (
+    game.last_result ? (
+      `${active[0].name} is the last one standing`
+    ) : (
+      "Add one more name to spin"
+    )
+  ) : game.last_result ? (
+    <>
+      Last pick{" "}
+      <strong className="font-display text-[15px] font-semibold text-primary-strong">{game.last_result.winner_name}</strong>
+    </>
+  ) : null;
 
   return (
-    <div className="min-h-screen pb-10 text-ink">
+    <div className="mx-auto flex min-h-screen w-full max-w-[1180px] flex-col gap-7 px-4 pt-7 pb-12 text-ink sm:px-6">
       <GameToolbar
         soundEnabled={sound}
         dark={theme === "dark"}
@@ -270,27 +269,39 @@ export default function GamePage() {
         newBusy={newBusy}
       />
 
-      <main className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-5 px-4 pt-3 sm:pt-4 md:grid-cols-[minmax(0,1fr)_minmax(300px,360px)] md:items-start md:gap-8 lg:gap-12">
-        <section aria-label="Wheel" className="flex min-w-0 flex-col items-center">
-          <div className="group @container relative w-full max-w-[min(640px,calc(100dvh-8.5rem))] min-w-[240px]">
+      <main className="grid grid-cols-1 items-start gap-7 md:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
+        <section
+          aria-label="Wheel"
+          className="flex min-w-0 flex-col items-center gap-6 rounded-[28px] border border-border bg-surface px-4 pt-9 pb-8 sm:px-6"
+        >
+          <h1 className="text-center font-display text-2xl font-semibold tracking-[-0.005em] sm:text-[30px]">Who's it gonna be?</h1>
+          <div className="group @container relative w-full max-w-[min(500px,calc(100dvh-19rem))] min-w-[240px]">
             <div className={canSpin ? "cursor-pointer" : ""} onClick={() => void doSpin()}>
-              <Wheel entries={game.entries} spin={activeSpin} onSpinComplete={handleSpinComplete} soundEnabled={sound} />
+              <Wheel
+                entries={game.entries}
+                spin={activeSpin}
+                onSpinComplete={handleSpinComplete}
+                soundEnabled={sound}
+                showHub={false}
+              />
             </div>
             <button
               type="button"
               onClick={() => void doSpin()}
               disabled={!canSpin}
               aria-label="Spin the wheel"
-              className="absolute top-1/2 left-1/2 size-[23%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#E3A81F] pb-[0.1em] font-display text-[max(1.05rem,6.2cqw)] text-[#13261F] transition-[background-color,scale] enabled:group-hover:bg-[#F0BC3C] enabled:active:scale-95 disabled:cursor-not-allowed disabled:text-[#13261F]/35"
+              className="absolute top-1/2 left-1/2 size-[20%] -translate-x-1/2 -translate-y-1/2 rounded-full border-[5px] border-white bg-primary font-display text-[clamp(14px,4.2cqw,21px)] font-semibold text-white shadow-[0_4px_0_var(--primary-shadow),0_10px_24px_var(--spin-glow)] transition-[translate,box-shadow] duration-[80ms] enabled:active:translate-y-[calc(-50%+3px)] enabled:active:shadow-[0_1px_0_var(--primary-shadow)] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
             >
               Spin
             </button>
           </div>
-
-          <p className="mt-1 min-h-6 text-center text-base font-medium text-muted">{caption}</p>
-          <div aria-live="polite" role="status" className="sr-only">
-            {status}
-          </div>
+          <p
+            role="status"
+            aria-live="polite"
+            className={`inline-flex min-h-9 items-center gap-2 rounded-full bg-bg px-4 py-2 text-center text-sm text-ink-muted ${caption ? "" : "invisible"}`}
+          >
+            {caption}
+          </p>
         </section>
 
         <EntryPanel
@@ -315,7 +326,7 @@ export default function GamePage() {
         onSubmit={(names) => mutate(() => api.addEntries(game.id, names))}
       />
       <ResultDialog
-        winner={result ? { name: result.name, color: result.color } : null}
+        winner={result ? { name: result.name } : null}
         showRemove={!game.settings.remove_winner && game.entries.some((e) => e.id === result?.spin.winner_entry_id && e.is_active)}
         removing={removing}
         onClose={() => setResult(null)}

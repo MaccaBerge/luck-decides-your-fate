@@ -13,10 +13,10 @@ export function Toast({ toast }: { toast: ToastMsg | null }) {
     <div
       key={toast.id}
       role={toast.kind === "error" ? "alert" : "status"}
-      className={`fixed bottom-5 left-1/2 z-[60] flex max-w-[calc(100vw-2rem)] animate-toast items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold shadow-[0_6px_20px_rgb(0_0_0/0.3)] ${
+      className={`fixed bottom-5 left-1/2 z-[60] flex max-w-[calc(100vw-2rem)] animate-toast items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium ${
         toast.kind === "error"
           ? "bg-danger text-on-danger"
-          : "bg-ink text-pad"
+          : "bg-ink text-surface"
       }`}
       style={{ transform: "translateX(-50%)" }}
     >

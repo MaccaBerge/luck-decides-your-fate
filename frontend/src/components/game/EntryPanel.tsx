@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { ClipboardList, Plus, Shuffle } from "lucide-react";
 import type { Entry } from "../../lib/types";
 import { EntryRow } from "./EntryRow";
 import { Switch } from "./Switch";
-import { quietBtn } from "./buttons";
+import { card, darkBtn, pillBtn } from "./buttons";
 
 interface Props {
   entries: Entry[];
@@ -36,106 +35,93 @@ export function EntryPanel(p: Props) {
     if (ok) setName("");
   };
 
-  const row = (e: Entry) => (
-    <EntryRow
-      key={e.id}
-      entry={e}
-      disabled={p.disabled}
-      onRename={(n) => p.onRename(e, n)}
-      onColor={(c) => p.onColor(e, c)}
-      onToggle={() => p.onToggle(e)}
-      onRemove={() => p.onRemove(e)}
-    />
-  );
-
   return (
-    <section
-      aria-label="Names"
-      className="flex min-h-0 flex-col rounded-md bg-pad px-4 pt-4 pb-2 shadow-[0_2px_6px_rgb(0_0_0/0.12)] sm:px-5 sm:pt-5 md:max-h-[calc(100dvh-7rem)]"
-    >
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-xl font-bold text-ink">Names</h2>
-        <span className="text-sm text-muted">
-          {active.length} on the wheel{inactive.length > 0 ? `, ${inactive.length} hidden` : ""}
-        </span>
-      </div>
-
-      <form
-        className="mt-3 flex items-center gap-2 border-b-2 border-ink"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void add();
-        }}
-      >
-        <input
-          aria-label="New name"
-          placeholder="Add a name"
-          value={name}
-          maxLength={40}
-          disabled={p.disabled || full}
-          onChange={(e) => setName(e.target.value)}
-          className="min-w-0 flex-1 bg-transparent py-2.5 text-lg text-ink placeholder:text-muted focus-visible:outline-none disabled:opacity-60"
-        />
-        <button
-          type="submit"
-          aria-label="Add name"
-          disabled={p.disabled || full || !name.trim()}
-          className="mb-1 grid size-9 shrink-0 place-items-center rounded-lg bg-brass text-on-brass transition-opacity hover:brightness-105 disabled:cursor-not-allowed disabled:bg-transparent disabled:text-muted"
-        >
-          <Plus className="size-5" aria-hidden="true" />
-        </button>
-      </form>
-
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {sorted.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted">No names yet. Add a few, or paste a whole list.</p>
-        ) : (
-          <>
-            <ul className="divide-y divide-line">{active.map(row)}</ul>
-            {inactive.length > 0 && (
-              <>
-                <div className="mt-3 flex items-center justify-between gap-3 border-b border-line pb-1">
-                  <h3 className="text-sm font-semibold text-muted">Hidden</h3>
-                  <button
-                    type="button"
-                    onClick={p.onRestore}
-                    disabled={p.disabled}
-                    aria-label="Restore all names"
-                    className="rounded-md px-2 py-1 text-sm font-semibold text-ink underline decoration-line underline-offset-3 hover:decoration-ink disabled:text-muted"
-                  >
-                    Restore all
-                  </button>
-                </div>
-                <ul className="divide-y divide-line">{inactive.map(row)}</ul>
-              </>
-            )}
-          </>
-        )}
-      </div>
-
-      {full && <p className="mt-2 text-sm text-muted">That's the maximum of {MAX_ENTRIES} names. Remove one to add another.</p>}
-
-      <div className="mt-1 border-t-2 border-ink pt-1.5">
-        <div className="-mx-3 flex flex-wrap gap-x-1">
-        <button type="button" onClick={p.onOpenPaste} disabled={p.disabled || full} className={quietBtn}>
-          <ClipboardList className="size-4" aria-hidden="true" />
-          Paste names
-        </button>
-        <button
-          type="button"
-          onClick={p.onShuffle}
-          disabled={p.disabled || active.length < 2}
-          aria-label="Shuffle names"
-          className={quietBtn}
-        >
-          <Shuffle className="size-4" aria-hidden="true" />
-          Shuffle
-        </button>
+    <aside aria-label="Names" className="flex min-w-0 flex-col gap-4">
+      <section className={`${card} flex min-h-0 flex-col gap-5 p-6`}>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-display text-[21px] font-semibold text-ink">Names</h2>
+          <span className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary-strong">
+            {active.length} on the wheel{inactive.length > 0 ? `, ${inactive.length} hidden` : ""}
+          </span>
         </div>
-      </div>
 
-      <label className="flex items-center justify-between gap-3 py-2">
-        <span className="text-sm font-semibold text-ink">Remove winner after spin</span>
+        <form
+          className="flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void add();
+          }}
+        >
+          <input
+            aria-label="New name"
+            placeholder="Add a name"
+            value={name}
+            maxLength={40}
+            disabled={p.disabled || full}
+            onChange={(e) => setName(e.target.value)}
+            className="h-11 min-w-0 flex-1 rounded-xl border border-border-strong bg-surface-muted px-3.5 text-[15px] text-ink placeholder:text-ink-muted disabled:opacity-60"
+          />
+          <button
+            type="submit"
+            aria-label="Add name"
+            disabled={p.disabled || full || !name.trim()}
+            // An empty input isn't an error state, so the button keeps its normal look.
+            className={`${darkBtn} ${p.disabled || full ? "" : "disabled:opacity-100 disabled:shadow-[0_3px_0_var(--ink-shadow)]"}`}
+          >
+            Add name
+          </button>
+        </form>
+
+        {sorted.length === 0 ? (
+          <p className="py-6 text-center text-sm text-ink-muted">No names yet. Add a few, or paste a whole list.</p>
+        ) : (
+          <ul className="-my-2 flex flex-col overflow-y-auto md:max-h-[calc(100dvh-29rem)] md:min-h-[150px]">
+            {[...active, ...inactive].map((e) => (
+              <EntryRow
+                key={e.id}
+                entry={e}
+                disabled={p.disabled}
+                onRename={(n) => p.onRename(e, n)}
+                onColor={(c) => p.onColor(e, c)}
+                onToggle={() => p.onToggle(e)}
+                onRemove={() => p.onRemove(e)}
+              />
+            ))}
+          </ul>
+        )}
+
+        {full && <p className="text-sm text-ink-muted">That's the maximum of {MAX_ENTRIES} names. Remove one to add another.</p>}
+
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={p.onOpenPaste} disabled={p.disabled || full} className={pillBtn}>
+            Paste names
+          </button>
+          <button
+            type="button"
+            onClick={p.onShuffle}
+            disabled={p.disabled || active.length < 2}
+            aria-label="Shuffle names"
+            className={pillBtn}
+          >
+            Shuffle names
+          </button>
+          <button
+            type="button"
+            onClick={p.onRestore}
+            disabled={p.disabled || inactive.length === 0}
+            aria-label="Restore all names"
+            className={pillBtn}
+          >
+            Restore all names
+          </button>
+        </div>
+      </section>
+
+      <label className={`${card} flex items-center justify-between gap-4 px-6 py-[18px]`}>
+        <span className="flex flex-col gap-0.5">
+          <span className="text-[15px] font-semibold text-ink">Remove winner after spin</span>
+          <span className="text-[13px] text-ink-muted">Last one standing loses</span>
+        </span>
         <Switch
           label="Remove winner after spin"
           checked={p.removeWinner}
@@ -143,6 +129,6 @@ export function EntryPanel(p: Props) {
           onChange={p.onRemoveWinnerChange}
         />
       </label>
-    </section>
+    </aside>
   );
 }
