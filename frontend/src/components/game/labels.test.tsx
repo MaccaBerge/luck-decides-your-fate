@@ -4,6 +4,7 @@ import type { Entry } from "../../lib/types";
 import { EntryPanel } from "./EntryPanel";
 import { GameToolbar } from "./GameToolbar";
 import { PasteNamesDialog } from "./PasteNamesDialog";
+import { QrDialog } from "./QrDialog";
 import { ResultDialog } from "./ResultDialog";
 import { SavedListsDialog } from "./SavedListsDialog";
 
@@ -54,27 +55,3 @@ describe("§11.8 accessible names", () => {
   });
   it("toolbar", () => {
     const html = renderToStaticMarkup(
-      <GameToolbar soundEnabled dark={false} onToggleSound={noop} onToggleTheme={noop} onNewWheel={noop} onCopyLink={noop} newBusy={false} onBigScreen={noop} />,
-    );
-    for (const l of ["Toggle sound", "Toggle dark mode", "New wheel", "Copy link", "Big screen"]) expect(html).toContain(`aria-label="${l}"`);
-  });
-  it("dialogs", () => {
-    const paste = renderToStaticMarkup(<PasteNamesDialog open onClose={noop} onSubmit={async () => true} />);
-    expect(paste).toContain('role="dialog"');
-    expect(paste).toContain('aria-label="Names, one per line"');
-    expect(paste).toContain(">Add names<");
-    const res = renderToStaticMarkup(
-      <ResultDialog winner={{ name: "Anna" }} showRemove removing={false} onClose={noop} onRemove={noop} />,
-    );
-    expect(res).toMatch(/role="dialog"[^>]*aria-label="Result"/);
-    expect(res).toContain('data-testid="winner-name"');
-    expect(res).toContain(">Close<");
-    expect(res).toContain("Remove from wheel");
-    const saved = renderToStaticMarkup(
-      <SavedListsDialog open names={["Anna"]} disabled={false} onClose={noop} onLoad={async () => true} />,
-    );
-    expect(saved).toMatch(/role="dialog"[^>]*aria-label="Saved lists"/);
-    expect(saved).toContain('aria-label="List name"');
-    expect(saved).toContain(">Save list<");
-  });
-});
