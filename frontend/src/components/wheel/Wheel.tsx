@@ -217,12 +217,11 @@ export default function Wheel({
         const mid = (i + 0.5) * s - Math.PI / 2;
         const { text, size } = fitLabel(ctx, labelCacheRef.current, list[i].name, px, n, R, inset);
         ctx.font = `700 ${size}px ${LABEL_FONT}`;
-        const flip = Math.cos(mid + rotation) < 0;
         ctx.save();
-        ctx.rotate(flip ? mid + Math.PI : mid);
-        ctx.textAlign = flip ? "left" : "right";
+        ctx.rotate(mid);
+        ctx.textAlign = "right";
         ctx.fillStyle = textColorFor(list[i].color);
-        ctx.fillText(text, flip ? -(R - inset) : R - inset, 0);
+        ctx.fillText(text, R - inset, 0);
         ctx.restore();
       }
     }
