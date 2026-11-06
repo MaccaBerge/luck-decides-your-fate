@@ -308,3 +308,144 @@ export default function GamePage() {
   ) : null;
 
   return (
+    // Big-screen mode changes only classes around the wheel: remounting Wheel would break a running spin.
+    <div
+      className={
+        bigScreen
+          ? "flex h-dvh w-full flex-col overflow-hidden text-ink"
+          : "mx-auto flex min-h-screen w-full max-w-[1180px] flex-col gap-7 px-4 pt-7 pb-12 text-ink sm:px-6"
+      }
+    >
+      <div className={bigScreen ? "hidden" : "contents"}>
+        <GameToolbar
+          soundEnabled={sound}
+          dark={theme === "dark"}
+          onToggleSound={toggleSound}
+          onToggleTheme={toggleTheme}
+          onNewWheel={() => void newWheel()}
+          onCopyLink={() => void copyLink()}
+          onShowQr={() => setQrOpen(true)}
+          newBusy={newBusy}
+          onBigScreen={enterBigScreen}
+        />
+      </div>
+
+      <main
+        className={
+          bigScreen
+            ? "min-h-0 flex-1"
+            : "grid grid-cols-1 items-start gap-7 md:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]"
+        }
+      >
+        <section
+          aria-label="Wheel"
+          className={`flex min-w-0 flex-col items-center ${
+            bigScreen
+              ? "h-full justify-center gap-2 py-2"
+              : "gap-6 rounded-[28px] border border-border bg-surface px-4 pt-9 pb-8 sm:px-6"
+          }`}
+        >
+          <h1 className={`text-center font-display text-2xl font-semibold tracking-[-0.005em] sm:text-[30px] ${bigScreen ? "hidden" : ""}`}>Who's it gonna be?</h1>
+          <div
+            className={`group @container relative ${
+              bigScreen
+                ? // As large as fits without scrolling: leaves room for the caption and its gap.
+                  "w-[min(calc(100dvw-1rem),calc(100dvh-4.5rem))]"
+                : "w-full max-w-[min(500px,calc(100dvh-19rem))] min-w-[240px]"
+            }`}
+          >
+            <div className={canSpin ? "cursor-pointer" : ""} onClick={() => void doSpin()}>
+              <Wheel
+                entries={game.entries}
+                spin={activeSpin}
+                onSpinComplete={handleSpinComplete}
+                soundEnabled={sound}
+                showHub={false}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => void doSpin()}
+              disabled={!canSpin}
+              aria-label="Spin the wheel"
+              className="absolute top-1/2 left-1/2 size-[20%] -translate-x-1/2 -translate-y-1/2 rounded-full border-[5px] border-white bg-primary font-display text-[clamp(14px,4.2cqw,21px)] font-semibold text-white shadow-[0_4px_0_var(--primary-shadow),0_10px_24px_var(--spin-glow)] transition-[translate,box-shadow] duration-[80ms] enabled:active:translate-y-[calc(-50%+3px)] enabled:active:shadow-[0_1px_0_var(--primary-shadow)] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
+            >
+              Spin
+            </button>
+          </div>
+          <p
+            role="status"
+            aria-live="polite"
+            className={`inline-flex min-h-9 max-w-full items-center gap-2 rounded-full bg-bg px-4 py-2 text-center text-sm text-ink-muted ${caption ? "" : "invisible"}`}
+          >
+            {caption}
+          </p>
+        </section>
+
+        <div className={bigScreen ? "hidden" : "contents"}>
+          <EntryPanel
+            entries={game.entries}
+            // The server's state can list a spin before this viewer's wheel lands.
+            recentSpins={game.recent_spins.filter((s) => !(animating && s.spin_id === activeSpin?.spin_id))}
+            removeWinner={game.settings.remove_winner}
+            disabled={spinning}
+            onAdd={(names) => mutate(() => api.addEntries(game.id, names))}
+            onOpenPaste={() => setPasteOpen(true)}
+            onOpenSavedLists={() => setSavedListsOpen(true)}
+            onRename={(e, name) => onEntry(e, { name })}
+            onColor={(e, color) => onEntry(e, { color })}
+            onToggle={(e) => onEntry(e, { is_active: !e.is_active })}
+            onRemove={(e) => void mutate(() => api.deleteEntry(game.id, e.id))}
+            onShuffle={() => void mutate(() => api.shuffleEntries(game.id))}
+            onRestore={() => void mutate(() => api.restoreEntries(game.id))}
+            onRemoveWinnerChange={(v) => void mutate(() => api.updateSettings(game.id, { remove_winner: v }))}
+          />
+        </div>
+      </main>
+
+      <footer className={bigScreen ? "hidden" : "-mt-4 flex justify-center"}>
+        <PrivacyLink />
+      </footer>
+
+      {bigScreen && (
+        <button
+          type="button"
+          aria-label="Exit big screen"
+          onClick={() => setBigScreen(false)}
+          className={`${secondaryBtn} fixed top-3 right-3 z-40 w-11 !px-0`}
+        >
+          <Minimize className="size-[18px]" aria-hidden="true" />
+        </button>
+      )}
+
+      <PasteNamesDialog
+        open={pasteOpen}
+        onClose={() => setPasteOpen(false)}
+        onSubmit={(names) => mutate(() => api.addEntries(game.id, names))}
+      />
+      <SavedListsDialog
+        open={savedListsOpen}
+        names={[...game.entries].sort((a, b) => a.position - b.position).map((e) => e.name)}
+        disabled={spinning}
+        onClose={() => setSavedListsOpen(false)}
+        onLoad={loadList}
+      />
+      <ResultDialog
+        winner={result ? { name: result.name } : null}
+        showRemove={!game.settings.remove_winner && game.entries.some((e) => e.id === result?.spin.winner_entry_id && e.is_active)}
+        removing={removing}
+        onClose={() => setResult(null)}
+        onRemove={() => void removeWinner()}
+      />
+      <QrDialog
+        url={qrOpen ? wheelUrl : null}
+        onClose={() => setQrOpen(false)}
+        onError={() => {
+          setQrOpen(false);
+          showToast("Could not create the QR code");
+        }}
+      />
+      <Toast toast={toast} />
+    </div>
+  );
+}

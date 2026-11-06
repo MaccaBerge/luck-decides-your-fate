@@ -55,3 +55,31 @@ describe("§11.8 accessible names", () => {
   });
   it("toolbar", () => {
     const html = renderToStaticMarkup(
+      <GameToolbar soundEnabled dark={false} onToggleSound={noop} onToggleTheme={noop} onNewWheel={noop} onCopyLink={noop} onShowQr={noop} newBusy={false} onBigScreen={noop} />,
+    );
+    for (const l of ["Toggle sound", "Toggle dark mode", "New wheel", "Copy link", "Show QR code", "Big screen"]) expect(html).toContain(`aria-label="${l}"`);
+  });
+  it("dialogs", () => {
+    const paste = renderToStaticMarkup(<PasteNamesDialog open onClose={noop} onSubmit={async () => true} />);
+    expect(paste).toContain('role="dialog"');
+    expect(paste).toContain('aria-label="Names, one per line"');
+    expect(paste).toContain(">Add names<");
+    const res = renderToStaticMarkup(
+      <ResultDialog winner={{ name: "Anna" }} showRemove removing={false} onClose={noop} onRemove={noop} />,
+    );
+    expect(res).toMatch(/role="dialog"[^>]*aria-label="Result"/);
+    expect(res).toContain('data-testid="winner-name"');
+    expect(res).toContain(">Close<");
+    expect(res).toContain("Remove from wheel");
+    const saved = renderToStaticMarkup(
+      <SavedListsDialog open names={["Anna"]} disabled={false} onClose={noop} onLoad={async () => true} />,
+    );
+    expect(saved).toMatch(/role="dialog"[^>]*aria-label="Saved lists"/);
+    expect(saved).toContain('aria-label="List name"');
+    expect(saved).toContain(">Save list<");
+    const qr = renderToStaticMarkup(<QrDialog url="https://example.test/g/abc" onClose={noop} onError={noop} />);
+    expect(qr).toMatch(/role="dialog"[^>]*aria-label="QR code"/);
+    expect(qr).toContain("Scan to join this wheel");
+    expect(qr).toContain(">Close<");
+  });
+});
