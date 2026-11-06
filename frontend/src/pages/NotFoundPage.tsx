@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createGame } from "../lib/api";
 import { primaryBtn } from "../components/game/buttons";
+import { PrivacyLink } from "../components/game/PrivacyLink";
 import { WheelMark } from "../components/game/WheelMark";
 
 export default function NotFoundPage() {
@@ -39,6 +40,7 @@ export default function NotFoundPage() {
         Create a new wheel
       </button>
       {error && <p className="text-sm text-danger">{error}</p>}
+      <PrivacyLink />
     </main>
   );
 }
