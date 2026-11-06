@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ApiError, createGame, getGame } from "../lib/api";
 import { clearLastGameId, getLastGameId } from "../lib/storage";
 import { Loading } from "../components/game/Loading";
+import { primaryBtn } from "../components/game/buttons";
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -39,13 +40,13 @@ export default function HomePage() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center text-slate-700 dark:text-slate-200">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
         <p className="text-lg font-semibold">Couldn't set up your wheel.</p>
-        <p className="text-sm opacity-75">{error}</p>
+        <p className="text-sm text-muted">{error}</p>
         <button
           type="button"
           onClick={() => void go()}
-          className="rounded-full bg-violet-600 px-5 py-2.5 font-semibold text-white shadow-md hover:bg-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
+          className={primaryBtn}
         >
           Try again
         </button>

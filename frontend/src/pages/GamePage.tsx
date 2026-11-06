@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import confetti from "canvas-confetti";
-import { Sparkles } from "lucide-react";
 import * as api from "../lib/api";
 import { ApiError } from "../lib/api";
 import type { Entry, PlayerEvent, PublicGameState, SpinStarted } from "../lib/types";
@@ -25,8 +24,8 @@ interface Result {
   color: string;
 }
 
-function fireConfetti() {
-  const colors = ["#EF4444", "#F59E0B", "#22C55E", "#06B6D4", "#8B5CF6", "#EC4899"];
+function fireConfetti(winnerColor: string) {
+  const colors = [winnerColor, winnerColor, "#E3A81F", "#F7F3E3"];
   const reduce = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (reduce) return;
   void confetti({ particleCount: 140, spread: 80, origin: { y: 0.6 }, colors, zIndex: 70 });
@@ -152,9 +151,9 @@ export default function GamePage() {
   const handleSpinComplete = useCallback((s: SpinStarted) => {
     setAnimating(false);
     const entry = gameRef.current?.entries.find((e) => e.id === s.winner_entry_id);
-    setResult({ spin: s, name: s.winner_name, color: entry?.color ?? "#8B5CF6" });
+    setResult({ spin: s, name: s.winner_name, color: entry?.color ?? "#3D4DB0" });
     setStatus(`Winner: ${s.winner_name}`);
-    fireConfetti();
+    fireConfetti(entry?.color ?? "#3D4DB0");
   }, []);
 
   const mutate = useCallback(
@@ -218,7 +217,7 @@ export default function GamePage() {
     const url = `${location.origin}/g/${game.id}`;
     try {
       await navigator.clipboard.writeText(url);
-      showToast("Link copied — share it with your friends!", "info");
+      showToast("Link copied", "info");
     } catch {
       showToast(url, "info");
     }
@@ -246,10 +245,21 @@ export default function GamePage() {
   const onEntry = (e: Entry, patch: { name?: string; color?: string; is_active?: boolean }) =>
     void mutate(() => api.updateEntry(game.id, e.id, patch));
 
-  const lastStanding = active.length === 1 && !spinning ? active[0].name : null;
+  // Hidden while spinning: the server's state can name the winner before the wheel lands.
+  const caption = spinning
+    ? null
+    : active.length === 0
+      ? "Add at least two names to spin"
+      : active.length === 1
+        ? game.last_result
+          ? `${active[0].name} is the last one standing`
+          : "Add one more name to spin"
+        : game.last_result
+          ? `Last spin: ${game.last_result.winner_name}`
+          : null;
 
   return (
-    <div className="min-h-screen pb-10 text-slate-900 dark:text-white">
+    <div className="min-h-screen pb-10 text-ink">
       <GameToolbar
         soundEnabled={sound}
         dark={theme === "dark"}
@@ -260,39 +270,24 @@ export default function GamePage() {
         newBusy={newBusy}
       />
 
-      <main className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-6 px-4 pt-4 sm:pt-6 md:grid-cols-[minmax(0,1fr)_minmax(300px,380px)] md:items-start md:gap-8 lg:gap-10">
+      <main className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-5 px-4 pt-3 sm:pt-4 md:grid-cols-[minmax(0,1fr)_minmax(300px,360px)] md:items-start md:gap-8 lg:gap-12">
         <section aria-label="Wheel" className="flex min-w-0 flex-col items-center">
-          <div
-            className={`w-full max-w-[min(560px,calc(100vh-14rem))] min-w-[240px] transition-transform ${
-              canSpin ? "cursor-pointer hover:scale-[1.01]" : ""
-            }`}
-            onClick={() => void doSpin()}
-          >
-            <Wheel entries={game.entries} spin={activeSpin} onSpinComplete={handleSpinComplete} soundEnabled={sound} />
+          <div className="group @container relative w-full max-w-[min(640px,calc(100dvh-8.5rem))] min-w-[240px]">
+            <div className={canSpin ? "cursor-pointer" : ""} onClick={() => void doSpin()}>
+              <Wheel entries={game.entries} spin={activeSpin} onSpinComplete={handleSpinComplete} soundEnabled={sound} />
+            </div>
+            <button
+              type="button"
+              onClick={() => void doSpin()}
+              disabled={!canSpin}
+              aria-label="Spin the wheel"
+              className="absolute top-1/2 left-1/2 size-[23%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#E3A81F] pb-[0.1em] font-display text-[max(1.05rem,6.2cqw)] text-[#13261F] transition-[background-color,scale] enabled:group-hover:bg-[#F0BC3C] enabled:active:scale-95 disabled:cursor-not-allowed disabled:text-[#13261F]/35"
+            >
+              Spin
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => void doSpin()}
-            disabled={!canSpin}
-            aria-label="Spin the wheel"
-            className="mt-5 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-500 px-10 py-4 text-lg font-black tracking-wide text-white uppercase shadow-xl shadow-fuchsia-500/30 transition hover:scale-[1.04] hover:shadow-fuchsia-500/40 focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-violet-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
-          >
-            <Sparkles className="size-5" aria-hidden="true" />
-            {spinning ? "Spinning…" : "Spin"}
-          </button>
-
-          <p className="mt-3 min-h-6 text-center text-sm font-semibold text-slate-600 dark:text-slate-300">
-            {lastStanding
-              ? `${lastStanding} is the last one standing`
-              : active.length === 0
-                ? "Add at least two names to spin"
-                : active.length === 1
-                  ? null
-                  : !spinning
-                    ? "Click the wheel or press Spin"
-                    : null}
-          </p>
+          <p className="mt-1 min-h-6 text-center text-base font-medium text-muted">{caption}</p>
           <div aria-live="polite" role="status" className="sr-only">
             {status}
           </div>

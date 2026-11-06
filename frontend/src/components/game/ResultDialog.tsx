@@ -1,4 +1,4 @@
-import { PartyPopper, UserMinus } from "lucide-react";
+import { textColorFor } from "../wheel/wheelMath";
 import { Modal } from "./Modal";
 
 interface Props {
@@ -9,30 +9,39 @@ interface Props {
   onRemove: () => void;
 }
 
+/** Long names step down in size so the reveal stays one confident block of type. */
+function nameSize(name: string): string {
+  if (name.length <= 8) return "text-[clamp(3.25rem,15vw,6rem)]";
+  if (name.length <= 16) return "text-[clamp(2.5rem,10vw,4rem)]";
+  return "text-[clamp(1.75rem,7vw,2.75rem)]";
+}
+
 export function ResultDialog({ winner, showRemove, removing, onClose, onRemove }: Props) {
+  const fg = winner ? textColorFor(winner.color) : undefined;
   return (
-    <Modal open={winner !== null} onClose={onClose} label="Result" className="text-center">
+    <Modal
+      open={winner !== null}
+      onClose={onClose}
+      label="Result"
+      className="max-w-xl px-6 pt-8 pb-6 text-center sm:px-10 sm:pt-10"
+      style={winner ? { backgroundColor: winner.color, color: fg } : undefined}
+    >
       {winner && (
         <>
-          <div className="mx-auto mb-3 grid size-14 place-items-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300">
-            <PartyPopper className="size-7" aria-hidden="true" />
-          </div>
-          <p className="text-sm font-semibold tracking-widest text-slate-500 uppercase dark:text-slate-400">
-            We have a winner!
-          </p>
+          <p className="text-base font-semibold">The wheel chose</p>
           <p
             data-testid="winner-name"
-            className="mt-2 text-4xl font-black break-words sm:text-5xl"
-            style={{ color: winner.color }}
+            className={`mt-2 font-display leading-[1.1] font-normal [overflow-wrap:anywhere] ${nameSize(winner.name)}`}
           >
             {winner.name}
           </p>
-          <div className="mt-6 flex flex-col-reverse justify-center gap-2 sm:flex-row">
+          <div className="mt-8 flex flex-col-reverse justify-center gap-2 sm:flex-row">
             <button
               type="button"
               data-autofocus
               onClick={onClose}
-              className="rounded-full bg-slate-100 px-6 py-2.5 font-bold text-slate-700 hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
+              style={{ backgroundColor: fg, color: winner.color, outlineColor: fg }}
+              className="rounded-lg px-7 py-2.5 font-bold transition-opacity hover:opacity-90"
             >
               Close
             </button>
@@ -41,9 +50,9 @@ export function ResultDialog({ winner, showRemove, removing, onClose, onRemove }
                 type="button"
                 onClick={onRemove}
                 disabled={removing}
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-violet-600 px-6 py-2.5 font-bold text-white shadow-md shadow-violet-500/30 hover:bg-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:opacity-60"
+                style={{ outlineColor: fg }}
+                className="rounded-lg border-2 border-current px-6 py-2.5 font-bold transition-opacity hover:opacity-80 disabled:opacity-60"
               >
-                <UserMinus className="size-4" aria-hidden="true" />
                 Remove from wheel
               </button>
             )}

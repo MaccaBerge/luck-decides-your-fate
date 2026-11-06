@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Eye, EyeOff, Palette, Pencil, Trash2 } from "lucide-react";
+import { Eye, EyeOff, Trash2 } from "lucide-react";
 import type { Entry } from "../../lib/types";
 
 interface Props {
@@ -12,7 +12,10 @@ interface Props {
 }
 
 const iconBtn =
-  "grid size-9 shrink-0 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-violet-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white";
+  "grid size-9 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-ink/10 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent";
+// Where a pointer can hover, row actions stay out of the way until they're wanted.
+const revealed =
+  "[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100";
 
 export function EntryRow({ entry, disabled, onRename, onColor, onToggle, onRemove }: Props) {
   const [editing, setEditing] = useState(false);
@@ -43,21 +46,19 @@ export function EntryRow({ entry, disabled, onRename, onColor, onToggle, onRemov
   };
 
   return (
-    <li
-      className={`group flex items-center gap-1.5 rounded-2xl py-1 pr-1 pl-2 transition ${
-        entry.is_active ? "hover:bg-slate-50 dark:hover:bg-white/5" : "opacity-55"
-      }`}
-    >
-      <span className="relative shrink-0">
+    <li className="group flex min-h-11 items-center gap-1">
+      <span className="relative -ml-1 shrink-0">
         <button
           type="button"
           aria-label={`Change color for ${entry.name}`}
           disabled={disabled}
           onClick={() => colorRef.current?.click()}
-          className="grid size-7 place-items-center rounded-full ring-2 ring-white shadow-sm transition hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:cursor-not-allowed dark:ring-white/10"
-          style={{ backgroundColor: entry.is_active ? entry.color : "#94a3b8" }}
+          className="grid size-8 place-items-center rounded-lg transition-colors hover:bg-ink/10 disabled:cursor-not-allowed disabled:hover:bg-transparent"
         >
-          <Palette className="size-3.5 text-white/90 opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
+          <span
+            className="size-[18px] rounded-full"
+            style={{ backgroundColor: entry.is_active ? entry.color : "var(--line)" }}
+          />
         </button>
         <input
           ref={colorRef}
@@ -67,7 +68,7 @@ export function EntryRow({ entry, disabled, onRename, onColor, onToggle, onRemov
           value={entry.color.toLowerCase()}
           disabled={disabled}
           onChange={(e) => onColor(e.target.value.toUpperCase())}
-          className="pointer-events-none absolute inset-0 size-7 opacity-0"
+          className="pointer-events-none absolute inset-0 size-8 opacity-0"
         />
       </span>
 
@@ -86,29 +87,29 @@ export function EntryRow({ entry, disabled, onRename, onColor, onToggle, onRemov
               setEditing(false);
             }
           }}
-          className="min-w-0 flex-1 rounded-xl border border-violet-400 bg-white px-2.5 py-1.5 text-base text-slate-900 outline-none focus:ring-4 focus:ring-violet-500/20 dark:bg-white/5 dark:text-white"
+          className="min-w-0 flex-1 rounded-md bg-ink/5 px-1 py-1 text-base font-medium text-ink"
         />
       ) : (
-        <span
-          className={`min-w-0 flex-1 truncate px-1 text-[15px] font-semibold ${
-            entry.is_active ? "text-slate-800 dark:text-slate-100" : "text-slate-500 line-through decoration-slate-400/60 dark:text-slate-400"
-          }`}
-          onDoubleClick={() => !disabled && startEdit()}
+        <button
+          type="button"
+          aria-label={`Edit ${entry.name}`}
           title={entry.name}
+          disabled={disabled}
+          onClick={startEdit}
+          className={`min-w-0 flex-1 truncate rounded-md px-1 py-1 text-left text-base font-medium decoration-muted underline-offset-3 enabled:hover:underline disabled:cursor-default ${
+            entry.is_active ? "text-ink" : "text-muted"
+          }`}
         >
           {entry.name}
-        </span>
+        </button>
       )}
 
-      <button type="button" aria-label={`Edit ${entry.name}`} disabled={disabled} onClick={startEdit} className={iconBtn}>
-        <Pencil className="size-4" aria-hidden="true" />
-      </button>
       <button
         type="button"
         aria-label={`${entry.is_active ? "Hide" : "Show"} ${entry.name}`}
         disabled={disabled}
         onClick={onToggle}
-        className={iconBtn}
+        className={`${iconBtn} ${entry.is_active ? revealed : ""}`}
       >
         {entry.is_active ? <Eye className="size-4" aria-hidden="true" /> : <EyeOff className="size-4" aria-hidden="true" />}
       </button>
@@ -117,7 +118,7 @@ export function EntryRow({ entry, disabled, onRename, onColor, onToggle, onRemov
         aria-label={`Remove ${entry.name}`}
         disabled={disabled}
         onClick={onRemove}
-        className={`${iconBtn} hover:!bg-red-50 hover:!text-red-600 dark:hover:!bg-red-500/15 dark:hover:!text-red-400`}
+        className={`${iconBtn} ${revealed} hover:bg-danger/15 hover:text-danger`}
       >
         <Trash2 className="size-4" aria-hidden="true" />
       </button>
