@@ -18,6 +18,7 @@ describe("§11.8 accessible names", () => {
     const html = renderToStaticMarkup(
       <EntryPanel
         entries={entries}
+        recentSpins={[{ spin_id: 1, winner_name: "Anna", finished_at: "2026-01-01T12:00:00Z" }]}
         removeWinner={false}
         disabled={false}
         onAdd={async () => true}
@@ -46,6 +47,8 @@ describe("§11.8 accessible names", () => {
       'aria-label="Hide Anna"',
       'aria-label="Remove Anna"',
       'aria-label="Show Jonas"',
+      'data-testid="recent-spins"',
+      ">Recent spins<",
     ])
       expect(html).toContain(l);
   });
