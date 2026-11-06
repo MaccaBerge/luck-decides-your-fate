@@ -55,9 +55,9 @@ describe("§11.8 accessible names", () => {
   });
   it("toolbar", () => {
     const html = renderToStaticMarkup(
-      <GameToolbar soundEnabled dark={false} onToggleSound={noop} onToggleTheme={noop} onNewWheel={noop} onCopyLink={noop} onShowQr={noop} newBusy={false} />,
+      <GameToolbar soundEnabled dark={false} onToggleSound={noop} onToggleTheme={noop} onNewWheel={noop} onCopyLink={noop} onShowQr={noop} newBusy={false} onBigScreen={noop} />,
     );
-    for (const l of ["Toggle sound", "Toggle dark mode", "New wheel", "Copy link", "Show QR code"]) expect(html).toContain(`aria-label="${l}"`);
+    for (const l of ["Toggle sound", "Toggle dark mode", "New wheel", "Copy link", "Show QR code", "Big screen"]) expect(html).toContain(`aria-label="${l}"`);
   });
   it("dialogs", () => {
     const paste = renderToStaticMarkup(<PasteNamesDialog open onClose={noop} onSubmit={async () => true} />);

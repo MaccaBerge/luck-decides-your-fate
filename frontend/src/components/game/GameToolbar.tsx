@@ -1,4 +1,4 @@
-import { Link as LinkIcon, Moon, Plus, QrCode, Sun, Volume2, VolumeX } from "lucide-react";
+import { Link as LinkIcon, Maximize, Moon, Plus, QrCode, Sun, Volume2, VolumeX } from "lucide-react";
 import { secondaryBtn } from "./buttons";
 import { WheelMark } from "./WheelMark";
 
@@ -11,6 +11,7 @@ interface Props {
   onCopyLink: () => void;
   onShowQr: () => void;
   newBusy: boolean;
+  onBigScreen: () => void;
 }
 
 const square = `${secondaryBtn} w-11 !px-0`;
@@ -47,6 +48,9 @@ export function GameToolbar(p: Props) {
         </button>
         <button type="button" aria-label="Toggle dark mode" aria-pressed={p.dark} onClick={p.onToggleTheme} className={square}>
           {p.dark ? <Sun className="size-[18px]" aria-hidden="true" /> : <Moon className="size-[18px]" aria-hidden="true" />}
+        </button>
+        <button type="button" aria-label="Big screen" onClick={p.onBigScreen} className={square}>
+          <Maximize className="size-[18px]" aria-hidden="true" />
         </button>
       </nav>
     </header>
