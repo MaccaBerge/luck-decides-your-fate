@@ -1,4 +1,4 @@
-import { Link as LinkIcon, Moon, Plus, Sun, Volume2, VolumeX } from "lucide-react";
+import { Link as LinkIcon, Maximize, Moon, Plus, Sun, Volume2, VolumeX } from "lucide-react";
 import { secondaryBtn } from "./buttons";
 import { WheelMark } from "./WheelMark";
 
@@ -10,10 +10,12 @@ interface Props {
   onNewWheel: () => void;
   onCopyLink: () => void;
   newBusy: boolean;
+  onBigScreen: () => void;
 }
 
 const square = `${secondaryBtn} w-11 !px-0`;
-const labelled = `${secondaryBtn} max-sm:px-3`;
+/** Icon-only on phones, so the toolbar fits on one row. */
+const labelled = `${secondaryBtn} max-sm:w-11 max-sm:!px-0`;
 
 export function GameToolbar(p: Props) {
   return (
@@ -25,11 +27,11 @@ export function GameToolbar(p: Props) {
       <nav className="flex flex-wrap items-center gap-2" aria-label="Toolbar">
         <button type="button" aria-label="New wheel" onClick={p.onNewWheel} disabled={p.newBusy} className={labelled}>
           <Plus className="size-4" aria-hidden="true" />
-          New wheel
+          <span className="max-sm:hidden">New wheel</span>
         </button>
         <button type="button" aria-label="Copy link" onClick={p.onCopyLink} className={labelled}>
           <LinkIcon className="size-4" aria-hidden="true" />
-          Copy link
+          <span className="max-sm:hidden">Copy link</span>
         </button>
         <button
           type="button"
@@ -42,6 +44,9 @@ export function GameToolbar(p: Props) {
         </button>
         <button type="button" aria-label="Toggle dark mode" aria-pressed={p.dark} onClick={p.onToggleTheme} className={square}>
           {p.dark ? <Sun className="size-[18px]" aria-hidden="true" /> : <Moon className="size-[18px]" aria-hidden="true" />}
+        </button>
+        <button type="button" aria-label="Big screen" onClick={p.onBigScreen} className={square}>
+          <Maximize className="size-[18px]" aria-hidden="true" />
         </button>
       </nav>
     </header>
