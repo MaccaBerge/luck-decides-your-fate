@@ -75,7 +75,8 @@ export function EntryPanel(p: Props) {
         {sorted.length === 0 ? (
           <p className="py-6 text-center text-sm text-ink-muted">No names yet. Add a few, or paste a whole list.</p>
         ) : (
-          <ul className="-my-2 flex flex-col overflow-y-auto md:max-h-[calc(100dvh-29rem)] md:min-h-[150px]">
+          // Scrolling clips at the list's edge, so the padding leaves room for row buttons, hover tints and focus rings.
+          <ul className="-mx-4 -my-2 flex flex-col overflow-y-auto px-4 md:max-h-[calc(100dvh-29rem)] md:min-h-[150px]">
             {[...active, ...inactive].map((e) => (
               <EntryRow
                 key={e.id}
