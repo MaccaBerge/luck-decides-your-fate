@@ -322,6 +322,8 @@ export default function GamePage() {
 
         <EntryPanel
           entries={game.entries}
+          // The server's state can list a spin before this viewer's wheel lands.
+          recentSpins={game.recent_spins.filter((s) => !(animating && s.spin_id === activeSpin?.spin_id))}
           removeWinner={game.settings.remove_winner}
           disabled={spinning}
           onAdd={(names) => mutate(() => api.addEntries(game.id, names))}

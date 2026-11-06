@@ -39,6 +39,12 @@ class LastResult(BaseModel):
     finished_at: str
 
 
+class RecentSpin(BaseModel):
+    spin_id: int
+    winner_name: str
+    finished_at: str
+
+
 class PublicGameState(BaseModel):
     id: str
     game_type: Literal["wheel"]
@@ -46,6 +52,7 @@ class PublicGameState(BaseModel):
     settings: GameSettingsOut
     current_spin: SpinStarted | None
     last_result: LastResult | None
+    recent_spins: list[RecentSpin]  # finished spins only, newest first
 
 
 # ---------- public requests ----------

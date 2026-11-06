@@ -45,7 +45,7 @@ Production: `npm run build`, then uvicorn serves `frontend/dist` (SPA fallback) 
 - `db/`: aiosqlite repository (fresh connection per call, `PRAGMA foreign_keys=ON`, WAL); `rows.py` dataclasses.
 - `engine/`: pure, game-agnostic logic: `normalize_name` (keep `isalnum` chars, then `casefold`; no accent folding), `evaluate_rule` (first target in the priority list that matches an active entry = X; falls back to fair on no match, or when `never` would exclude everyone), `pick_winner`.
 - `models.py`: Pydantic API schemas = the exact JSON contract shared with the frontend.
-- `services/serializers.py`: **the only place public JSON is built.** Public state must never contain `mode`, `target_names`, `label`, `origin`, `rule_status`, `rule_applied` or `matched_*`.
+- `services/serializers.py`: **the only place public JSON is built.** Public state must never contain `mode`, `target_names`, `label`, `origin`, `rule_status`, `rule_applied` or `matched_*`. Its `recent_spins` copies three fields from finished spins only; never serialize a `SpinRow` directly.
 - `services/views.py`: builds full states and broadcasts. `notify_public_change` → players + admin + dashboard; `notify_admin_change` (rule/label/presence) → admin + dashboard **only**. A rule change must produce zero player-socket traffic (no timing side channel).
 - `services/spins.py` + `services/state.py`: in-memory per-game runtime (lock, `current_spin`, `last_result`). The spin holds the lock for `duration_ms + 300`, then finishes it, applies remove-winner, and broadcasts `spin_finished` + state. Mutations during a spin → 409 `spin_in_progress`.
 - `realtime/manager.py`: socket registry. Only player sockets count as players/presence; admin sockets never do. Dashboard pushes are throttled.

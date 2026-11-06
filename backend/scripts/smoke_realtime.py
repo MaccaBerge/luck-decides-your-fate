@@ -71,8 +71,12 @@ async def main():
                 asp = await next_event(adm, lambda m: m["type"] == "spin_started")
                 assert asp["rule_applied"] is True
                 await next_event(player, lambda m: m["type"] == "spin_finished", timeout=10)
-                await next_event(player, lambda m: m["type"] == "state", timeout=5)
+                done = await next_event(player, lambda m: m["type"] == "state", timeout=5)
+                assert_no_leak(done)
+                recent = done["state"]["recent_spins"]
+                assert recent and set(recent[0]) == {"spin_id", "winner_name", "finished_at"}, recent
                 ok("spin broadcast; rule_applied only on admin socket")
+                ok("recent_spins has exactly the three allowed keys")
 
                 await http.patch(f"/api/admin/links/{link}", json={"mode": "never", "label": "changed"})
                 await next_event(adm, lambda m: m["type"] == "admin_state" and m["state"]["link"]["mode"] == "never")
