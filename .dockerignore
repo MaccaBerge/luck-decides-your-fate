@@ -21,4 +21,5 @@ docs
 **/*.db
 **/*.db-*
 *.png
+!frontend/public/og-image.png
 test-artifacts

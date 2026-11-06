@@ -69,6 +69,8 @@ jobs:
           done
           echo "the container did not become healthy within 30 s"
           exit 1
+      - name: Link preview image is in the image
+        run: curl -fsS -o /dev/null http://localhost:8000/og-image.png
       - name: Install smoke test dependencies
         run: pip install httpx websockets
       - name: API smoke test

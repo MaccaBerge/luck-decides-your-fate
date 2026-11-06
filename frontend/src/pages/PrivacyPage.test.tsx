@@ -24,6 +24,10 @@ describe("/privacy", () => {
     expect(text).toContain("deleted after 7 days without activity");
   });
 
+  it("shows the contact address", () => {
+    expect(html).toMatch(/href="mailto:luckdecidesyourfate@gmail.com"[^>]*>luckdecidesyourfate@gmail.com</);
+  });
+
   it("stays under 200 words and makes no claim about outcomes", () => {
     expect(text.trim().split(/\s+/).length).toBeLessThan(200);
     expect(text).not.toMatch(/\b(fair|unbiased|random|rigged?)\b/i);

@@ -14,6 +14,10 @@ def _is_admin_path(path: str) -> bool:
     )
 
 
+def _is_wheel_path(path: str) -> bool:
+    return path.startswith("/g/")
+
+
 def _cache_control(path: str, status: int, content_type: str) -> str | None:
     if path.startswith("/assets/"):
         # Filenames are hashed, so found files never change. A miss must not stick around.
@@ -34,7 +38,7 @@ def apply_response_headers(headers: MutableHeaders, path: str, status: int, *, s
     cache_control = _cache_control(path, status, headers.get("content-type", ""))
     if cache_control is not None:
         headers["Cache-Control"] = cache_control
-    if _is_admin_path(path):
+    if _is_admin_path(path) or _is_wheel_path(path):
         headers["X-Robots-Tag"] = "noindex, nofollow"
 
 

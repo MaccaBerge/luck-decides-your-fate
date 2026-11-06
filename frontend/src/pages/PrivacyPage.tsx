@@ -39,6 +39,13 @@ export default function PrivacyPage() {
         <Section title="Hosting">
           The site runs on Railway behind Cloudflare, whose systems process technical data such as IP addresses.
         </Section>
+        <Section title="Contact">
+          Questions, or want something removed? Email{" "}
+          <a href="mailto:luckdecidesyourfate@gmail.com" className="text-ink underline underline-offset-3 [overflow-wrap:anywhere]">
+            luckdecidesyourfate@gmail.com
+          </a>
+          .
+        </Section>
       </div>
       <Link to="/" className={`${secondaryBtn} self-start`}>
         Back to the wheel
