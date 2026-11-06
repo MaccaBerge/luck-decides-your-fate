@@ -1,15 +1,21 @@
-const COLORS = ["#D23C28", "#F2BE2E", "#1A9E96", "#3D4DB0", "#EC7A92", "#27804F"];
+import { SLICE_COLORS } from "../../lib/palette";
 
-/** A small drawing of the wheel, for places where there is no game yet. */
-export function WheelMark({ className = "" }: { className?: string }) {
+const SLICES = [
+  "M18 18 L18 3 A15 15 0 0 1 32.3 13.4 Z",
+  "M18 18 L32.3 13.4 A15 15 0 0 1 26.8 30.1 Z",
+  "M18 18 L26.8 30.1 A15 15 0 0 1 4.6 24.5 Z",
+  "M18 18 L4.6 24.5 A15 15 0 0 1 18 3 Z",
+];
+
+/** The logo: a small drawing of the wheel. */
+export function WheelMark({ className = "size-[34px]" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 48 48" aria-hidden="true" className={className}>
-      <circle cx="24" cy="24" r="24" fill="#2F1E14" />
-      {COLORS.map((color, i) => (
-        <path key={color} d="M24 24 L24 4 A20 20 0 0 1 41.32 14 Z" fill={color} transform={`rotate(${i * 60} 24 24)`} />
+    <svg viewBox="0 0 36 36" aria-hidden="true" className={`shrink-0 ${className}`}>
+      <circle cx="18" cy="18" r="17" fill="#FFFFFF" stroke="var(--border)" />
+      {SLICES.map((d, i) => (
+        <path key={d} d={d} fill={SLICE_COLORS[i]} />
       ))}
-      <circle cx="24" cy="24" r="6" fill="#2F1E14" />
-      <circle cx="24" cy="24" r="4.5" fill="#E3A81F" />
+      <circle cx="18" cy="18" r="3.5" fill="#1C1830" />
     </svg>
   );
 }
