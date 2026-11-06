@@ -96,6 +96,8 @@ Then do a real-world run, **on your phone using mobile data, not Wi-Fi**, with y
 
 Don't run the smoke scripts against production. They expect short spin durations and would leave test data behind.
 
+**Link previews:** after a deploy that changes the preview tags or image, paste a wheel link into iMessage, Snapchat and Messenger. Each should show the site name, description and image. If a preview is missing, check that `https://luckdecidesyourfate.com/og-image.png` opens, then check Cloudflare's bot settings (Security → Bots): bot blocking can stop preview crawlers from reading the page. Chat apps cache previews, so test with a new wheel link.
+
 ## 6. Backups & rollback
 
 - **Backups:** Admin dashboard → "Download backup", for example before every deploy. Store the file somewhere safe. To check a file, run `sqlite3 file.db ".tables"`.
