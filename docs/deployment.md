@@ -47,7 +47,7 @@ www.luckdecidesyourfate.com ─┘                                              
    | `RAILWAY_RUN_UID` | `0` | Railway's volumes are owned by root, so the app must run as root on Railway to write to them. The image itself stays non-root everywhere else. |
 
    Do **not** set `SPIN_DURATION_*` or `PORT`. Railway provides `PORT`.
-5. Deploy. Check the logs for a line starting with `config:` and no errors. It should look like `config: db=/data/luckdecidesyourfate.db cookie_secure=true ttl_days=7 frontend=yes`.
+5. Deploy. Check the logs for a line starting with `config:` and no errors. It should look like `config: db=/data/luckdecidesyourfate.db cookie_secure=true ttl_days=7 frontend=yes backups=off`.
 6. **Volume write check:** create a rigged link in the admin at `/admin`, then trigger a redeploy (Railway → Deployments → Redeploy). Log in again: **the link must still be there.**
 
    If you see permission errors, or the link is gone, the volume isn't writable or isn't mounted at `/data`. Stop and fix that before continuing:
@@ -98,9 +98,51 @@ Don't run the smoke scripts against production. They expect short spin durations
 
 ## 6. Backups & rollback
 
-- **Backups:** Admin dashboard → "Download backup", for example before every deploy. Store the file somewhere safe. To check a file, run `sqlite3 file.db ".tables"`.
+- **Backups:** Admin dashboard → "Download backup", for example before every deploy. Store the file somewhere safe. To check a file, run `sqlite3 file.db "PRAGMA integrity_check"`, which should print `ok`. For automatic copies, see below.
 - **Rollback:** In Railway → Deployments, redeploy the previous successful deployment. Alternatively, revert the PR on GitHub, and auto-deploy picks it up.
-- **Restore a backup** (rare): ask Claude for a restore procedure at that point. It needs file access to the volume, and the right approach depends on Railway's tooling at the time.
+- **Restore a backup** (rare), rehearsed locally:
+  1. Stop the app.
+  2. Check the backup file: `sqlite3 backup.db "PRAGMA integrity_check"` should print `ok`.
+  3. Copy it over the database file, for example `cp backup.db data/luckdecidesyourfate.db`.
+  4. Delete the leftover `luckdecidesyourfate.db-wal` and `luckdecidesyourfate.db-shm` files next to it, if there are any. They belong to the old database.
+  5. Start the app and check that your links and wheels are there.
+
+  **The production restore is untested.** It needs the same steps on the Railway volume at `/data`, with the app stopped, and that hasn't been tried. Try it on a spare service before you have to rely on it.
+
+### Automatic backups
+
+A daily copy of the SQLite file goes to a private S3-compatible bucket outside Railway. They're off until all four `BACKUP_S3_*` variables are set. Setting only some of them stops the app at startup.
+
+**What's in a copy:** wheels, names, rules, link labels and spin history. Admin sessions, live state and `ADMIN_PASSWORD` aren't in it. **Copies contain the rigging rules, so the bucket must stay private and the token must stay limited to it.**
+
+**Set it up with Cloudflare R2:**
+
+1. Cloudflare dashboard → **R2 Object Storage → Create bucket**. Name it, for example, `ldyf-backups`. Leave public access off.
+2. On the R2 page, go to **Manage R2 API Tokens → Create API token**. Choose **Object Read & Write**, and limit it to that bucket only.
+3. Copy the **Access Key ID**, **Secret Access Key** and the **S3 endpoint** (`https://<account-id>.r2.cloudflarestorage.com`). The secret is only shown once.
+4. In Railway → service → **Variables**, add the following. Saving them restarts the app.
+
+   | Variable | Value |
+   |---|---|
+   | `BACKUP_S3_ENDPOINT` | the S3 endpoint from step 3, without the bucket name |
+   | `BACKUP_S3_BUCKET` | the bucket name |
+   | `BACKUP_S3_ACCESS_KEY_ID` | from step 3 |
+   | `BACKUP_S3_SECRET_ACCESS_KEY` | from step 3 |
+
+   Optional: `BACKUP_INTERVAL_HOURS` (default 24) and `BACKUP_KEEP` (default 14). If you change either, update the "How long it's kept" line on the privacy page so it stays true.
+
+**Confirm the first backup:**
+
+1. The startup log line ends with `backups=on`, and a line `backup: uploaded` follows shortly after.
+2. A `backups/luckdecidesyourfate-….db` object appears in the bucket.
+3. The admin dashboard shows "Last automatic backup" with the time.
+4. Download that object and run `sqlite3 file.db "PRAGMA integrity_check"`. It should print `ok`.
+
+**How it behaves:**
+
+- The app checks hourly and backs up when the newest copy in the bucket is at least `BACKUP_INTERVAL_HOURS` old, so restarts don't skip or repeat a backup.
+- Old copies are deleted only after a successful upload, keeping the newest `BACKUP_KEEP`. Only objects named exactly like a backup under `backups/` are ever deleted.
+- A failure leaves the app running and is retried at the next hourly check. **The dashboard shows it in red, so look there now and then.** It shows only an error type; the logs say which step failed.
 
 ## 7. After it's live
 

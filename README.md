@@ -82,6 +82,9 @@ Real environment variables take precedence over `backend/.env`.
 | `ADMIN_PASSWORD` | (none) | **Required.** The app exits at startup with a clear message if it is missing, and logs a warning if it is shorter than 16 characters. |
 | `DATABASE_PATH` | `./data/luckdecidesyourfate.db` | SQLite file. Its parent directory is created automatically. |
 | `GAME_TTL_DAYS` | `7` | Public games idle this long are deleted (checked hourly). Admin links are never deleted automatically. |
+| `BACKUP_S3_ENDPOINT`, `BACKUP_S3_BUCKET`, `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY` | (unset) | Automatic backups to a private S3-compatible bucket. All four turn them on, none leaves them off, and only some stops startup. See `docs/deployment.md`. |
+| `BACKUP_INTERVAL_HOURS` | `24` | Back up when the newest copy is at least this old (checked hourly). |
+| `BACKUP_KEEP` | `14` | How many copies to keep. Older ones are deleted after a successful upload. |
 | `COOKIE_SECURE` | `false` | `true/false/1/0/yes/no`; anything else stops startup. `true` adds `Secure` to the admin cookie and sends HSTS. |
 | `SPIN_DURATION_MS_MIN` | `4500` | Spin animation length range. |
 | `SPIN_DURATION_MS_MAX` | `7000` | |
