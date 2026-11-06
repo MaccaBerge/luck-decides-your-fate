@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Check, Loader2, Minus, Save, Users } from "lucide-react";
+import { Loader2, Target } from "lucide-react";
 import Wheel from "../components/wheel/Wheel";
+import { textColorFor } from "../components/wheel/wheelMath";
 import type { Mode, SpinStarted } from "../lib/types";
 import * as adminApi from "./adminApi";
 import { errorMessage, errorStatus, parseNames, type UpdateLinkBody } from "./adminApi";
@@ -10,19 +11,25 @@ import { useAdminAuth } from "./auth";
 import { useAdminLinkSocket } from "./useAdminSocket";
 import RuleStatusBanner from "./components/RuleStatusBanner";
 import {
+  btnPill,
   btnPrimary,
   btnSecondary,
   card,
+  cardTitle,
   clockTime,
   CopyButton,
   DeleteWithConfirm,
   ErrorText,
+  fieldLabel,
   input,
   linkTitle,
   LogoutButton,
   MODE_LABEL,
   ModeRadioGroup,
+  page,
   StatusBadge,
+  textarea,
+  Wordmark,
 } from "./components/ui";
 
 /**
@@ -141,18 +148,20 @@ export default function LinkControlPage() {
   }
 
   const header = (
-    <header className="flex items-center justify-between gap-2">
-      <button type="button" className={btnSecondary} onClick={goDashboard}>
-        <ArrowLeft className="h-4 w-4" aria-hidden />
-        Back to dashboard
-      </button>
-      <LogoutButton onClick={logout} />
+    <header className="flex flex-wrap items-center justify-between gap-4">
+      <Wordmark>Controller</Wordmark>
+      <nav className="flex items-center gap-2">
+        <button type="button" className={btnSecondary} onClick={goDashboard}>
+          Back to dashboard
+        </button>
+        <LogoutButton onClick={logout} />
+      </nav>
     </header>
   );
 
   if (notFound) {
     return (
-      <div className="mx-auto w-full max-w-5xl space-y-5 px-4 py-5 sm:py-8">
+      <div className={page}>
         {header}
         <div className={card}>
           <p className="font-medium">This link no longer exists.</p>
@@ -163,10 +172,10 @@ export default function LinkControlPage() {
 
   if (!st) {
     return (
-      <div className="mx-auto w-full max-w-5xl space-y-5 px-4 py-5 sm:py-8">
+      <div className={page}>
         {header}
         <ErrorText>{error}</ErrorText>
-        <Loader2 className="h-6 w-6 animate-spin text-muted" aria-label="Loading link" />
+        <Loader2 className="size-6 animate-spin text-ink-muted" aria-label="Loading link" />
       </div>
     );
   }
@@ -180,41 +189,41 @@ export default function LinkControlPage() {
   const displayMode = pendingMode ?? link.mode;
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-5 px-4 py-5 sm:py-8">
+    <div className={page}>
       {header}
 
-      <section className={`${card} space-y-3`}>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="min-w-0 truncate text-lg font-semibold">{title}</h1>
-          <StatusBadge status={link.status} />
-          <span className="inline-flex items-center gap-1 text-sm text-muted">
-            <Users className="h-4 w-4" aria-hidden />
-            <span data-testid="player-count" className="font-semibold tabular-nums">
-              {link.player_count}
+      <section aria-label="Link" className={`${card} flex flex-wrap items-center gap-x-6 gap-y-4 !py-5`}>
+        <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-2">
+          <h1 className="truncate font-display text-[26px] leading-tight font-semibold">{title}</h1>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <StatusBadge status={link.status} />
+            <span className="text-[13px] text-ink-muted">
+              <span data-testid="player-count" className="tabular-nums">
+                {link.player_count}
+              </span>{" "}
+              {link.player_count === 1 ? "player" : "players"}, {active.length} {active.length === 1 ? "name" : "names"}
             </span>
-            {link.player_count === 1 ? "player" : "players"}
-          </span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-[1_1_400px] items-center gap-2">
           <code
             data-testid="link-url"
-            className="min-w-0 flex-1 truncate rounded-md bg-ink/5 px-3 py-2 text-sm"
+            className="flex h-[46px] min-w-0 flex-1 items-center overflow-hidden rounded-full bg-surface-tint px-4 text-sm font-medium text-ellipsis whitespace-nowrap"
             title={url}
           >
             {url}
           </code>
-          <CopyButton text={url} label="Copy link" />
+          <CopyButton text={url} label="Copy link" idleText="Copy link" className={`${btnPrimary} shrink-0`} />
         </div>
       </section>
 
       <ErrorText>{error}</ErrorText>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <section className={`${card} space-y-4`}>
-          <h2 className="text-base font-semibold">Rules</h2>
-          <RuleStatusBanner status={rule_status} mode={link.mode} />
-          <div className="space-y-1">
-            <span className="text-sm text-muted">Mode (applies immediately)</span>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+        <section aria-label="Rules" className={`${card} flex flex-col gap-[22px]`}>
+          <h2 className="font-display text-xl font-semibold">Rules</h2>
+          <div className="flex flex-col gap-2.5">
+            <span className={fieldLabel}>Mode (applies immediately)</span>
             <ModeRadioGroup
               name={`mode-${game.id}`}
               value={displayMode}
@@ -222,14 +231,12 @@ export default function LinkControlPage() {
               disabled={pendingMode !== null}
             />
           </div>
-          <div className="space-y-2">
-            <label className="block space-y-1">
-              <span className="text-sm text-muted">
-                Target names, one per line, in priority order
-              </span>
+          <div className="flex flex-col gap-2.5">
+            <label className="flex flex-col gap-2.5">
+              <span className={fieldLabel}>Target names, one per line, in priority order</span>
               <textarea
                 aria-label="Target names"
-                className={`${input} min-h-24 resize-y`}
+                className={textarea}
                 rows={3}
                 value={targetsDraft}
                 onChange={(e) => setTargetsDraft(e.target.value)}
@@ -237,20 +244,17 @@ export default function LinkControlPage() {
             </label>
             <button
               type="button"
-              className={btnPrimary}
+              className={`${btnPill} self-start`}
               onClick={saveTargets}
               disabled={saving !== null || !targetsDirty}
             >
-              {saving === "targets" ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              ) : (
-                <Save className="h-4 w-4" aria-hidden />
-              )}
+              {saving === "targets" && <Loader2 className="size-4 animate-spin" aria-hidden />}
               Save target names
             </button>
           </div>
-          <div className="space-y-1">
-            <span className="text-sm text-muted">Label (private)</span>
+          <RuleStatusBanner status={rule_status} mode={link.mode} />
+          <div className="flex flex-col gap-2.5">
+            <span className={fieldLabel}>Label (private)</span>
             <div className="flex gap-2">
               <input
                 aria-label="Link label"
@@ -275,107 +279,106 @@ export default function LinkControlPage() {
           </div>
         </section>
 
-        <section className={`${card} space-y-4`}>
-          <h2 className="text-base font-semibold">Live wheel</h2>
-          <div className="mx-auto w-full max-w-[18rem]">
-            <Wheel
-              entries={game.entries}
-              spin={spin}
-              soundEnabled={false}
-              ariaLabel={`Live wheel with ${active.length} names`}
-            />
-          </div>
-          <p className="text-center text-sm text-muted" aria-live="polite">
-            {game.current_spin
-              ? "Spinning…"
-              : game.last_result
-                ? `Last winner: ${game.last_result.winner_name}`
-                : "No spins yet"}
-          </p>
-          <div>
-            <h3 className="mb-2 text-sm font-semibold">Names ({active.length})</h3>
-            {game.entries.length === 0 ? (
-              <p className="text-sm text-muted">The wheel is empty.</p>
-            ) : (
-              <ul className="flex flex-wrap gap-1.5">
-                {active.map((e) => {
-                  const isX = matched.has(e.id);
-                  return (
+        <div className="flex min-w-0 flex-col gap-6">
+          <section aria-label="Live wheel" className={`${card} flex flex-wrap items-center gap-7`}>
+            <div className="mx-auto w-[220px] shrink-0 sm:mx-0">
+              <Wheel entries={game.entries} spin={spin} soundEnabled={false} ariaLabel={`Live wheel with ${active.length} names`} />
+            </div>
+            <div className="flex min-w-0 flex-[1_1_240px] flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <span aria-hidden className="size-2 rounded-full bg-success-dot" />
+                <h2 className={cardTitle}>Their wheel, live</h2>
+              </div>
+              {game.entries.length === 0 ? (
+                <p className="text-sm text-ink-muted">The wheel is empty.</p>
+              ) : (
+                <ul className="flex flex-wrap gap-2">
+                  {active.map((e) => {
+                    const isX = matched.has(e.id);
+                    return (
+                      <li
+                        key={e.id}
+                        className={`flex h-[34px] max-w-full items-center gap-1.5 rounded-full px-3.5 text-sm ${
+                          isX
+                            ? "font-semibold shadow-[0_0_0_2px_var(--surface),0_0_0_4px_var(--primary)]"
+                            : "font-medium"
+                        }`}
+                        style={{ backgroundColor: e.color, color: textColorFor(e.color) }}
+                        title={isX ? "Target" : undefined}
+                      >
+                        {isX && <Target className="size-3 shrink-0" aria-hidden />}
+                        <span className="truncate">{e.name}</span>
+                        {isX && <span className="sr-only"> (target)</span>}
+                      </li>
+                    );
+                  })}
+                  {inactive.map((e) => (
                     <li
                       key={e.id}
-                      className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm ${
-                        isX
-                          ? "border-brass bg-brass font-semibold text-on-brass"
-                          : "border-line"
-                      }`}
-                      title={isX ? "Target" : undefined}
+                      className="flex h-[34px] max-w-full items-center rounded-full border border-dashed border-border-strong px-3.5 text-sm text-ink-muted line-through"
                     >
-                      <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: e.color }} />
                       <span className="truncate">{e.name}</span>
-                      {isX && <span className="sr-only"> (target)</span>}
+                      <span className="sr-only"> (hidden)</span>
                     </li>
-                  );
-                })}
-                {inactive.map((e) => (
-                  <li
-                    key={e.id}
-                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-dashed border-line px-2.5 py-1 text-sm text-muted line-through"
-                  >
-                    <span className="truncate">{e.name}</span>
-                    <span className="sr-only"> (hidden)</span>
-                  </li>
-                ))}
-              </ul>
+                  ))}
+                </ul>
+              )}
+              <p className="text-[13px] text-ink-muted" aria-live="polite">
+                {game.current_spin
+                  ? "Spinning…"
+                  : game.last_result
+                    ? `Last winner: ${game.last_result.winner_name}`
+                    : "No spins yet"}
+              </p>
+              {matched.size > 0 && <p className="text-[13px] text-ink-muted">The ringed name is your target.</p>}
+            </div>
+          </section>
+
+          <section aria-label="Spin history" className={`${card} flex min-w-0 flex-col gap-3`}>
+            <h2 className={cardTitle}>Spin history</h2>
+            {spin_history.length === 0 ? (
+              <p className="text-sm text-ink-muted">No spins yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-left text-sm">
+                  <thead className="text-xs text-ink-muted">
+                    <tr>
+                      <th className="py-2 pr-3 font-medium">Time</th>
+                      <th className="py-2 pr-3 font-medium">Winner</th>
+                      <th className="py-2 pr-3 font-medium">Mode</th>
+                      <th className="py-2 text-right font-medium">Rule applied</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {spin_history.map((s) => (
+                      <tr key={s.spin_id} className="border-t border-divider">
+                        <td className="py-3 pr-3 text-ink-muted tabular-nums">{clockTime(s.started_at)}</td>
+                        <td className="max-w-[8rem] truncate py-3 pr-3 font-semibold">
+                          {s.winner_name}
+                          {s.finished_at === null && <span className="ml-1 text-xs font-normal text-ink-muted">(spinning)</span>}
+                        </td>
+                        <td className="py-3 pr-3">{MODE_LABEL[s.mode]}</td>
+                        <td className="py-3 text-right">
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              s.rule_applied ? "bg-primary-soft text-primary-strong" : "bg-surface-tint text-ink-muted"
+                            }`}
+                          >
+                            {s.rule_applied ? "Rigged" : "Fair"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
-          </div>
-        </section>
-      </div>
+          </section>
 
-      <section className={`${card} min-w-0`}>
-        <h2 className="mb-3 text-base font-semibold">Spin history</h2>
-        {spin_history.length === 0 ? (
-          <p className="text-sm text-muted">No spins yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs text-muted">
-                <tr>
-                  <th className="py-1.5 pr-3 font-medium">Time</th>
-                  <th className="py-1.5 pr-3 font-medium">Winner</th>
-                  <th className="py-1.5 pr-3 font-medium">Mode</th>
-                  <th className="py-1.5 font-medium">Rule applied</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {spin_history.map((s) => (
-                  <tr key={s.spin_id}>
-                    <td className="py-1.5 pr-3 tabular-nums text-muted">
-                      {clockTime(s.started_at)}
-                    </td>
-                    <td className="max-w-[8rem] truncate py-1.5 pr-3 font-medium">
-                      {s.winner_name}
-                      {s.finished_at === null && (
-                        <span className="ml-1 text-xs font-normal text-muted">(spinning)</span>
-                      )}
-                    </td>
-                    <td className="py-1.5 pr-3">{MODE_LABEL[s.mode]}</td>
-                    <td className="py-1.5">
-                      {s.rule_applied ? (
-                        <Check className="h-4 w-4 text-ink" aria-label="Yes" />
-                      ) : (
-                        <Minus className="h-4 w-4 text-muted" aria-label="No" />
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="flex justify-end">
+            <DeleteWithConfirm label={`Delete link ${title}`} onConfirm={remove} />
           </div>
-        )}
-      </section>
-
-      <div className="flex justify-end">
-        <DeleteWithConfirm label={`Delete link ${title}`} onConfirm={remove} />
+        </div>
       </div>
     </div>
   );

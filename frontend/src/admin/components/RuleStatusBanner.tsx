@@ -1,4 +1,4 @@
-import { AlertTriangle, Scale, Target } from "lucide-react";
+import { AlertTriangle, Scale, Star } from "lucide-react";
 import type { Mode } from "../../lib/types";
 import type { RuleStatus } from "../adminTypes";
 
@@ -19,17 +19,14 @@ export default function RuleStatusBanner({ status, mode }: { status: RuleStatus;
   const warn = status.state === "no_match" || status.state === "all_excluded";
   const tone =
     status.state === "active"
-      ? "border-brass bg-brass text-on-brass"
+      ? "bg-primary-soft text-primary-soft-ink"
       : warn
-        ? "border-danger text-ink"
-        : "border-line text-ink";
-  const Icon = status.state === "active" ? Target : warn ? AlertTriangle : Scale;
+        ? "bg-warn-soft text-warn-ink"
+        : "bg-surface-tint text-ink";
+  const Icon = status.state === "active" ? Star : warn ? AlertTriangle : Scale;
   return (
-    <div
-      role={warn ? "alert" : "status"}
-      className={`flex items-start gap-2 rounded-md border px-3 py-2.5 text-sm font-medium ${tone}`}
-    >
-      <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+    <div role={warn ? "alert" : "status"} className={`flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm leading-snug ${tone}`}>
+      <Icon className={`size-5 shrink-0 ${status.state === "active" ? "text-primary-strong" : ""}`} aria-hidden />
       <span data-testid="rule-status">{ruleStatusText(status, mode)}</span>
     </div>
   );
