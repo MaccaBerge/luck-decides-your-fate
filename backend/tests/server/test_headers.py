@@ -67,6 +67,17 @@ def test_index_html_is_no_cache(spa, path):
     assert r.headers["cache-control"] == "no-cache"
 
 
+def test_top_level_image_is_served_from_dist(tmp_path):
+    dist = make_dist(tmp_path)
+    (dist / "og-image.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    app = create_app(make_settings(tmp_path, frontend_dist=str(dist)), run_cleanup=False)
+    with TestClient(app) as c:
+        r = c.get("/og-image.png")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "image/png"
+    assert "x-robots-tag" not in r.headers
+
+
 def test_head_on_index_has_the_headers(spa):
     r = spa.head("/")
     assert r.status_code == 200

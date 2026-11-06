@@ -21,8 +21,9 @@ from app.config import BACKEND_DIR
 router = APIRouter()
 
 # /admin is deliberately not listed: this file is public and would reveal the controller.
-# The admin area gets an X-Robots-Tag header instead (app.middleware).
-ROBOTS_TXT = "User-agent: *\nDisallow: /g/\n"
+# Wheel pages stay crawlable so link previews work. The admin area and wheel pages stay out of
+# search results through an X-Robots-Tag header instead (app.middleware).
+ROBOTS_TXT = "User-agent: *\nAllow: /\n"
 
 
 @router.api_route("/robots.txt", methods=["GET", "HEAD"], response_class=PlainTextResponse)
