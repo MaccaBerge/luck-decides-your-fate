@@ -1,7 +1,7 @@
 """Stored wheels: ordinary (public) wheels still in the database.
 
 Idle wheels are deleted automatically, together with their names and spins, so these only
-describe wheels that are still stored.
+describe wheels that are still stored. The Daily totals section counts every wheel.
 """
 from app.analytics.query import scalar
 from app.analytics.registry import MetricContext, Section, metric
@@ -12,7 +12,7 @@ SECTION = Section("wheels", "Stored wheels")
 @metric(
     id="wheels_stored",
     title="Wheels stored",
-    description="Ordinary wheels in the database now. Idle wheels are deleted automatically.",
+    description="Ordinary wheels in the database now. Idle wheels are deleted automatically; Daily totals still count them.",
     section=SECTION,
     kind="number",
 )
@@ -23,7 +23,7 @@ async def wheels_stored(ctx: MetricContext) -> dict:
 @metric(
     id="wheels_used",
     title="Wheels used in range",
-    description="Ordinary wheels last used in the range. Only counts wheels that haven't been deleted.",
+    description="Ordinary wheels last used in the range. Deleted wheels aren't counted here.",
     section=SECTION,
     kind="number",
 )

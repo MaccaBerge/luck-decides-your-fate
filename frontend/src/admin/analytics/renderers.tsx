@@ -43,6 +43,7 @@ export function SeriesChart({ data, title }: RendererProps<SeriesData>) {
     <div className="flex flex-col gap-3">
       <p className="text-sm text-ink-muted">
         <span className="font-display text-[26px] leading-none font-semibold text-ink tabular-nums">{fmt(total)}</span> in total
+        {data.hint && <span> · {data.hint}</span>}
       </p>
       <div role="img" aria-label={summary} className="flex h-28 items-end border-b border-border-strong">
         {points.map((p) => (

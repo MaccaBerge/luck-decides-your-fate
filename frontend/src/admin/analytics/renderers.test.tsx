@@ -37,6 +37,11 @@ describe("analytics renderers", () => {
     expect(html).toContain("height:max(2px, 50%)");
   });
 
+  it("series: shows the hint next to the total", () => {
+    const html = render(metric("series", { points: [{ day: "2026-11-07", value: 3 }], hint: "Since Nov 7, 2026" }));
+    expect(text(html)).toContain("3 in total · Since Nov 7, 2026");
+  });
+
   it("series: all zeros draws no bars and does not divide by zero", () => {
     const html = render(metric("series", { points: [{ day: "2026-11-07", value: 0 }] }));
     expect(html).not.toContain("NaN");

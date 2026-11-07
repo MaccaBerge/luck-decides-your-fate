@@ -154,6 +154,7 @@ class SeriesPoint(_Strict):
 
 class SeriesData(_Strict):
     points: list[SeriesPoint]      # one per day in the range, oldest first, zeros included
+    hint: str | None = None
 
 
 class BreakdownItem(_Strict):
