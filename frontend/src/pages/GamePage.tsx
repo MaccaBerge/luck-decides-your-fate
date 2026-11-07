@@ -439,6 +439,7 @@ export default function GamePage() {
   const toolbar = (
     <GameToolbar
       multiplayer={multiplayer}
+      hideQr={multiplayer && canControl}
       onHost={() => setHostOpen(true)}
       onJoinCode={() => {
         setJoinCodeError(null);

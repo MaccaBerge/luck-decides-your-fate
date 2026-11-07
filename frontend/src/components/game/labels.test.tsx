@@ -65,6 +65,11 @@ describe("§11.8 accessible names", () => {
     const multi = toolbar(true);
     for (const l of [...common, "Copy link", "Show QR code"]) expect(multi).toContain(`aria-label="${l}"`);
     expect(multi).not.toContain('aria-label="Host this wheel"');
+    const host = renderToStaticMarkup(
+      <GameToolbar multiplayer hideQr onHost={noop} onJoinCode={noop} soundEnabled dark={false} onToggleSound={noop} onToggleTheme={noop} onNewWheel={noop} onCopyLink={noop} onShowQr={noop} newBusy={false} onBigScreen={noop} />,
+    );
+    expect(host).toContain('aria-label="Copy link"');
+    expect(host).not.toContain('aria-label="Show QR code"');
   });
   it("dialogs", () => {
     const paste = renderToStaticMarkup(<PasteNamesDialog open onClose={noop} onSubmit={async () => true} />);

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy } from "lucide-react";
+import { QrZoom } from "./QrZoom";
 import { card } from "./buttons";
 
 interface Props {
@@ -60,6 +61,8 @@ export function InviteCard({ code, url, players, variant = "floating" }: Props) 
   }, []);
 
   const codeRef = useRef<HTMLSpanElement>(null);
+  const qrRef = useRef<HTMLButtonElement>(null);
+  const [zoomed, setZoomed] = useState(false);
 
   const copyCode = async () => {
     if (!(await copyText(code))) {
@@ -84,9 +87,25 @@ export function InviteCard({ code, url, players, variant = "floating" }: Props) 
           : "fixed top-3 left-3 z-40 flex items-center gap-3 rounded-2xl border border-border bg-surface p-2.5 pr-4 text-ink max-sm:hidden"
       }
     >
-      <div className={`shrink-0 overflow-hidden rounded-lg bg-white ${panel ? "size-28" : "size-24 lg:size-32"}`}>
-        {src && <img src={src} alt="QR code to join this game" className="size-full" />}
-      </div>
+      {panel ? (
+        <button
+          ref={qrRef}
+          type="button"
+          aria-label="Enlarge QR code"
+          title="Enlarge QR code"
+          disabled={!src}
+          onClick={() => setZoomed(true)}
+          // Hidden while enlarged, so the big code looks like this one moving.
+          className={`size-28 shrink-0 cursor-zoom-in overflow-hidden rounded-lg bg-white transition-transform hover:scale-[1.03] ${zoomed ? "invisible" : ""}`}
+        >
+          {src && <img src={src} alt="" className="size-full" />}
+        </button>
+      ) : (
+        <div className="size-24 shrink-0 overflow-hidden rounded-lg bg-white lg:size-32">
+          {src && <img src={src} alt="QR code to join this game" className="size-full" />}
+        </div>
+      )}
+      {zoomed && src && <QrZoom src={src} code={code} from={qrRef} onClose={() => setZoomed(false)} />}
       <div className="flex min-w-0 flex-col">
         <span className="text-xs font-medium text-ink-muted">Join with the code</span>
         <span className="flex items-center gap-1">

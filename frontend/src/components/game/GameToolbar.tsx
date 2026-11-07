@@ -5,6 +5,8 @@ import { WheelMark } from "./WheelMark";
 interface Props {
   /** Solo wheels offer hosting and joining; a multiplayer game offers its invite link and QR code. */
   multiplayer: boolean;
+  /** The host has the QR code on their invite card instead. */
+  hideQr?: boolean;
   onHost: () => void;
   onJoinCode: () => void;
   soundEnabled: boolean;
@@ -40,9 +42,11 @@ export function GameToolbar(p: Props) {
               <LinkIcon className="size-4" aria-hidden="true" />
               <span className="max-sm:hidden">Copy link</span>
             </button>
-            <button type="button" aria-label="Show QR code" onClick={p.onShowQr} className={square}>
-              <QrCode className="size-[18px]" aria-hidden="true" />
-            </button>
+            {!p.hideQr && (
+              <button type="button" aria-label="Show QR code" onClick={p.onShowQr} className={square}>
+                <QrCode className="size-[18px]" aria-hidden="true" />
+              </button>
+            )}
           </>
         ) : (
           <>
