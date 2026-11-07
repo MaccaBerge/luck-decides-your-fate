@@ -28,3 +28,21 @@ def new_game_id() -> str:
 
 def new_entry_id() -> str:
     return "en_" + _rand(10)
+
+
+def new_player_id() -> str:
+    return "pl_" + _rand(10)
+
+
+# No look-alikes (0/O, 1/I/L), so a code read off a screen is easy to type.
+JOIN_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+JOIN_CODE_LENGTH = 6
+
+
+def new_join_code() -> str:
+    return "".join(secrets.choice(JOIN_CODE_ALPHABET) for _ in range(JOIN_CODE_LENGTH))
+
+
+def new_player_token() -> str:
+    """The random key a player's browser keeps. Only its SHA-256 is stored."""
+    return secrets.token_urlsafe(32)

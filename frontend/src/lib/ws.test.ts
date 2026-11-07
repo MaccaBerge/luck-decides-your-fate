@@ -191,3 +191,55 @@ describe("the wheel socket pauses while the tab is hidden", () => {
     dispose();
   });
 });
+
+describe("a joined player's socket uses a fresh ticket each time", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    FakeSocket.instances = [];
+    vi.stubGlobal("WebSocket", FakeSocket);
+    vi.stubGlobal("location", { protocol: "http:", host: "example.test" });
+    vi.stubGlobal("document", new FakeDocument());
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("waits for the path, then reconnects with a new one", async () => {
+    let n = 0;
+    const dispose = openSocket(() => Promise.resolve(`/ws/games/abc?ticket=t${++n}`), () => {}, undefined, {
+      markResumes: true,
+    });
+    expect(FakeSocket.instances).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(urls()).toEqual(["/ws/games/abc?ticket=t1"]);
+    FakeSocket.instances[0].onopen?.();
+    FakeSocket.instances[0].onclose?.({ code: 1012 });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(urls()).toEqual(["/ws/games/abc?ticket=t1", "/ws/games/abc?ticket=t2&resume=1"]);
+    dispose();
+  });
+
+  it("opens nothing if disposed while waiting", async () => {
+    let resolve: (p: string) => void = () => {};
+    const dispose = openSocket(() => new Promise<string>((r) => (resolve = r)), () => {});
+    dispose();
+    resolve("/ws/games/abc?ticket=t1");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(FakeSocket.instances).toHaveLength(0);
+  });
+
+  it("retries later if the path can't be had", async () => {
+    let fail = true;
+    const dispose = openSocket(
+      () => (fail ? Promise.reject(new Error("offline")) : Promise.resolve("/ws/games/abc")),
+      () => {},
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(FakeSocket.instances).toHaveLength(0);
+    fail = false;
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(urls()).toEqual(["/ws/games/abc"]);
+    dispose();
+  });
+});

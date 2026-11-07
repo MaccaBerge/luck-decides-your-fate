@@ -3,6 +3,7 @@ from typing import Literal
 
 Mode = Literal["fair", "always", "never"]
 Origin = Literal["public", "admin_link"]
+Kind = Literal["solo", "multiplayer"]
 
 
 @dataclass(frozen=True)
@@ -17,6 +18,8 @@ class GameRow:
     created_at: str
     first_opened_at: str | None
     last_activity_at: str
+    kind: Kind = "solo"
+    join_code: str | None = None
 
 
 @dataclass(frozen=True)
@@ -40,3 +43,15 @@ class SpinRow:
     rule_applied: bool
     started_at: str
     finished_at: str | None
+
+
+@dataclass(frozen=True)
+class PlayerRow:
+    id: str
+    game_id: str
+    entry_id: str
+    name: str                    # the entry's name
+    avatar: str
+    is_host: bool
+    joined_at: str
+    last_seen_at: str

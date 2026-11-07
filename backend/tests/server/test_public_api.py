@@ -21,7 +21,11 @@ def test_create_game(client):
     r = client.post("/api/games")
     assert r.status_code == 201
     body = r.json()
-    assert set(body) == {"id", "game_type", "entries", "settings", "current_spin", "last_result", "recent_spins"}
+    assert set(body) == {
+        "id", "game_type", "kind", "join_code", "entries", "settings", "current_spin",
+        "last_result", "recent_spins", "players",
+    }
+    assert body["kind"] == "solo" and body["join_code"] is None and body["players"] == []
     assert body["game_type"] == "wheel"
     assert body["entries"] == []
     assert body["settings"] == {"remove_winner": False}

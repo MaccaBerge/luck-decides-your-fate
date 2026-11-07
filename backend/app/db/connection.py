@@ -47,4 +47,25 @@ async def init_db(db_path: str) -> None:
     async with connect() as db:
         if db_path != ":memory:":
             await db.execute("PRAGMA journal_mode = WAL")
+        await _add_missing_game_columns(db)
         await db.executescript(schema)
+        await db.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_games_join_code ON games(join_code)"
+            " WHERE join_code IS NOT NULL"
+        )
+
+
+async def _add_missing_game_columns(db: aiosqlite.Connection) -> None:
+    """Databases created before multiplayer lack games.kind and games.join_code."""
+    async with db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='games'") as cur:
+        if await cur.fetchone() is None:
+            return  # a new database: schema.sql creates the table with every column
+    async with db.execute("PRAGMA table_info(games)") as cur:
+        columns = {r[1] for r in await cur.fetchall()}
+    if "kind" not in columns:
+        await db.execute(
+            "ALTER TABLE games ADD COLUMN kind TEXT NOT NULL DEFAULT 'solo'"
+            " CHECK (kind IN ('solo','multiplayer'))"
+        )
+    if "join_code" not in columns:
+        await db.execute("ALTER TABLE games ADD COLUMN join_code TEXT")

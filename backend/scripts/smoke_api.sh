@@ -82,4 +82,20 @@ expect_code 204 "delete link"                  -b $CJ -X DELETE $BASE/api/admin/
 expect_code 404 "deleted link is gone"         $BASE/api/games/$LINK
 expect_code 204 "logout"                       -b $CJ -c $CJ -X POST $BASE/api/admin/logout
 expect_code 401 "logged out"                   -b $CJ $BASE/api/admin/dashboard
+# Multiplayer: host a wheel, join by code, only the host spins.
+MP=$(curl -sf -X POST $BASE/api/games | jq -r '.id')
+curl -sf -X POST $BASE/api/games/$MP/entries -H "$H" -d '{"names":["Anna","Jonas"]}' >/dev/null
+HOSTED=$(curl -sf -X POST $BASE/api/games/$MP/host -H "$H" -d '{"name":"Hanna","avatar":"fox"}')
+HOST_KEY=$(echo "$HOSTED" | jq -r '.player_token')
+CODE=$(echo "$HOSTED" | jq -r '.state.join_code')
+echo "$HOSTED" | jq -e '.state.kind=="multiplayer" and (.state.players|length)==1 and .state.players[0].is_host' >/dev/null \
+  && ok "host a wheel" || fail "host a wheel"
+expect_jq   "find the game by its code"  ".game_id==\"$MP\""  $BASE/api/join/$CODE
+GUEST_KEY=$(curl -sf -X POST $BASE/api/games/$MP/players -H "$H" -d '{"name":"Mia","avatar":"robot"}' | jq -r '.player_token')
+expect_jq   "a guest can't spin"  '.error.code=="not_host"'  -X POST $BASE/api/games/$MP/spin -H "X-Player-Token: $GUEST_KEY"
+expect_code 202 "the host spins"  -X POST $BASE/api/games/$MP/spin -H "X-Player-Token: $HOST_KEY"
+sleep 0.8
+expect_jq   "the key is never in public state"  "(tostring|contains(\"$HOST_KEY\")|not) and (.players|length)==2"  $BASE/api/games/$MP
+expect_jq   "a guest leaves"  '(.players|length)==1'  -X DELETE $BASE/api/games/$MP/players/me -H "X-Player-Token: $GUEST_KEY"
+
 echo "ALL API SMOKE CHECKS PASSED"

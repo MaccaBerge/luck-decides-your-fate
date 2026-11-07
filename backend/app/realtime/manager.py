@@ -36,12 +36,17 @@ class ConnectionManager:
         self._dash_task: asyncio.Task[None] | None = None
         self._dash_dirty = False
         self._background: set[asyncio.Task[Any]] = set()
+        # Player sockets that belong to a joined multiplayer player (opened with a ticket).
+        self._player_of: dict[WebSocket, str] = {}
 
     # ---------- registry ----------
-    def add_player(self, game_id: str, ws: WebSocket) -> None:
+    def add_player(self, game_id: str, ws: WebSocket, player_id: str | None = None) -> None:
         self._players[game_id].add(ws)
+        if player_id is not None:
+            self._player_of[ws] = player_id
 
     def remove_player(self, game_id: str, ws: WebSocket) -> bool:
+        self._player_of.pop(ws, None)
         sockets = self._players.get(game_id)
         if not sockets or ws not in sockets:
             return False
@@ -69,6 +74,10 @@ class ConnectionManager:
     # ---------- presence ----------
     def player_count(self, game_id: str) -> int:
         return len(self._players.get(game_id, ()))
+
+    def players_here(self, game_id: str) -> set[str]:
+        """IDs of multiplayer players with at least one open socket in this game."""
+        return {self._player_of[ws] for ws in self._players.get(game_id, ()) if ws in self._player_of}
 
     def player_total(self) -> int:
         """Player sockets across all games (one per open wheel page; admin sockets never count)."""
@@ -112,6 +121,8 @@ class ConnectionManager:
         """Close and forget every socket (player + admin) of a game."""
         sockets = list(self._players.pop(game_id, ())) + list(self._admins.pop(game_id, ()))
         for ws in sockets:
+            self._player_of.pop(ws, None)
+        for ws in sockets:
             try:
                 await ws.close(code=code)
             except Exception:  # noqa: BLE001
@@ -124,6 +135,7 @@ class ConnectionManager:
         self._players.clear()
         self._admins.clear()
         self._dashboards.clear()
+        self._player_of.clear()
         for ws in sockets:
             try:
                 await ws.close(code=SERVICE_RESTART)

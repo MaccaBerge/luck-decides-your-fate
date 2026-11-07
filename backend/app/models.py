@@ -45,14 +45,30 @@ class RecentSpin(BaseModel):
     finished_at: str
 
 
+Kind = Literal["solo", "multiplayer"]
+PlayerStatus = Literal["here", "away"]
+
+
+class PlayerOut(BaseModel):
+    id: str
+    entry_id: str                  # the player's slice on the wheel
+    name: str
+    avatar: str                    # a key from app.services.players.AVATARS
+    status: PlayerStatus           # "here": a socket of theirs is open; "away": none is
+    is_host: bool
+
+
 class PublicGameState(BaseModel):
     id: str
     game_type: Literal["wheel"]
+    kind: Kind
+    join_code: str | None          # multiplayer only
     entries: list[EntryOut]        # ordered by position, includes inactive
     settings: GameSettingsOut
     current_spin: SpinStarted | None
     last_result: LastResult | None
     recent_spins: list[RecentSpin]  # finished spins only, newest first
+    players: list[PlayerOut]       # multiplayer only (empty for solo), in joining order
 
 
 # ---------- public requests ----------
@@ -69,6 +85,26 @@ class UpdateEntryRequest(BaseModel):
 
 class UpdateSettingsRequest(BaseModel):
     remove_winner: bool
+
+
+class JoinRequest(BaseModel):
+    """Body of POST /api/games/{id}/host and POST /api/games/{id}/players."""
+    name: str                      # stripped, 1..40 chars
+    avatar: str                    # a key from app.services.players.AVATARS
+
+
+class JoinResponse(BaseModel):
+    player_id: str
+    player_token: str              # shown once; the browser keeps it, the server stores a hash
+    state: PublicGameState
+
+
+class JoinCodeLookup(BaseModel):
+    game_id: str
+
+
+class SocketTicket(BaseModel):
+    ticket: str                    # single use, valid for 30 seconds
 
 
 # ---------- admin ----------

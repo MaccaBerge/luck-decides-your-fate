@@ -1,4 +1,6 @@
 import type { PlayerEvent } from "./types";
+import { getMe } from "./players";
+import { socketTicket } from "./api";
 
 export const wsUrl = (path: string) =>
   `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}${path}`;
@@ -30,7 +32,8 @@ const isHidden = () => typeof document !== "undefined" && document.visibilitySta
  * Returns a disposer.
  */
 export function openSocket<T>(
-  path: string,
+  /** The socket's path, or a function giving it for each connection (e.g. with a fresh ticket). */
+  path: string | (() => string | Promise<string>),
   onEvent: (e: T) => void,
   onClose?: (code: number) => void,
   options: SocketOptions = {},
@@ -58,10 +61,31 @@ export function openSocket<T>(
     ws = null;
   };
 
+  let pending = false; // waiting for an async path
+
   const connect = () => {
     timer = null;
-    if (disposed || paused) return;
-    const url = options.markResumes && opened ? `${path}${path.includes("?") ? "&" : "?"}resume=1` : path;
+    if (disposed || paused || pending || ws) return;
+    const next = typeof path === "string" ? path : path();
+    if (typeof next === "string") {
+      open(next);
+      return;
+    }
+    pending = true;
+    next.then(
+      (p) => {
+        pending = false;
+        if (!disposed && !paused && !ws) open(p);
+      },
+      () => {
+        pending = false;
+        if (!disposed && !paused && !ws) timer = setTimeout(connect, BACKOFF_MS[BACKOFF_MS.length - 1]);
+      },
+    );
+  };
+
+  const open = (base: string) => {
+    const url = options.markResumes && opened ? `${base}${base.includes("?") ? "&" : "?"}resume=1` : base;
     ws = new WebSocket(wsUrl(url));
     ws.onopen = () => {
       attempt = 0;
@@ -130,13 +154,23 @@ export function openSocket<T>(
   };
 }
 
-/** The wheel page's socket: it pauses while the tab is hidden and marks reconnects as resumes. */
+/**
+ * The wheel page's socket: it pauses while the tab is hidden and marks reconnects as resumes.
+ * A joined multiplayer player connects with a fresh single-use ticket each time (never their key);
+ * if that fails, the socket still opens and just watches.
+ */
 export const connectGameSocket = (
   gameId: string,
   onEvent: (e: PlayerEvent) => void,
   onClose?: (code: number) => void,
-) =>
-  openSocket<PlayerEvent>(`/ws/games/${encodeURIComponent(gameId)}`, onEvent, onClose, {
-    pauseWhenHidden: true,
-    markResumes: true,
-  });
+) => {
+  const base = `/ws/games/${encodeURIComponent(gameId)}`;
+  const path = () =>
+    getMe(gameId)
+      ? socketTicket(gameId).then(
+          ({ ticket }) => `${base}?ticket=${encodeURIComponent(ticket)}`,
+          () => base,
+        )
+      : base;
+  return openSocket<PlayerEvent>(path, onEvent, onClose, { pauseWhenHidden: true, markResumes: true });
+};

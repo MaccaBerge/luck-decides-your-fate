@@ -8,7 +8,10 @@ CREATE TABLE IF NOT EXISTS games (
     remove_winner    INTEGER NOT NULL DEFAULT 0,
     created_at       TEXT NOT NULL,
     first_opened_at  TEXT,
-    last_activity_at TEXT NOT NULL
+    last_activity_at TEXT NOT NULL,
+    -- 'solo' (one screen) or 'multiplayer' (a hosted game people join). Public, unlike origin.
+    kind             TEXT NOT NULL DEFAULT 'solo' CHECK (kind IN ('solo','multiplayer')),
+    join_code        TEXT              -- multiplayer only; unique index created in connection.py
 );
 CREATE INDEX IF NOT EXISTS idx_games_origin_activity ON games(origin, last_activity_at);
 
@@ -43,3 +46,17 @@ CREATE TABLE IF NOT EXISTS daily_counters (
     value INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (day, name)
 );
+
+-- Multiplayer players. A player's name is their entry's name; deleting the entry removes them.
+-- token_hash is a SHA-256 of the random key the player's browser keeps; the key itself is never stored.
+CREATE TABLE IF NOT EXISTS players (
+    id           TEXT PRIMARY KEY,
+    game_id      TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+    entry_id     TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+    avatar       TEXT NOT NULL,
+    is_host      INTEGER NOT NULL DEFAULT 0,
+    token_hash   TEXT NOT NULL UNIQUE,
+    joined_at    TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_players_game ON players(game_id, joined_at);

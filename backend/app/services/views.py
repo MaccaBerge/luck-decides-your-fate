@@ -38,6 +38,8 @@ async def public_state(
         ctx.runtime.current_spin(game.id),
         await last_result(ctx, game.id),
         await repo.list_finished_spins(game.id, PUBLIC_HISTORY_LIMIT),
+        await repo.list_players(game.id) if game.kind == "multiplayer" else [],
+        ctx.manager.players_here(game.id),
     )
 
 

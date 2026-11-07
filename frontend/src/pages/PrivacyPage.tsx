@@ -26,7 +26,7 @@ export default function PrivacyPage() {
         <Section title="What's stored">
           The server stores the names people type, their colours, wheel settings and spin results. The server also
           counts how many times wheel pages are opened and how long they stay visible, as daily totals with no names or
-          identifiers.
+          identifiers. For multiplayer games, the server also stores each player's chosen name and avatar.
         </Section>
         <Section title="Who can see it">
           Anyone with a wheel's link can see and change that wheel. The site's operator can view, change and delete
@@ -39,7 +39,8 @@ export default function PrivacyPage() {
         </Section>
         <Section title="On your device">
           Your browser's local storage keeps your theme, your sound setting, your last wheel and any name lists you
-          save. The site uses no advertising or tracking cookies.
+          save. If you join a multiplayer game, your browser also keeps a random key so the game recognises you when you
+          come back. The site uses no advertising or tracking cookies.
         </Section>
         <Section title="Hosting">
           The site runs on Railway behind Cloudflare, whose systems process technical data such as IP addresses.

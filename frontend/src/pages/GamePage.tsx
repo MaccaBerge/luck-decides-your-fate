@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import confetti from "canvas-confetti";
-import { Minimize } from "lucide-react";
+import { Minimize, Users } from "lucide-react";
 import * as api from "../lib/api";
 import { ApiError } from "../lib/api";
-import type { Entry, PlayerEvent, PublicGameState, SpinStarted } from "../lib/types";
+import type { Entry, Player, PlayerEvent, PublicGameState, SpinStarted } from "../lib/types";
+import { clearMe, getMe, setMe, type Me } from "../lib/players";
 import { connectGameSocket } from "../lib/ws";
 import { useTheme } from "../lib/theme";
 import { loadSoundPref, saveSoundPref, unlockAudio } from "../lib/sound";
@@ -19,6 +20,12 @@ import { secondaryBtn } from "../components/game/buttons";
 import { EntryPanel, MAX_ENTRIES } from "../components/game/EntryPanel";
 import { PasteNamesDialog } from "../components/game/PasteNamesDialog";
 import { QrDialog } from "../components/game/QrDialog";
+import { HostDialog } from "../components/game/HostDialog";
+import { JoinCodeDialog } from "../components/game/JoinCodeDialog";
+import { JoinScreen } from "../components/game/JoinScreen";
+import { PlayerRow } from "../components/game/PlayerRow";
+import { GuestPanel } from "../components/game/GuestPanel";
+import { InviteCard } from "../components/game/InviteCard";
 import { ResultDialog } from "../components/game/ResultDialog";
 import { SavedListsDialog } from "../components/game/SavedListsDialog";
 import { Toast, type ToastMsg } from "../components/game/Toast";
@@ -62,6 +69,14 @@ export default function GamePage() {
   const [newBusy, setNewBusy] = useState(false);
   const [spinRequested, setSpinRequested] = useState(false);
   const [bigScreen, setBigScreen] = useState(false);
+  // Multiplayer: which player this browser is (from local storage), and the dialogs around it.
+  const [me, setMeState] = useState<Me | null>(() => getMe(gameId));
+  const [watching, setWatching] = useState(false);
+  const [hostOpen, setHostOpen] = useState(false);
+  const [joinCodeOpen, setJoinCodeOpen] = useState(false);
+  const [joinCodeError, setJoinCodeError] = useState<string | null>(null);
+  const [playerBusy, setPlayerBusy] = useState(false);
+  const sawMyself = useRef(false);
 
   const seenSpinIds = useRef<Set<number>>(new Set());
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -96,6 +111,9 @@ export default function GamePage() {
     setAnimating(false);
     setResult(null);
     seenSpinIds.current = new Set();
+    setMeState(getMe(gameId));
+    setWatching(false);
+    sawMyself.current = false;
   }, [gameId]);
 
   useEffect(() => {
@@ -145,7 +163,8 @@ export default function GamePage() {
       alive = false;
       dispose();
     };
-  }, [gameId, beginSpin, showToast]);
+    // A new player ID reconnects the socket, now with (or without) a ticket.
+  }, [gameId, me?.playerId, beginSpin, showToast]);
 
   useEffect(
     () => () => {
@@ -157,6 +176,30 @@ export default function GamePage() {
   // Tell new tabs this wheel is open here, so they start their own.
   const loadedId = game?.id;
   useEffect(() => (loadedId ? announceOpenWheel(loadedId) : undefined), [loadedId]);
+
+  // Removed from the game (by the host, or after being away too long)? A state that doesn't list
+  // this player may just be older than the join, so ask the server before forgetting the key.
+  const myPlayerId = me?.playerId ?? null;
+  const listed = !!game && game.players.some((p) => p.id === myPlayerId);
+  const multiplayerId = game?.kind === "multiplayer" ? game.id : null;
+  useEffect(() => {
+    if (listed) {
+      sawMyself.current = true;
+      return;
+    }
+    if (!multiplayerId || !myPlayerId) return;
+    let alive = true;
+    api.socketTicket(multiplayerId).catch((e) => {
+      if (!alive || !(e instanceof ApiError) || e.code !== "not_a_player") return;
+      clearMe(multiplayerId);
+      setMeState(null);
+      if (sawMyself.current) showToast("You're no longer in this game", "info");
+      sawMyself.current = false;
+    });
+    return () => {
+      alive = false;
+    };
+  }, [listed, multiplayerId, myPlayerId, showToast]);
 
   const handleSpinComplete = useCallback((s: SpinStarted) => {
     setAnimating(false);
@@ -207,7 +250,78 @@ export default function GamePage() {
 
   const active = game.entries.filter((e) => e.is_active).sort((a, b) => a.position - b.position);
   const spinning = game.current_spin !== null || animating;
-  const canSpin = !spinning && !spinRequested && active.length >= 2;
+  const multiplayer = game.kind === "multiplayer";
+  const myPlayer = multiplayer ? (game.players.find((p) => p.id === myPlayerId) ?? null) : null;
+  // In a multiplayer game only the host spins and edits; the server enforces it too.
+  const canControl = !multiplayer || !!myPlayer?.is_host;
+  const canSpin = canControl && !spinning && !spinRequested && active.length >= 2;
+  const host = game.players.find((p) => p.is_host) ?? null;
+
+  const becomePlayer = (gameId: string, r: { player_id: string; player_token: string; state: PublicGameState }) => {
+    const mine = { playerId: r.player_id, token: r.player_token };
+    setMe(gameId, mine);
+    setMeState(mine);
+    setGame(r.state);
+  };
+
+  const hostWheel = async (name: string, avatar: string) => {
+    setPlayerBusy(true);
+    try {
+      becomePlayer(game.id, await api.hostGame(game.id, name, avatar));
+      setHostOpen(false);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Could not host this wheel");
+    } finally {
+      setPlayerBusy(false);
+    }
+  };
+
+  const joinThis = async (name: string, avatar: string) => {
+    setPlayerBusy(true);
+    try {
+      becomePlayer(game.id, await api.joinGame(game.id, name, avatar));
+      setWatching(false);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Could not join");
+    } finally {
+      setPlayerBusy(false);
+    }
+  };
+
+  const leave = async () => {
+    setPlayerBusy(true);
+    try {
+      const s = await api.leaveGame(game.id);
+      clearMe(game.id);
+      setMeState(null);
+      sawMyself.current = false;
+      setGame(s);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Could not leave");
+    } finally {
+      setPlayerBusy(false);
+    }
+  };
+
+  const removePlayer = async (p: Player) => {
+    setPlayerBusy(true);
+    await mutate(() => api.removePlayer(game.id, p.id));
+    setPlayerBusy(false);
+  };
+
+  const joinByCode = async (code: string) => {
+    setPlayerBusy(true);
+    setJoinCodeError(null);
+    try {
+      const { game_id } = await api.findGameByCode(code);
+      setJoinCodeOpen(false);
+      navigate(`/g/${game_id}`);
+    } catch (e) {
+      setJoinCodeError(e instanceof ApiError && e.code === "code_not_found" ? "No game with that code. Check it and try again." : e instanceof Error ? e.message : "Could not join");
+    } finally {
+      setPlayerBusy(false);
+    }
+  };
 
   const doSpin = async () => {
     if (!canSpin) return;
@@ -245,7 +359,8 @@ export default function GamePage() {
     if (ok) setResult(null);
   };
 
-  const wheelUrl = `${location.origin}/g/${game.id}`;
+  // A multiplayer game's invite link carries its short code; a solo wheel's link is its own URL.
+  const wheelUrl = multiplayer && game.join_code ? `${location.origin}/j/${game.join_code}` : `${location.origin}/g/${game.id}`;
 
   const copyLink = async () => {
     try {
@@ -312,6 +427,40 @@ export default function GamePage() {
     </>
   ) : null;
 
+  const toolbar = (
+    <GameToolbar
+      multiplayer={multiplayer}
+      onHost={() => setHostOpen(true)}
+      onJoinCode={() => {
+        setJoinCodeError(null);
+        setJoinCodeOpen(true);
+      }}
+      soundEnabled={sound}
+      dark={theme === "dark"}
+      onToggleSound={toggleSound}
+      onToggleTheme={toggleTheme}
+      onNewWheel={() => void newWheel()}
+      onCopyLink={() => void copyLink()}
+      onShowQr={() => setQrOpen(true)}
+      newBusy={newBusy}
+      onBigScreen={enterBigScreen}
+    />
+  );
+
+  if (multiplayer && !myPlayer && !watching) {
+    return (
+      <div className="mx-auto flex min-h-screen w-full max-w-[1180px] flex-col gap-7 px-4 pt-7 pb-12 text-ink sm:px-6">
+        {toolbar}
+        <JoinScreen players={game.players} busy={playerBusy} onJoin={(n, a) => void joinThis(n, a)} onWatch={() => setWatching(true)} />
+        <footer className="flex justify-center">
+          <PrivacyLink />
+        </footer>
+        <QrDialog url={qrOpen ? wheelUrl : null} onClose={() => setQrOpen(false)} onError={() => setQrOpen(false)} />
+        <Toast toast={toast} />
+      </div>
+    );
+  }
+
   return (
     // Big-screen mode changes only classes around the wheel: remounting Wheel would break a running spin.
     <div
@@ -322,17 +471,7 @@ export default function GamePage() {
       }
     >
       <div className={bigScreen ? "hidden" : "contents"}>
-        <GameToolbar
-          soundEnabled={sound}
-          dark={theme === "dark"}
-          onToggleSound={toggleSound}
-          onToggleTheme={toggleTheme}
-          onNewWheel={() => void newWheel()}
-          onCopyLink={() => void copyLink()}
-          onShowQr={() => setQrOpen(true)}
-          newBusy={newBusy}
-          onBigScreen={enterBigScreen}
-        />
+        {toolbar}
       </div>
 
       <main
@@ -350,6 +489,23 @@ export default function GamePage() {
               : "gap-6 rounded-[28px] border border-border bg-surface px-4 pt-9 pb-8 sm:px-6"
           }`}
         >
+          {multiplayer && game.join_code && (
+            <p
+              data-testid="join-code"
+              className={
+                bigScreen
+                  ? "hidden" // the invite card shows the code in big-screen mode
+                  : "-mt-3 inline-flex items-center gap-2 rounded-full bg-primary-soft px-3.5 py-1.5 text-sm font-semibold text-primary-soft-ink"
+              }
+            >
+              <Users className="size-4" aria-hidden="true" />
+              Multiplayer
+              <span aria-hidden="true">·</span>
+              <span>
+                Code <span className="font-display tracking-[0.12em]">{game.join_code}</span>
+              </span>
+            </p>
+          )}
           <h1 className={`text-center font-display text-2xl font-semibold tracking-[-0.005em] sm:text-[30px] ${bigScreen ? "hidden" : ""}`}>Who's it gonna be?</h1>
           <div
             className={`group @container relative ${
@@ -365,9 +521,11 @@ export default function GamePage() {
                 spin={activeSpin}
                 onSpinComplete={handleSpinComplete}
                 soundEnabled={sound}
-                showHub={false}
+                // The Spin button covers the centre; guests in a multiplayer game don't get one.
+                showHub={!canControl}
               />
             </div>
+            {canControl && (
             <button
               type="button"
               onClick={() => void doSpin()}
@@ -377,6 +535,7 @@ export default function GamePage() {
             >
               Spin
             </button>
+            )}
           </div>
           <p
             role="status"
@@ -385,9 +544,21 @@ export default function GamePage() {
           >
             {caption}
           </p>
+          {multiplayer && !bigScreen && (
+            <PlayerRow
+              players={game.players}
+              meId={myPlayer?.id ?? null}
+              isHost={canControl}
+              busy={playerBusy || spinning}
+              onLeave={() => void leave()}
+              onJoin={() => setWatching(false)}
+              onRemove={(pl) => void removePlayer(pl)}
+            />
+          )}
         </section>
 
         <div className={bigScreen ? "hidden" : "contents"}>
+          {canControl ? (
           <EntryPanel
             entries={game.entries}
             // The server's state can list a spin before this viewer's wheel lands.
@@ -405,6 +576,12 @@ export default function GamePage() {
             onRestore={() => void mutate(() => api.restoreEntries(game.id))}
             onRemoveWinnerChange={(v) => void mutate(() => api.updateSettings(game.id, { remove_winner: v }))}
           />
+          ) : (
+            <GuestPanel
+              recentSpins={game.recent_spins.filter((s) => !(animating && s.spin_id === activeSpin?.spin_id))}
+              hostName={host?.name ?? null}
+            />
+          )}
         </div>
       </main>
 
@@ -412,6 +589,9 @@ export default function GamePage() {
         <PrivacyLink />
       </footer>
 
+      {bigScreen && multiplayer && game.join_code && (
+        <InviteCard code={game.join_code} url={wheelUrl} players={game.players.length} />
+      )}
       {bigScreen && (
         <button
           type="button"
@@ -437,7 +617,7 @@ export default function GamePage() {
       />
       <ResultDialog
         winner={result ? { name: result.name } : null}
-        showRemove={!game.settings.remove_winner && game.entries.some((e) => e.id === result?.spin.winner_entry_id && e.is_active)}
+        showRemove={canControl && !game.settings.remove_winner && game.entries.some((e) => e.id === result?.spin.winner_entry_id && e.is_active)}
         removing={removing}
         onClose={() => setResult(null)}
         onRemove={() => void removeWinner()}
@@ -449,6 +629,14 @@ export default function GamePage() {
           setQrOpen(false);
           showToast("Could not create the QR code");
         }}
+      />
+      <HostDialog open={hostOpen} busy={playerBusy} onClose={() => setHostOpen(false)} onHost={(n, a) => void hostWheel(n, a)} />
+      <JoinCodeDialog
+        open={joinCodeOpen}
+        busy={playerBusy}
+        error={joinCodeError}
+        onClose={() => setJoinCodeOpen(false)}
+        onJoin={(c) => void joinByCode(c)}
       />
       <Toast toast={toast} />
     </div>

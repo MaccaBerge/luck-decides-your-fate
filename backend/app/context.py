@@ -13,6 +13,7 @@ from app.realtime.manager import ConnectionManager
 from app.services.backup import BackupStatus
 from app.services.rate_limit import LoginRateLimiter
 from app.services.state import RuntimeRegistry
+from app.services.tickets import TicketStore
 
 
 @dataclass
@@ -24,6 +25,7 @@ class AppContext:
     runtime: RuntimeRegistry = field(default_factory=RuntimeRegistry)
     rng: secrets.SystemRandom = field(default_factory=secrets.SystemRandom)
     backup_status: BackupStatus = field(default_factory=BackupStatus)
+    tickets: TicketStore = field(default_factory=TicketStore)
 
 
 def get_ctx(conn: HTTPConnection) -> AppContext:
