@@ -6,6 +6,9 @@ const pressPrimary =
 /** The one chunky action a surface is asking for. */
 export const primaryBtn = `${base} ${pressPrimary} h-11 rounded-full bg-primary px-5 font-display text-[15px] font-semibold text-white`;
 
+/** Like primaryBtn, in the danger colour: for confirming something risky, such as leaving a game. */
+export const dangerBtn = `${base} transition-[translate,box-shadow] duration-[80ms] shadow-[0_4px_0_color-mix(in_srgb,var(--danger)_65%,var(--ink-shadow))] enabled:active:translate-y-[3px] enabled:active:shadow-[0_1px_0_color-mix(in_srgb,var(--danger)_65%,var(--ink-shadow))] disabled:opacity-60 disabled:shadow-none h-11 rounded-full bg-danger px-5 font-display text-[15px] font-semibold text-on-danger`;
+
 /** The dark "Add name" button. */
 export const darkBtn = `${base} h-11 shrink-0 rounded-xl bg-ink px-4 text-sm font-semibold text-surface shadow-[0_3px_0_var(--ink-shadow)] transition-[translate,box-shadow] duration-[80ms] enabled:active:translate-y-[2px] enabled:active:shadow-[0_1px_0_var(--ink-shadow)] disabled:opacity-60 disabled:shadow-none`;
 

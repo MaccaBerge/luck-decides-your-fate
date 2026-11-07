@@ -74,10 +74,10 @@ Players are identified by a random key returned once when they host or join. The
 |---|---|---|---|---|
 | POST | `/api/games/{id}/host` | `{ "name", "avatar" }` | 201 `{ player_id, player_token, state }`: the game becomes multiplayer, the caller is host, and their name is added to the wheel | 409 `already_multiplayer`, 409 `entries_limit`, 409 `spin_in_progress`, 422 |
 | POST | `/api/games/{id}/players` | `{ "name", "avatar" }` | 201 `{ player_id, player_token, state }`; the first player of an empty game becomes host | 409 `not_multiplayer`, 409 `entries_limit`, 409 `spin_in_progress`, 422 |
-| DELETE | `/api/games/{id}/players/me` | none | 200 `PublicGameState` (the player and their name are removed; the host role passes on) | 403 `not_a_player`, 409 `spin_in_progress` |
+| DELETE | `/api/games/{id}/players/me` | none | 200 `{ "ended", "state" }`: the player and their name are removed and the host role passes on (`ended: false`, `state` is the game). If they were the last player the game ends: `{ "ended": true, "state": null }` (see below) | 403 `not_a_player`, 409 `spin_in_progress` |
 | DELETE | `/api/games/{id}/players/{player_id}` | none | 200 `PublicGameState` (host only) | 403 `not_host`, 404 `player_not_found`, 409 `not_multiplayer`, 409 `spin_in_progress` |
 | POST | `/api/games/{id}/socket-ticket` | none | 200 `{ "ticket" }`: single use, valid for 30 seconds | 403 `not_a_player` |
-| GET | `/api/join/{code}` | none | 200 `{ "game_id" }` (the code is case-insensitive) | 404 `code_not_found` |
+| GET | `/api/join/{code}` | none | 200 `{ "game_id", "players" }` (the code is case-insensitive; `players` is how many are in the game) | 404 `code_not_found` |
 
 `avatar` is one of `fox`, `cat`, `frog`, `panda`, `owl`, `octopus`, `penguin`, `tiger`, `unicorn`, `bear`, `wizard`, `ninja`, `hero`, `cowboy`, `alien`, `robot`. Names follow the entry rules (1–40 characters after trimming).
 
@@ -86,4 +86,6 @@ Players are identified by a random key returned once when they host or join. The
 New error codes: `not_host` (403), `not_a_player` (403), `not_multiplayer` (409), `already_multiplayer` (409), `code_not_found` (404), `player_not_found` (404).
 
 Controller links are solo games until the controller part of multiplayer (2b); a friend can host one like any other wheel, and its rule still applies.
+
+**Ending a game.** When the last player leaves, the game ends. An ordinary wheel is deleted (its watchers get `game_deleted`); a controller link is only closed: it goes back to a solo wheel with no code, its names, rule and label kept, so a friend can never delete the controller's link (the owner's decision). The leave response is the same either way; only revisiting the old URL shows the difference. A player removed by the 10-minute sweep doesn't end the game.
 

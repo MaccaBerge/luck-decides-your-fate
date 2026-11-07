@@ -9,7 +9,8 @@ interface Props {
   onRename: (name: string) => void;
   onColor: (color: string) => void;
   onToggle: () => void;
-  onRemove: () => void;
+  /** Left out for a name that can't be deleted here (the host's own name in a multiplayer game). */
+  onRemove?: () => void;
 }
 
 export function EntryRow({ entry, disabled, onRename, onColor, onToggle, onRemove }: Props) {
@@ -108,15 +109,19 @@ export function EntryRow({ entry, disabled, onRename, onColor, onToggle, onRemov
       >
         {entry.is_active ? <Eye className="size-4" aria-hidden="true" /> : <EyeOff className="size-4" aria-hidden="true" />}
       </button>
-      <button
-        type="button"
-        aria-label={`Remove ${entry.name}`}
-        disabled={disabled}
-        onClick={onRemove}
-        className={`${iconBtn} -mr-3`}
-      >
-        <X className="size-4" aria-hidden="true" />
-      </button>
+      {onRemove ? (
+        <button
+          type="button"
+          aria-label={`Remove ${entry.name}`}
+          disabled={disabled}
+          onClick={onRemove}
+          className={`${iconBtn} -mr-3`}
+        >
+          <X className="size-4" aria-hidden="true" />
+        </button>
+      ) : (
+        <span aria-hidden="true" className="-mr-3 size-11 shrink-0" />
+      )}
     </li>
   );
 }

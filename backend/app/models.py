@@ -101,6 +101,13 @@ class JoinResponse(BaseModel):
 
 class JoinCodeLookup(BaseModel):
     game_id: str
+    players: int                   # players in the game now (0: nobody, so nothing to rejoin)
+
+
+class LeaveResponse(BaseModel):
+    """Leaving as the last player ends the game; `state` is then null (whatever happened to it)."""
+    ended: bool
+    state: PublicGameState | None
 
 
 class SocketTicket(BaseModel):

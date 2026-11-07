@@ -6,6 +6,7 @@ import * as api from "../lib/api";
 import { ApiError } from "../lib/api";
 import type { Entry, Player, PlayerEvent, PublicGameState, SpinStarted } from "../lib/types";
 import { clearMe, getMe, setMe, type Me } from "../lib/players";
+import { setRecentGame } from "../lib/recentGame";
 import { connectGameSocket } from "../lib/ws";
 import { useTheme } from "../lib/theme";
 import { loadSoundPref, saveSoundPref, unlockAudio } from "../lib/sound";
@@ -26,6 +27,8 @@ import { JoinScreen } from "../components/game/JoinScreen";
 import { PlayerRow } from "../components/game/PlayerRow";
 import { GuestPanel } from "../components/game/GuestPanel";
 import { InviteCard } from "../components/game/InviteCard";
+import { ConfirmDialog } from "../components/game/ConfirmDialog";
+import { RecentGameBar } from "../components/game/RecentGameBar";
 import { ResultDialog } from "../components/game/ResultDialog";
 import { SavedListsDialog } from "../components/game/SavedListsDialog";
 import { Toast, type ToastMsg } from "../components/game/Toast";
@@ -76,6 +79,8 @@ export default function GamePage() {
   const [joinCodeOpen, setJoinCodeOpen] = useState(false);
   const [joinCodeError, setJoinCodeError] = useState<string | null>(null);
   const [playerBusy, setPlayerBusy] = useState(false);
+  // "Are you sure?" before leaving the game, or before a host starts a new wheel.
+  const [confirming, setConfirming] = useState<null | "leave" | "newWheel">(null);
   const sawMyself = useRef(false);
 
   const seenSpinIds = useRef<Set<number>>(new Set());
@@ -123,7 +128,8 @@ export default function GamePage() {
     const applyState = (s: PublicGameState) => {
       if (!alive) return;
       setGame(s);
-      setLastGameId(s.id);
+      // "/" reopens your last solo wheel; multiplayer games are offered by the recent-game bar.
+      if (s.kind === "solo") setLastGameId(s.id);
       if (s.current_spin) beginSpin(s.current_spin);
     };
 
@@ -176,6 +182,14 @@ export default function GamePage() {
   // Tell new tabs this wheel is open here, so they start their own.
   const loadedId = game?.id;
   useEffect(() => (loadedId ? announceOpenWheel(loadedId) : undefined), [loadedId]);
+
+  // Remember the game you're in, so the wheel page can offer it again later.
+  const myCode =
+    game?.kind === "multiplayer" && game.players.some((p) => p.id === me?.playerId) ? game.join_code : null;
+  useEffect(() => {
+    if (myCode && game) setRecentGame({ gameId: game.id, code: myCode });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myCode, game?.id]);
 
   // Removed from the game (by the host, or after being away too long)? A state that doesn't list
   // this player may just be older than the join, so ask the server before forgetting the key.
@@ -297,19 +311,26 @@ export default function GamePage() {
     }
   };
 
-  const leave = async () => {
-    setPlayerBusy(true);
+  /** Leave the game (the last player leaving ends it). Returns false if it failed. */
+  const leaveGame = async (): Promise<boolean> => {
     try {
-      const s = await api.leaveGame(game.id);
-      clearMe(game.id);
-      setMeState(null);
-      sawMyself.current = false;
-      setGame(s);
+      await api.leaveGame(game.id);
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Could not leave");
-    } finally {
-      setPlayerBusy(false);
+      return false;
     }
+    clearMe(game.id);
+    sawMyself.current = false;
+    return true;
+  };
+
+  // Leaving takes you home, like opening the site: your last solo wheel, or a new one.
+  const leave = async () => {
+    setPlayerBusy(true);
+    const ok = await leaveGame();
+    setPlayerBusy(false);
+    setConfirming(null);
+    if (ok) navigate("/");
   };
 
   const removePlayer = async (p: Player) => {
@@ -380,8 +401,23 @@ export default function GamePage() {
     }
   };
 
-  const newWheel = async () => {
+  const newWheel = async (confirmed = false) => {
+    // A host leaves the game first (asked to confirm): the others get a new host straight away.
+    if (multiplayer && myPlayer?.is_host && !confirmed) {
+      setConfirming("newWheel");
+      return;
+    }
     setNewBusy(true);
+    if (confirmed) {
+      setPlayerBusy(true);
+      const ok = await leaveGame();
+      setPlayerBusy(false);
+      setConfirming(null);
+      if (!ok) {
+        setNewBusy(false);
+        return;
+      }
+    }
     try {
       const g = await api.createGame();
       navigate(`/g/${g.id}`);
@@ -436,6 +472,15 @@ export default function GamePage() {
     </>
   ) : null;
 
+  const others = game.players.filter((p) => p.id !== myPlayer?.id).length;
+  const leaveMessage = !myPlayer?.is_host
+    ? confirming === "newWheel"
+      ? null
+      : "You can join again while the game is still going."
+    : others === 0
+      ? "You're the only player, so the game ends."
+      : `You're the host. ${others === 1 ? "The other player" : "Someone who's here"} takes over.`;
+
   const toolbar = (
     <GameToolbar
       multiplayer={multiplayer}
@@ -460,6 +505,7 @@ export default function GamePage() {
   if (multiplayer && !myPlayer && !watching) {
     return (
       <div className="mx-auto flex min-h-screen w-full max-w-[1180px] flex-col gap-7 px-4 pt-7 pb-12 text-ink sm:px-6">
+        <RecentGameBar currentGameId={game.id} />
         {toolbar}
         <JoinScreen players={game.players} busy={playerBusy} onJoin={(n, a) => void joinThis(n, a)} onWatch={() => setWatching(true)} />
         <footer className="flex justify-center">
@@ -481,6 +527,7 @@ export default function GamePage() {
       }
     >
       <div className={bigScreen ? "hidden" : "contents"}>
+        <RecentGameBar currentGameId={game.id} />
         {toolbar}
       </div>
 
@@ -560,7 +607,7 @@ export default function GamePage() {
               meId={myPlayer?.id ?? null}
               isHost={canControl}
               busy={playerBusy || spinning}
-              onLeave={() => void leave()}
+              onLeave={() => setConfirming("leave")}
               onJoin={() => setWatching(false)}
               onRemove={(pl) => void removePlayer(pl)}
             />
@@ -590,6 +637,8 @@ export default function GamePage() {
             onShuffle={() => void mutate(() => api.shuffleEntries(game.id))}
             onRestore={() => void mutate(() => api.restoreEntries(game.id))}
             onRemoveWinnerChange={(v) => void mutate(() => api.updateSettings(game.id, { remove_winner: v }))}
+            // The host leaves with "Leave" rather than deleting their own name.
+            undeletableIds={myPlayer?.is_host ? new Set([myPlayer.entry_id]) : undefined}
           />
           </div>
           ) : (
@@ -645,6 +694,16 @@ export default function GamePage() {
           setQrOpen(false);
           showToast("Could not create the QR code");
         }}
+      />
+      <ConfirmDialog
+        open={confirming !== null}
+        title={confirming === "newWheel" ? "Start a new wheel?" : "Leave the game?"}
+        message={leaveMessage}
+        confirmLabel={confirming === "newWheel" ? "Leave and start" : "Leave"}
+        busy={playerBusy}
+        danger
+        onConfirm={() => void (confirming === "newWheel" ? newWheel(true) : leave())}
+        onClose={() => setConfirming(null)}
       />
       <HostDialog
         open={hostOpen}

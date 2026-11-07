@@ -14,6 +14,7 @@ from app.context import AppContext
 from app.db import repository as repo
 from app.db.rows import GameRow, PlayerRow
 from app.errors import not_a_player, not_host, validation_error
+from app.services import serializers as ser
 from app.services import views
 from app.timeutil import utc_iso
 
@@ -81,6 +82,26 @@ async def remove(ctx: AppContext, game_id: str, player_id: str) -> bool:
         return False
     await ensure_host(ctx, game_id)
     return True
+
+
+async def end_game(ctx: AppContext, game: GameRow) -> None:
+    """The last player left: end the game. Call with the game's lock held.
+
+    The owner's decision (November 2026): an ordinary wheel is deleted at once; a controller link
+    is only closed (back to a solo wheel, no code), so a friend can never delete the controller's
+    link. This is the one place here that looks at `origin`; the leave response is identical
+    either way, and only revisiting the old URL shows the difference.
+    """
+    if game.origin == "public":
+        await repo.delete_game(game.id)
+        ctx.runtime.forget(game.id)
+        await ctx.manager.send_players(game.id, ser.GAME_DELETED_EVENT)
+        await ctx.manager.close_game(game.id, code=1000)
+        ctx.manager.request_dashboard()
+    else:
+        await repo.close_multiplayer(game.id)
+        await repo.touch_game(game.id)
+        await views.notify_public_change(ctx, game.id)
 
 
 async def sweep_once(ctx: AppContext, now: datetime | None = None) -> list[str]:

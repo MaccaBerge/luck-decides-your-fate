@@ -7,6 +7,8 @@ import { PlayerSetup } from "./PlayerSetup";
 import { JoinCodeDialog } from "./JoinCodeDialog";
 import { JoinScreen } from "./JoinScreen";
 import { HostDialog } from "./HostDialog";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { EntryPanel } from "./EntryPanel";
 import { InviteCard } from "./InviteCard";
 
 const noop = () => {};
@@ -128,5 +130,47 @@ describe("InviteCard", () => {
     expect(floating).not.toContain("Enlarge QR code");
     expect(floating).toContain("fixed");
     expect(text(floating)).toBe("Join with the code ACP7KY 3 players");
+  });
+});
+
+describe("leaving", () => {
+  it("asks before leaving", () => {
+    const html = renderToStaticMarkup(
+      <ConfirmDialog open title="Leave the game?" message="You're the only player, so the game ends." confirmLabel="Leave" onConfirm={noop} onClose={noop} />,
+    );
+    expect(html).toMatch(/role="dialog"[^>]*aria-label="Leave the game\?"/);
+    expect(text(html)).toContain("Leave the game? You're the only player, so the game ends. Cancel Leave");
+    const red = renderToStaticMarkup(<ConfirmDialog open danger title="Leave the game?" confirmLabel="Leave" onConfirm={noop} onClose={noop} />);
+    expect(red).toContain("bg-danger");
+    expect(html).not.toContain("bg-danger");
+  });
+
+  it("the host can't delete their own name, but can delete other players'", () => {
+    const entries = [
+      { id: "e1", name: "Hanna", color: "#C9B8FF", position: 0, is_active: true },
+      { id: "e2", name: "Mia", color: "#FFC9A8", position: 1, is_active: true },
+    ];
+    const html = renderToStaticMarkup(
+      <EntryPanel
+        entries={entries}
+        recentSpins={[]}
+        removeWinner={false}
+        disabled={false}
+        onAdd={async () => true}
+        onOpenPaste={noop}
+        onOpenSavedLists={noop}
+        onRename={noop}
+        onColor={noop}
+        onToggle={noop}
+        onRemove={noop}
+        onShuffle={noop}
+        onRestore={noop}
+        onRemoveWinnerChange={noop}
+        undeletableIds={new Set(["e1"])}
+      />,
+    );
+    expect(html).not.toContain('aria-label="Remove Hanna"');
+    expect(html).toContain('aria-label="Remove Mia"');
+    expect(html).toContain('aria-label="Edit Hanna"'); // renaming your own name still works
   });
 });

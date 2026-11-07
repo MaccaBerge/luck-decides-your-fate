@@ -96,6 +96,8 @@ expect_jq   "a guest can't spin"  '.error.code=="not_host"'  -X POST $BASE/api/g
 expect_code 202 "the host spins"  -X POST $BASE/api/games/$MP/spin -H "X-Player-Token: $HOST_KEY"
 sleep 0.8
 expect_jq   "the key is never in public state"  "(tostring|contains(\"$HOST_KEY\")|not) and (.players|length)==2"  $BASE/api/games/$MP
-expect_jq   "a guest leaves"  '(.players|length)==1'  -X DELETE $BASE/api/games/$MP/players/me -H "X-Player-Token: $GUEST_KEY"
+expect_jq   "a guest leaves"  '.ended==false and (.state.players|length)==1'  -X DELETE $BASE/api/games/$MP/players/me -H "X-Player-Token: $GUEST_KEY"
+expect_jq   "the last player leaving ends the game"  '.ended==true and .state==null'  -X DELETE $BASE/api/games/$MP/players/me -H "X-Player-Token: $HOST_KEY"
+expect_code 404 "an ended wheel is gone"  $BASE/api/games/$MP
 
 echo "ALL API SMOKE CHECKS PASSED"
