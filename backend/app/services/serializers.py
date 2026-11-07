@@ -25,6 +25,7 @@ from app.models import (
     PublicGameState,
     RecentSpin,
     RuleStatusOut,
+    RuleTarget,
     SpinStarted,
 )
 
@@ -146,6 +147,7 @@ def rule_status_out(status: RuleStatus) -> RuleStatusOut:
         state=status.state,
         matched_target=status.matched_target,
         matched_entry_ids=list(status.matched_entry_ids),
+        targets=[RuleTarget(name=name, entry_ids=list(ids)) for name, ids in status.targets],
     )
 
 

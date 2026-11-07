@@ -74,7 +74,12 @@ def test_create_link(admin):
     assert link["target_names"] == ["Erik", "Jonas"]
     assert link["status"] == "created" and link["player_count"] == 0 and link["entry_count"] == 0
     assert link["first_opened_at"] is None
-    assert body["rule_status"] == {"state": "no_match", "matched_target": None, "matched_entry_ids": []}
+    assert body["rule_status"] == {
+        "state": "no_match",
+        "matched_target": None,
+        "matched_entry_ids": [],
+        "targets": [{"name": "Erik", "entry_ids": []}, {"name": "Jonas", "entry_ids": []}],
+    }
     assert body["spin_history"] == []
 
 
@@ -243,3 +248,33 @@ def test_dangling_spin_finished_on_startup(tmp_path):
         assert state["current_spin"] is None
         assert state["last_result"]["spin_id"] == s["spin_id"]
         assert c.post(f"/api/games/{gid}/spin").status_code == 202
+
+
+def test_rule_status_targets_follow_entries(client, admin):
+    from .helpers import assert_no_leak, new_link
+    gid = new_link(admin, client, ["Anna", "Jonas", "jonas"], mode="always", target_names=["Erik", "Jonas"])
+    st = admin.get(f"/api/admin/links/{gid}").json()
+    ids = {e["name"]: e["id"] for e in st["game"]["entries"]}
+    assert st["rule_status"]["targets"] == [
+        {"name": "Erik", "entry_ids": []},
+        {"name": "Jonas", "entry_ids": [ids["Jonas"], ids["jonas"]]},
+    ]
+    # An inactive entry is not a match.
+    client.patch(f"/api/games/{gid}/entries/{ids['jonas']}", json={"is_active": False})
+    st = admin.get(f"/api/admin/links/{gid}").json()
+    assert st["rule_status"]["targets"][1] == {"name": "Jonas", "entry_ids": [ids["Jonas"]]}
+    assert_no_leak(client.get(f"/api/games/{gid}").json())
+
+
+def test_clicking_targets_sends_nothing_to_players(client, admin):
+    from .helpers import new_link
+    gid = new_link(admin, client, ["Anna", "Jonas"], mode="always")
+    with client.websocket_connect(f"/ws/games/{gid}?resume=1") as p:
+        p.receive_json()
+        for targets in (["Anna"], ["Anna", "Jonas"], ["Jonas"], []):
+            r = admin.patch(f"/api/admin/links/{gid}", json={"target_names": targets})
+            assert r.status_code == 200
+            assert [t["name"] for t in r.json()["rule_status"]["targets"]] == targets
+        client.post(f"/api/games/{gid}/entries", json={"names": ["Marker"]})
+        m = p.receive_json()
+        assert m["type"] == "state" and m["state"]["entries"][-1]["name"] == "Marker"

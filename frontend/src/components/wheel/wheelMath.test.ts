@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SLICE_COLORS } from "../../lib/palette";
-import { computeFinalRotation, INK, mod, sliceAtPointer, textColorFor } from "./wheelMath";
+import { computeFinalRotation, INK, mod, sliceAt, sliceAtPointer, textColorFor } from "./wheelMath";
 
 describe("mod", () => {
   it("handles negatives", () => {
@@ -67,5 +67,25 @@ describe("textColorFor", () => {
   it("uses ink on light colours and white on dark ones", () => {
     expect(textColorFor("#FFFFFF")).toBe(INK);
     expect(textColorFor("#000000")).toBe("#ffffff");
+  });
+});
+
+describe("sliceAt", () => {
+  it("agrees with the pointer straight above the centre", () => {
+    for (const rotation of [0, 11.25, 90, 200, -45, 1000.5]) {
+      for (const n of [1, 2, 5, 12]) {
+        expect(sliceAt(0, -10, rotation, n)).toBe(sliceAtPointer(rotation, n));
+      }
+    }
+  });
+
+  it("goes clockwise from the top on an unturned wheel", () => {
+    // Four slices: top-right quadrant is 0, bottom-right 1, bottom-left 2, top-left 3.
+    expect(sliceAt(10, -10, 0, 4)).toBe(0);
+    expect(sliceAt(10, 10, 0, 4)).toBe(1);
+    expect(sliceAt(-10, 10, 0, 4)).toBe(2);
+    expect(sliceAt(-10, -10, 0, 4)).toBe(3);
+    expect(sliceAt(10, -10, 90, 4)).toBe(3); // turning the wheel 90° clockwise brings slice 3 there
+    expect(sliceAt(1, 1, 0, 0)).toBe(-1);
   });
 });

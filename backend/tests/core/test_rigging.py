@@ -166,3 +166,24 @@ def test_never_x_last_one_standing():
         r = pick_winner(entries, "never", ["Jonas"], rng)
         entries = [e for e in entries if e.id != r.winner.id]
     assert entries[0].name == "Jonas"
+
+
+# ---------- targets (for the controller's click-to-target UI) ----------
+def test_targets_lists_every_target_in_order_with_its_matches():
+    entries = make("Anna", "Jonas", "jonas!", "Mia")
+    st = evaluate_rule(entries, "always", ["Erik", "JONAS", "Anna", "!!!"])
+    assert st.targets == (
+        ("Erik", ()),
+        ("JONAS", (entries[1].id, entries[2].id)),
+        ("Anna", (entries[0].id,)),
+        ("!!!", ()),
+    )
+    assert st.matched_target == "JONAS"  # the first target that matches still decides
+
+
+@pytest.mark.parametrize("mode", ["fair", "always", "never"])
+def test_targets_present_in_every_state(mode):
+    entries = make("Anna")
+    st = evaluate_rule(entries, mode, ["Anna", "Erik"])
+    assert st.targets == (("Anna", (entries[0].id,)), ("Erik", ()))
+    assert evaluate_rule(entries, mode, []).targets == ()

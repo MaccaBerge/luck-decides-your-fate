@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import type { Entry, SpinStarted } from "../../lib/types";
 import { playTick, playWin } from "../../lib/sound";
 import { SLICE_COLORS } from "../../lib/palette";
-import { computeFinalRotation, easeOutQuart, mod, sliceAtPointer, textColorFor } from "./wheelMath";
+import { computeFinalRotation, easeOutQuart, mod, sliceAt, sliceAtPointer, textColorFor } from "./wheelMath";
 
 export interface WheelProps {
   /** Full list; draws active ones in position order when idle. */
@@ -18,6 +18,8 @@ export interface WheelProps {
   ariaLabel?: string;
   /** Draw the centre dot. Off where a Spin button sits on top of the wheel. */
   showHub?: boolean;
+  /** Called with the entry ID of a clicked slice while the wheel is at rest. */
+  onSliceClick?: (entryId: string) => void;
 }
 
 interface Slice {
@@ -108,6 +110,7 @@ export default function Wheel({
   size,
   ariaLabel,
   showHub = true,
+  onSliceClick,
 }: WheelProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -403,6 +406,18 @@ export default function Wheel({
   const n = slices.length;
   const label = ariaLabel ?? `Wheel with ${n} ${n === 1 ? "name" : "names"}`;
 
+  const handleClick = (ev: MouseEvent<HTMLCanvasElement>) => {
+    if (!onSliceClick || animRef.current) return;
+    const rect = ev.currentTarget.getBoundingClientRect();
+    const dx = ev.clientX - rect.left - rect.width / 2;
+    const dy = ev.clientY - rect.top - rect.height / 2;
+    // Only the slices themselves (radius 90 of the 208-unit design), not the ring around them.
+    if (Math.hypot(dx, dy) > (rect.width / 208) * 90) return;
+    const list = slicesRef.current;
+    const i = sliceAt(dx, dy, rotationRef.current, list.length);
+    if (i >= 0) onSliceClick(list[i].id);
+  };
+
   return (
     <div
       ref={wrapRef}
@@ -413,8 +428,9 @@ export default function Wheel({
         ref={canvasRef}
         role="img"
         aria-label={label}
-        className="block select-none"
+        className={`block select-none ${onSliceClick ? "cursor-pointer" : ""}`}
         style={{ width: px || "100%", height: px || "100%" }}
+        onClick={onSliceClick ? handleClick : undefined}
       />
     </div>
   );

@@ -53,3 +53,7 @@ Additions to the v1 contract (`docs/plan-v1.md` §8). Nothing from v1 changed sh
 ## v1.3: visits
 
 `/ws/games/{id}` accepts an optional `?resume=1`. The wheel page adds it to every connection after its first one (after the tab was hidden for 15 seconds, or an automatic reconnect), so the server counts one visit per page load. It's a flag, not an identifier; anything other than `1` counts as a new visit. The socket behaves the same either way: it marks the link opened, sends `state` and updates presence.
+
+## v1.4: click-to-target
+
+`rule_status` in admin link state has a new field, `targets`: every entry of `target_names` in priority order, as `{ "name", "entry_ids" }`, where `entry_ids` are the active entries the server matches to that target (possibly none). The controller uses it to show and toggle targets by clicking names, without matching names in the browser. Targets are still saved through `PATCH /api/admin/links/{id}` with `target_names`. Admin-only, like the rest of `rule_status`.

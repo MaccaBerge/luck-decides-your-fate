@@ -17,10 +17,18 @@ export interface LinkSummary {
   last_activity_at: string;
 }
 
+export interface RuleTarget {
+  /** The target exactly as stored in `target_names`. */
+  name: string;
+  /** Active entries the server matched to it (possibly none). */
+  entry_ids: string[];
+}
 export interface RuleStatus {
   state: RuleState;
   matched_target: string | null;
   matched_entry_ids: string[];
+  /** Every target in priority order. */
+  targets: RuleTarget[];
 }
 
 export interface AdminSpinRecord {

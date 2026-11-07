@@ -90,10 +90,16 @@ class LinkSummary(BaseModel):
     last_activity_at: str
 
 
+class RuleTarget(BaseModel):
+    name: str              # the target exactly as stored in target_names
+    entry_ids: list[str]   # active entries it matches, possibly none
+
+
 class RuleStatusOut(BaseModel):
     state: RuleState
     matched_target: str | None
     matched_entry_ids: list[str]
+    targets: list[RuleTarget]   # every target in priority order
 
 
 class AdminSpinRecord(BaseModel):
