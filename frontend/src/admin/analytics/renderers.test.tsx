@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { AnalyticsMetric } from "../adminTypes";
-import { dayLabel, MetricBody } from "./renderers";
+import { dayLabel, durationLabel, MetricBody } from "./renderers";
 
 const metric = (kind: string, data: unknown, error: string | null = null): AnalyticsMetric => ({
   id: "m",
@@ -20,6 +20,12 @@ describe("analytics renderers", () => {
     const html = render(metric("number", { value: 1234, hint: "Of 2000" }));
     expect(text(html)).toBe("1,234 Of 2000");
     expect(text(render(metric("number", { value: 1.3, hint: null })))).toBe("1.3");
+  });
+
+  it("number: a duration is shown in minutes and seconds", () => {
+    const html = render(metric("number", { value: 200, hint: "12 visits", format: "duration" }));
+    expect(text(html)).toBe("3m 20s 12 visits");
+    expect([0, 45, 60, 3599, 3600, 7325].map(durationLabel)).toEqual(["0s", "45s", "1m 0s", "59m 59s", "1h 0m", "2h 2m"]);
   });
 
   it("series: one bar per day, the total, UTC day labels and a summary", () => {

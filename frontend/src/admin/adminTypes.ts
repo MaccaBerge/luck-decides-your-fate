@@ -66,6 +66,8 @@ export type AnalyticsDays = 7 | 30 | 90;
 export interface NumberData {
   value: number;
   hint: string | null;
+  /** "duration": `value` is seconds, shown as e.g. "3m 20s". */
+  format?: "duration" | null;
 }
 export interface SeriesData {
   points: { day: string; value: number }[];

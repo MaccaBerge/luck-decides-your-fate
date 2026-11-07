@@ -12,6 +12,14 @@ export interface RendererProps<T> {
 
 const fmt = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 1 });
 
+/** Seconds -> "45s", "3m 20s" or "2h 5m". */
+export function durationLabel(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`;
+  return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
+}
+
 /** "2026-11-07" -> "Nov 7". Days are UTC, so they're formatted in UTC. */
 export function dayLabel(day: string): string {
   const d = new Date(`${day}T00:00:00Z`);
@@ -23,7 +31,9 @@ export function dayLabel(day: string): string {
 export function NumberStat({ data }: RendererProps<NumberData>) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="font-display text-[28px] sm:text-[34px] leading-none font-semibold text-ink tabular-nums">{fmt(data.value)}</span>
+      <span className="font-display text-[28px] sm:text-[34px] leading-none font-semibold text-ink tabular-nums">
+        {data.format === "duration" ? durationLabel(data.value) : fmt(data.value)}
+      </span>
       {data.hint && <span className="text-[13px] text-ink-muted">{data.hint}</span>}
     </div>
   );
