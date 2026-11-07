@@ -25,7 +25,9 @@ BASE=http://localhost:8100 bash scripts/smoke_api.sh
 BASE=http://localhost:8100 ADMIN_PASSWORD=testpass .venv/bin/python scripts/smoke_realtime.py
 ```
 
-Frontend (run from `frontend/`; dev server on :5173 proxies `/api` and `/ws` to :8000):
+Local test environment (from the repo root): `./dev.sh` starts the backend on :8000 and the frontend on :5173 together (`--fresh`, `--seed`, `--fast`, `--phone`; see README "Running in development"). It's the user's own dev setup: when Claude verifies something it runs its own copy on other ports with its own database, e.g. `DEV_BACKEND_PORT=8210 DEV_FRONTEND_PORT=5183 DEV_SEED_PORT=8299 ./dev.sh --fresh --seed --fast` from a separate worktree, and never touches :8000, :5173 or the user's `data/dev.db`.
+
+Frontend (run from `frontend/`; dev server on :5173 proxies `/api` and `/ws` to :8000, or to `DEV_BACKEND_PORT`):
 ```bash
 npm run dev
 npm run typecheck && npm run test && npm run build

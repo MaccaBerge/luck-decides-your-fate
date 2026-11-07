@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["./dev.sh"],
+      "port": 5173
+    },
+    {
+      "name": "dev (fresh test data, fast spins)",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["./dev.sh", "--fresh", "--seed", "--fast"],
+      "port": 5173
+    }
+  ]
+}

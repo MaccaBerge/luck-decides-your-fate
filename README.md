@@ -37,7 +37,34 @@ npm install
 
 ## Running in development
 
-Two terminals:
+One command starts the backend (:8000) and the frontend (:5173), both reloading when you change code, and stops both with Ctrl+C:
+
+```bash
+./dev.sh
+```
+
+Open http://localhost:5173 for the wheel and http://localhost:5173/admin for the controller (password `devpass`, or whatever `ADMIN_PASSWORD` is set to in your shell; it overrides `backend/.env`). The data lives in `backend/data/dev.db`.
+
+| Option | What it does |
+|---|---|
+| `--fresh` | Deletes the dev database first. |
+| `--seed` | Adds test data through the API: a wheel with a few spins, a link rigged to "always Jonas" with a few spins, and a fair link nobody has opened. It prints their URLs. |
+| `--fast` | Spins take about 1 second instead of 4.5–7. |
+| `--phone` | Also serves the site on your Wi-Fi and prints an address like `http://192.168.1.23:5173` for your phone (same network). |
+
+For example, a clean slate with test data and quick spins:
+
+```bash
+./dev.sh --fresh --seed --fast
+```
+
+Notes:
+- Dev data is never backed up: the script turns backups off even if `backend/.env` has backup settings.
+- To run a second copy next to the first, change the ports: `DEV_BACKEND_PORT=8010 DEV_FRONTEND_PORT=5174 ./dev.sh`. The frontend's proxy follows `DEV_BACKEND_PORT`.
+- If a port is already in use, the script says so and stops; it never stops other processes.
+- In the Claude desktop app, `.claude/launch.json` offers the same two setups ("dev", and "dev (fresh test data, fast spins)") to start from the Code tab.
+
+Starting the two servers by hand still works:
 
 ```bash
 # 1) backend on :8000 (always a single worker: live state is kept in memory)
@@ -49,7 +76,15 @@ cd frontend
 npm run dev
 ```
 
-Open http://localhost:5173 for the wheel and http://localhost:5173/admin for the controller.
+### What to click through
+
+A quick pass over every feature, with `./dev.sh --fresh --seed --fast` (add `--phone` to try it on your phone too):
+
+- **Solo wheel:** add, paste, hide, delete and shuffle names; spin; "Remove winner after spin"; Recent spins; saved lists; QR code; big-screen mode (enter mid-spin, Escape with and without the result dialog).
+- **Two tabs on one wheel:** a spin or a name change in one shows up live in the other. Hide one tab for over 15 seconds, change something, and come back.
+- **Controller:** log in at `/admin`; open the seeded rigged link; change the mode; click names and slices to set targets (they sort to the front, numbered); spin from the link's wheel and check the result and the spin history.
+- **Analytics:** `/admin/analytics`, in 7, 30 and 90 days.
+- **Light and dark:** the theme button, on the wheel and in the controller.
 
 ## Production-style run (single service)
 
