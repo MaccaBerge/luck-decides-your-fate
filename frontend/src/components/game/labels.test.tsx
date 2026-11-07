@@ -54,10 +54,17 @@ describe("§11.8 accessible names", () => {
       expect(html).toContain(l);
   });
   it("toolbar", () => {
-    const html = renderToStaticMarkup(
-      <GameToolbar soundEnabled dark={false} onToggleSound={noop} onToggleTheme={noop} onNewWheel={noop} onCopyLink={noop} onShowQr={noop} newBusy={false} onBigScreen={noop} />,
-    );
-    for (const l of ["Toggle sound", "Toggle dark mode", "New wheel", "Copy link", "Show QR code", "Big screen"]) expect(html).toContain(`aria-label="${l}"`);
+    const toolbar = (multiplayer: boolean) =>
+      renderToStaticMarkup(
+        <GameToolbar multiplayer={multiplayer} onHost={noop} onJoinCode={noop} soundEnabled dark={false} onToggleSound={noop} onToggleTheme={noop} onNewWheel={noop} onCopyLink={noop} onShowQr={noop} newBusy={false} onBigScreen={noop} />,
+      );
+    const common = ["Toggle sound", "Toggle dark mode", "New wheel", "Big screen"];
+    const solo = toolbar(false);
+    for (const l of [...common, "Host this wheel", "Join a game"]) expect(solo).toContain(`aria-label="${l}"`);
+    expect(solo).not.toContain('aria-label="Copy link"');
+    const multi = toolbar(true);
+    for (const l of [...common, "Copy link", "Show QR code"]) expect(multi).toContain(`aria-label="${l}"`);
+    expect(multi).not.toContain('aria-label="Host this wheel"');
   });
   it("dialogs", () => {
     const paste = renderToStaticMarkup(<PasteNamesDialog open onClose={noop} onSubmit={async () => true} />);

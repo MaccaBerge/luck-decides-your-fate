@@ -1,8 +1,12 @@
-import { Link as LinkIcon, Maximize, Moon, Plus, QrCode, Sun, Volume2, VolumeX } from "lucide-react";
+import { KeyRound, Link as LinkIcon, Maximize, Moon, Plus, QrCode, Sun, Users, Volume2, VolumeX } from "lucide-react";
 import { secondaryBtn } from "./buttons";
 import { WheelMark } from "./WheelMark";
 
 interface Props {
+  /** Solo wheels offer hosting and joining; a multiplayer game offers its invite link and QR code. */
+  multiplayer: boolean;
+  onHost: () => void;
+  onJoinCode: () => void;
   soundEnabled: boolean;
   dark: boolean;
   onToggleSound: () => void;
@@ -30,13 +34,27 @@ export function GameToolbar(p: Props) {
           <Plus className="size-4" aria-hidden="true" />
           <span className="max-sm:hidden">New wheel</span>
         </button>
-        <button type="button" aria-label="Copy link" onClick={p.onCopyLink} className={labelled}>
-          <LinkIcon className="size-4" aria-hidden="true" />
-          <span className="max-sm:hidden">Copy link</span>
-        </button>
-        <button type="button" aria-label="Show QR code" onClick={p.onShowQr} className={square}>
-          <QrCode className="size-[18px]" aria-hidden="true" />
-        </button>
+        {p.multiplayer ? (
+          <>
+            <button type="button" aria-label="Copy link" onClick={p.onCopyLink} className={labelled}>
+              <LinkIcon className="size-4" aria-hidden="true" />
+              <span className="max-sm:hidden">Copy link</span>
+            </button>
+            <button type="button" aria-label="Show QR code" onClick={p.onShowQr} className={square}>
+              <QrCode className="size-[18px]" aria-hidden="true" />
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" aria-label="Host this wheel" onClick={p.onHost} className={labelled}>
+              <Users className="size-4" aria-hidden="true" />
+              <span className="max-sm:hidden">Host</span>
+            </button>
+            <button type="button" aria-label="Join a game" onClick={p.onJoinCode} className={square} title="Join a game">
+              <KeyRound className="size-[18px]" aria-hidden="true" />
+            </button>
+          </>
+        )}
         <button
           type="button"
           aria-label="Toggle sound"

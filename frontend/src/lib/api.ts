@@ -1,4 +1,5 @@
-import type { ApiErrorBody, PublicGameState, SpinStarted } from "./types";
+import type { ApiErrorBody, JoinResponse, PublicGameState, SpinStarted } from "./types";
+import { getMe } from "./players";
 
 export class ApiError extends Error {
   status: number;
@@ -15,13 +16,20 @@ export class ApiError extends Error {
 }
 
 /** Generic JSON request helper (relative URL, same-origin cookies). 204 → undefined. */
-export async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+export async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  extraHeaders?: Record<string, string>,
+): Promise<T> {
   let res: Response;
+  const headers: Record<string, string> = { ...extraHeaders };
+  if (body !== undefined) headers["Content-Type"] = "application/json";
   try {
     res = await fetch(path, {
       method,
       credentials: "same-origin",
-      headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
@@ -52,19 +60,38 @@ export async function request<T>(method: string, path: string, body?: unknown): 
 
 const g = (id: string) => `/api/games/${encodeURIComponent(id)}`;
 
+/** In a multiplayer game, this browser's player key; the server ignores it on solo wheels. */
+function as(id: string): Record<string, string> | undefined {
+  const me = getMe(id);
+  return me ? { "X-Player-Token": me.token } : undefined;
+}
+
 export const createGame = () => request<PublicGameState>("POST", "/api/games");
 export const getGame = (id: string) => request<PublicGameState>("GET", g(id));
 export const addEntries = (id: string, names: string[]) =>
-  request<PublicGameState>("POST", `${g(id)}/entries`, { names });
+  request<PublicGameState>("POST", `${g(id)}/entries`, { names }, as(id));
 export const updateEntry = (
   id: string,
   entryId: string,
   patch: { name?: string; color?: string; is_active?: boolean },
-) => request<PublicGameState>("PATCH", `${g(id)}/entries/${encodeURIComponent(entryId)}`, patch);
+) => request<PublicGameState>("PATCH", `${g(id)}/entries/${encodeURIComponent(entryId)}`, patch, as(id));
 export const deleteEntry = (id: string, entryId: string) =>
-  request<PublicGameState>("DELETE", `${g(id)}/entries/${encodeURIComponent(entryId)}`);
-export const shuffleEntries = (id: string) => request<PublicGameState>("POST", `${g(id)}/shuffle`);
-export const restoreEntries = (id: string) => request<PublicGameState>("POST", `${g(id)}/restore`);
+  request<PublicGameState>("DELETE", `${g(id)}/entries/${encodeURIComponent(entryId)}`, undefined, as(id));
+export const shuffleEntries = (id: string) => request<PublicGameState>("POST", `${g(id)}/shuffle`, undefined, as(id));
+export const restoreEntries = (id: string) => request<PublicGameState>("POST", `${g(id)}/restore`, undefined, as(id));
 export const updateSettings = (id: string, s: { remove_winner: boolean }) =>
-  request<PublicGameState>("PATCH", `${g(id)}/settings`, s);
-export const spin = (id: string) => request<SpinStarted>("POST", `${g(id)}/spin`);
+  request<PublicGameState>("PATCH", `${g(id)}/settings`, s, as(id));
+export const spin = (id: string) => request<SpinStarted>("POST", `${g(id)}/spin`, undefined, as(id));
+
+// Multiplayer
+export const hostGame = (id: string, name: string, avatar: string) =>
+  request<JoinResponse>("POST", `${g(id)}/host`, { name, avatar }, as(id));
+export const joinGame = (id: string, name: string, avatar: string) =>
+  request<JoinResponse>("POST", `${g(id)}/players`, { name, avatar });
+export const leaveGame = (id: string) => request<PublicGameState>("DELETE", `${g(id)}/players/me`, undefined, as(id));
+export const removePlayer = (id: string, playerId: string) =>
+  request<PublicGameState>("DELETE", `${g(id)}/players/${encodeURIComponent(playerId)}`, undefined, as(id));
+export const socketTicket = (id: string) =>
+  request<{ ticket: string }>("POST", `${g(id)}/socket-ticket`, undefined, as(id));
+export const findGameByCode = (code: string) =>
+  request<{ game_id: string }>("GET", `/api/join/${encodeURIComponent(code.trim().toUpperCase())}`);

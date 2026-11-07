@@ -29,9 +29,17 @@ describe("/privacy", () => {
     expect(html).toMatch(/href="mailto:luckdecidesyourfate@gmail.com"[^>]*>luckdecidesyourfate@gmail.com</);
   });
 
-  it("stays under 200 words and makes no claim about outcomes", () => {
-    expect(text.trim().split(/\s+/).length).toBeLessThan(200);
-    expect(text).not.toMatch(/\b(fair|unbiased|random|rigged?)\b/i);
+  // The limit was 200 words; the two multiplayer sentences the owner approved in November 2026
+  // took it past that, so it's 230 now. Keep the page short.
+  it("stays under 230 words and makes no claim about outcomes", () => {
+    expect(text.trim().split(/\s+/).length).toBeLessThan(230);
+    // "random key" (the multiplayer player key) is about identity, not about how spins turn out.
+    expect(text.replace(/\brandom key\b/gi, "")).not.toMatch(/\b(fair|unbiased|random|rigged?)\b/i);
+  });
+
+  it("mentions what multiplayer stores", () => {
+    expect(text).toContain("your browser also keeps a random key so the game recognises you when you come back");
+    expect(text).toContain("the server also stores each player's chosen name and avatar");
   });
 });
 

@@ -32,9 +32,26 @@ export interface RecentSpin {
   winner_name: string;
   finished_at: string;
 }
+export type GameKind = "solo" | "multiplayer";
+export interface Player {
+  id: string;
+  /** The player's slice on the wheel. */
+  entry_id: string;
+  name: string;
+  /** A key from lib/avatars.ts. */
+  avatar: string;
+  /** "here": one of their pages is open and visible; "away": none is. */
+  status: "here" | "away";
+  is_host: boolean;
+}
 export interface PublicGameState {
   id: string;
   game_type: "wheel";
+  kind: GameKind;
+  /** Multiplayer only. */
+  join_code: string | null;
+  /** Multiplayer only (empty for solo), in joining order. */
+  players: Player[];
   entries: Entry[];
   settings: GameSettings;
   current_spin: SpinStarted | null;
@@ -50,3 +67,10 @@ export type PlayerEvent =
   | { type: "spin_started"; spin: SpinStarted }
   | { type: "spin_finished"; spin_id: number; winner_entry_id: string; winner_name: string }
   | { type: "game_deleted" };
+
+export interface JoinResponse {
+  player_id: string;
+  /** The key this browser keeps to be recognised as this player. */
+  player_token: string;
+  state: PublicGameState;
+}

@@ -4,6 +4,7 @@ import HomePage from "./pages/HomePage";
 import GamePage from "./pages/GamePage";
 import NotFoundPage from "./pages/NotFoundPage";
 import PrivacyPage from "./pages/PrivacyPage";
+import JoinCodePage from "./pages/JoinCodePage";
 
 const AdminApp = lazy(() => import("./admin/AdminApp"));
 // useLayoutEffect scrolls before the first paint; it warns during server rendering (tests), so fall back there.
@@ -26,6 +27,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/g/:gameId" element={<GamePage />} />
+      <Route path="/j/:code" element={<JoinCodePage />} />
       <Route path="/privacy" element={<PrivacyPage />} />
       <Route
         path="/admin/*"
