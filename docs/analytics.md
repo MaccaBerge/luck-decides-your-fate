@@ -28,7 +28,7 @@ Each function returns a dict in the shape for its kind. The server checks the sh
 
 | Kind | Returns | Drawn as |
 |---|---|---|
-| `number` | `{"value": int or float, "hint": str or None}` (`hint` is optional) | a big number with a small line under it |
+| `number` | `{"value": int or float, "hint": str or None, "format": "duration" or None}` (`hint` and `format` are optional; `"duration"` means `value` is seconds) | a big number with a small line under it, or a duration such as "3m 20s" |
 | `series` | `{"points": [{"day": "YYYY-MM-DD", "value": int}], "hint": str or None}`, exactly one point per day in the range, oldest first (`hint` is optional). Use `ctx.fill_days(counts)` to build it, which adds the zeros. | a bar chart with the total, the hint and UTC day labels |
 | `breakdown` | `{"items": [{"label": str, "value": int}]}` | horizontal bars |
 | `table` | `{"columns": [str], "rows": [[str or int]]}` | a table that scrolls sideways on small screens |
@@ -95,8 +95,10 @@ It holds numbers only: `name` is a counter name such as `spins_wheels`, never a 
 | `spins_wheels`, `spins_links` | a spin finishes, by where it ran |
 | `spins_rule_decided` | a finished spin's result was picked by the rule |
 | `names_added` | names are added through `POST /api/games/{id}/entries` (by the number added) |
+| `visits` | a wheel page's player socket closes, unless it was a resume (see "Visits" below) |
+| `active_seconds` | a player socket closes (by how long it was open, at most 2 hours) |
 
-The "Daily totals" section reads these with `counter_series(ctx, *names)` from `metrics/history.py`, which sums the named counters per day and adds a "Since <first day>" hint.
+The "Daily totals" section reads these with helpers from `metrics/history.py`: `counter_series(ctx, *names, divide_by=1)` sums the named counters per day and adds a "Since <first day>" hint, `counter_total(ctx, *names)` sums them over the range, and `since_hint(*names)` gives the hint on its own.
 
 **Adding a counter:** add a constant to `counters.py` (and to `ALL`), then call `await counters.bump(counters.MY_COUNTER)` right after the action has succeeded, never before or inside a failing path. `bump` never raises: a failure is logged with its class name only, and the action carries on. A spin is counted after its broadcasts, outside the game's lock, and every spin makes the same writes whether or not a rule decided it. The table is created at startup (`schema.sql`), so new counters need no schema change. Then add a metric, for example:
 
@@ -108,6 +110,17 @@ async def links_created_per_day(ctx: MetricContext) -> dict:
 ```
 
 Backups include `daily_counters` automatically, because a backup is a copy of the whole database.
+
+## Visits
+
+The "Visits" section shows average active time per visit, spins per visit, visits per day and active minutes per day, from the `visits` and `active_seconds` counters. This is the one agreed exception to "no visitor tracking": daily totals only, never a row per visit, and the privacy page says so.
+
+- **A visit** is one load of a wheel page (`/g/{id}`) in one tab. Two tabs are two visits, and the admin's own visits count too. Admin and dashboard sockets never count.
+- **Active** means the tab is visible. The wheel page's socket (`connectGameSocket` in `frontend/src/lib/ws.ts`) closes after the tab has been hidden for 15 seconds and reconnects when it's visible again, so socket time is close to visible time (up to 15 seconds extra per hide). Mouse, keyboard and scrolling are never watched. Clients still never send anything on sockets.
+- **Resumes:** every connection after the page's first one that opened (after hiding, or an automatic reconnect after a deploy or a network drop) adds `?resume=1`. It's a flag, not an identifier. The server counts a visit only for a connection without it. A resume still marks a link opened, gets state and updates presence.
+- **When it's recorded:** in the player socket's `finally` block, when the connection closes (shutdown included): +1 `visits` unless it was a resume, and + its duration in `active_seconds`. The writes are shielded, because a closing tab or a shutdown can cancel the handler, and `bump` never raises, so a failure can't affect closing the socket. A server crash loses the open connections' numbers.
+- **The cap:** each connection adds at most 2 hours (`counters.ACTIVE_CAP_S`), so a tab left visible overnight doesn't wreck the average. The cap only limits the number counted; it never closes or changes the connection.
+- **Side effects:** "Players connected now", live games and a link's presence only count visible tabs, so a link shows as not open while the friend's tab is hidden. A spin that finishes while a tab is hidden shows as "Last pick" when the tab returns, without the result dialog.
 
 ## Rules
 
