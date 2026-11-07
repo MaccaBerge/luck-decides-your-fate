@@ -7,6 +7,7 @@ import { AdminAuthContext, type AdminAuth } from "./auth";
 import LoginPage from "./LoginPage";
 import DashboardPage from "./DashboardPage";
 import LinkControlPage from "./LinkControlPage";
+import AnalyticsPage from "./analytics/AnalyticsPage";
 
 type AuthState = "checking" | "in" | "out";
 
@@ -49,6 +50,7 @@ export default function AdminApp() {
       <Routes>
         <Route index element={<DashboardPage />} />
         <Route path="links/:gameId" element={<LinkControlPage />} />
+        <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="*" element={<DashboardPage />} />
       </Routes>
     );

@@ -59,3 +59,43 @@ export type AdminLinkEvent =
   | { type: "game_deleted" };
 
 export type DashboardEvent = { type: "dashboard"; dashboard: Dashboard };
+
+// ---------- analytics (GET /api/admin/analytics) ----------
+export type AnalyticsDays = 7 | 30 | 90;
+
+export interface NumberData {
+  value: number;
+  hint: string | null;
+}
+export interface SeriesData {
+  points: { day: string; value: number }[];
+}
+export interface BreakdownData {
+  items: { label: string; value: number }[];
+}
+export interface TableData {
+  columns: string[];
+  rows: (string | number)[][];
+}
+
+/** `kind` is a string, not a union: the server may send a kind this build can't draw yet. */
+export interface AnalyticsMetric {
+  id: string;
+  title: string;
+  description: string;
+  kind: string;
+  data: unknown;
+  error: string | null;
+}
+
+export interface AnalyticsSection {
+  id: string;
+  title: string;
+  metrics: AnalyticsMetric[];
+}
+
+export interface AnalyticsReport {
+  generated_at: string;
+  days: AnalyticsDays;
+  sections: AnalyticsSection[];
+}

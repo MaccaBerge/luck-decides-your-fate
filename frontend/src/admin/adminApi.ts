@@ -1,6 +1,6 @@
 import { ApiError, request } from "../lib/api";
 import type { Mode } from "../lib/types";
-import type { AdminGameState, Dashboard } from "./adminTypes";
+import type { AdminGameState, AnalyticsDays, AnalyticsReport, Dashboard } from "./adminTypes";
 
 export interface CreateLinkBody {
   label: string | null;
@@ -22,6 +22,9 @@ export const logout = () => request<void>("POST", "/api/admin/logout");
 export const me = () => request<{ authenticated: boolean }>("GET", "/api/admin/me");
 
 export const getDashboard = () => request<Dashboard>("GET", "/api/admin/dashboard");
+
+export const getAnalytics = (days: AnalyticsDays) =>
+  request<AnalyticsReport>("GET", `/api/admin/analytics?days=${days}`);
 
 export const createLink = (body: CreateLinkBody) =>
   request<AdminGameState>("POST", "/api/admin/links", body);
