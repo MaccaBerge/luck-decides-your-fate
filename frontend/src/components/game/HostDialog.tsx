@@ -15,11 +15,6 @@ interface Props {
   onHost: (name: string, avatar: string, choice: HostChoice) => void;
 }
 
-function namesSummary(names: string[]): string {
-  if (names.length <= 3) return names.join(", ");
-  return `${names.slice(0, 2).join(", ")} and ${names.length - 2} more`;
-}
-
 /** "Host this wheel": turns a wheel into a multiplayer game, with you as the host. */
 export function HostDialog({ open, busy, names, onClose, onHost }: Props) {
   const [choice, setChoice] = useState<HostChoice | null>(null);
@@ -29,13 +24,9 @@ export function HostDialog({ open, busy, names, onClose, onHost }: Props) {
     if (open) setChoice(null);
   }, [open]);
 
-  const options: { value: HostChoice; title: string; detail: string }[] = [
-    {
-      value: "keep",
-      title: "Keep these names",
-      detail: `${namesSummary(names)} ${names.length === 1 ? "stays" : "stay"} on the wheel, and players are added to ${names.length === 1 ? "it" : "them"}.`,
-    },
-    { value: "fresh", title: "Start fresh", detail: "Host a new, empty wheel. This one stays as it is." },
+  const options: { value: HostChoice; label: string }[] = [
+    { value: "keep", label: "Keep names from current wheel" },
+    { value: "fresh", label: "Create new wheel" },
   ];
 
   return (
@@ -67,14 +58,13 @@ export function HostDialog({ open, busy, names, onClose, onHost }: Props) {
                   role="radio"
                   aria-checked={checked}
                   onClick={() => setChoice(o.value)}
-                  className={`flex flex-col gap-0.5 rounded-2xl border px-4 py-3 text-left transition-colors ${
+                  className={`flex min-h-12 items-center rounded-2xl border px-4 py-3 text-left text-[15px] font-semibold transition-colors ${
                     checked
                       ? "border-primary bg-primary-soft text-primary-soft-ink"
                       : "border-border-strong bg-surface text-ink hover:bg-surface-muted"
                   }`}
                 >
-                  <span className="text-[15px] font-semibold">{o.title}</span>
-                  <span className={`text-sm ${checked ? "" : "text-ink-muted"} [overflow-wrap:anywhere]`}>{o.detail}</span>
+                  {o.label}
                 </button>
               );
             })}

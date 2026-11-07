@@ -91,8 +91,7 @@ describe("HostDialog", () => {
     const html = dialog(["Anna", "Jonas", "Mia", "Leo"]);
     expect(html).toMatch(/role="radiogroup"[^>]*aria-label="Names to start with"/);
     expect(text(html)).toContain("This wheel has 4 names. What should the game start with?");
-    expect(text(html)).toContain("Keep these names Anna, Jonas and 2 more stay on the wheel");
-    expect(text(html)).toContain("Start fresh Host a new, empty wheel. This one stays as it is.");
+    expect(text(html)).toContain("Keep names from current wheel Create new wheel");
     expect(html.match(/aria-checked="false"/g)?.length).toBeGreaterThanOrEqual(2);
     expect(html).toMatch(/type="submit"[^>]*disabled/);
   });
@@ -104,6 +103,6 @@ describe("HostDialog", () => {
   });
 
   it("words one name in the singular", () => {
-    expect(text(dialog(["Anna"]))).toContain("This wheel has 1 name. What should the game start with? Keep these names Anna stays on the wheel, and players are added to it.");
+    expect(text(dialog(["Anna"]))).toContain("This wheel has 1 name. What should the game start with?");
   });
 });
