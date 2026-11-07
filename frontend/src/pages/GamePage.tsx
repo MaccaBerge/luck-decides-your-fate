@@ -20,7 +20,7 @@ import { secondaryBtn } from "../components/game/buttons";
 import { EntryPanel, MAX_ENTRIES } from "../components/game/EntryPanel";
 import { PasteNamesDialog } from "../components/game/PasteNamesDialog";
 import { QrDialog } from "../components/game/QrDialog";
-import { HostDialog } from "../components/game/HostDialog";
+import { HostDialog, type HostChoice } from "../components/game/HostDialog";
 import { JoinCodeDialog } from "../components/game/JoinCodeDialog";
 import { JoinScreen } from "../components/game/JoinScreen";
 import { PlayerRow } from "../components/game/PlayerRow";
@@ -264,11 +264,20 @@ export default function GamePage() {
     setGame(r.state);
   };
 
-  const hostWheel = async (name: string, avatar: string) => {
+  const hostWheel = async (name: string, avatar: string, choice: HostChoice) => {
     setPlayerBusy(true);
     try {
-      becomePlayer(game.id, await api.hostGame(game.id, name, avatar));
-      setHostOpen(false);
+      if (choice === "fresh") {
+        // A new, empty wheel becomes the game; this one is left exactly as it was.
+        const fresh = await api.createGame();
+        const r = await api.hostGame(fresh.id, name, avatar);
+        setMe(fresh.id, { playerId: r.player_id, token: r.player_token });
+        setHostOpen(false);
+        navigate(`/g/${fresh.id}`);
+      } else {
+        becomePlayer(game.id, await api.hostGame(game.id, name, avatar));
+        setHostOpen(false);
+      }
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Could not host this wheel");
     } finally {
@@ -630,7 +639,13 @@ export default function GamePage() {
           showToast("Could not create the QR code");
         }}
       />
-      <HostDialog open={hostOpen} busy={playerBusy} onClose={() => setHostOpen(false)} onHost={(n, a) => void hostWheel(n, a)} />
+      <HostDialog
+        open={hostOpen}
+        busy={playerBusy}
+        names={active.map((e) => e.name)}
+        onClose={() => setHostOpen(false)}
+        onHost={(n, a, choice) => void hostWheel(n, a, choice)}
+      />
       <JoinCodeDialog
         open={joinCodeOpen}
         busy={playerBusy}

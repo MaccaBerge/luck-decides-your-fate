@@ -6,6 +6,7 @@ import { PlayerRow } from "./PlayerRow";
 import { PlayerSetup } from "./PlayerSetup";
 import { JoinCodeDialog } from "./JoinCodeDialog";
 import { JoinScreen } from "./JoinScreen";
+import { HostDialog } from "./HostDialog";
 
 const noop = () => {};
 const players: Player[] = [
@@ -79,5 +80,30 @@ describe("join screens", () => {
     expect(text(html)).toContain("Hanna is hosting.");
     expect(text(html)).toContain("3 players have joined");
     expect(html).toContain(">Just watch<");
+  });
+});
+
+describe("HostDialog", () => {
+  const dialog = (names: string[]) =>
+    renderToStaticMarkup(<HostDialog open busy={false} names={names} onClose={noop} onHost={noop} />);
+
+  it("asks whether to keep the names or start fresh", () => {
+    const html = dialog(["Anna", "Jonas", "Mia", "Leo"]);
+    expect(html).toMatch(/role="radiogroup"[^>]*aria-label="Names to start with"/);
+    expect(text(html)).toContain("This wheel has 4 names. What should the game start with?");
+    expect(text(html)).toContain("Keep these names Anna, Jonas and 2 more stay on the wheel");
+    expect(text(html)).toContain("Start fresh Host a new, empty wheel. This one stays as it is.");
+    expect(html.match(/aria-checked="false"/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(html).toMatch(/type="submit"[^>]*disabled/);
+  });
+
+  it("asks nothing on an empty wheel", () => {
+    const html = dialog([]);
+    expect(html).not.toContain("Names to start with");
+    expect(html).toContain("Host this wheel");
+  });
+
+  it("words one name in the singular", () => {
+    expect(text(dialog(["Anna"]))).toContain("This wheel has 1 name. What should the game start with? Keep these names Anna stays on the wheel, and players are added to it.");
   });
 });
