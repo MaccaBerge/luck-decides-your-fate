@@ -41,15 +41,15 @@ export function HostDialog({ open, busy, names, onClose, onHost }: Props) {
       <div className="flex items-center gap-1">
         <p className="font-display text-[23px] font-semibold">Play together</p>
         <InfoTip label="About playing together">
-          Friends join from their own phones with a code, and each of them gets a slice on the wheel. You spin.
+          Friends join on their own devices with a code, and each of them gets a slice on the wheel. You spin.
         </InfoTip>
       </div>
       {ask && (
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-2 text-sm font-semibold text-ink">
+          <legend className="mb-1.5 text-[13px] text-ink-muted">
             This wheel has {names.length} {names.length === 1 ? "name" : "names"}. What should the game start with?
           </legend>
-          <div role="radiogroup" aria-label="Names to start with" className="flex flex-col gap-2">
+          <div role="radiogroup" aria-label="Names to start with" className="flex flex-col gap-1.5">
             {options.map((o) => {
               const checked = choice === o.value;
               return (
@@ -59,7 +59,7 @@ export function HostDialog({ open, busy, names, onClose, onHost }: Props) {
                   role="radio"
                   aria-checked={checked}
                   onClick={() => setChoice(o.value)}
-                  className={`flex min-h-12 items-center rounded-2xl border px-4 py-3 text-left text-[15px] font-semibold transition-colors ${
+                  className={`flex min-h-10 items-center rounded-xl border px-3.5 py-2 text-left text-sm font-medium transition-colors ${
                     checked
                       ? "border-primary bg-primary-soft text-primary-soft-ink"
                       : "border-border-strong bg-surface text-ink hover:bg-surface-muted"

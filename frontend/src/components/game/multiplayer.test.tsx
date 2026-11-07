@@ -102,7 +102,7 @@ describe("HostDialog", () => {
   it("keeps the explanation behind an info button", () => {
     const html = dialog(["Anna"]);
     expect(html).toMatch(/aria-label="About playing together"[^>]*aria-expanded="false"|aria-expanded="false"[^>]*aria-label="About playing together"/);
-    expect(html).not.toContain("Friends join from their own phones");
+    expect(html).not.toContain("Friends join on their own devices");
   });
 
   it("asks nothing on an empty wheel", () => {
@@ -118,18 +118,18 @@ describe("HostDialog", () => {
 
 describe("InviteCard", () => {
   it("shows the code and player count, in the side column or floating in big-screen mode", () => {
-    const panel = renderToStaticMarkup(<InviteCard variant="panel" code="ACP7KY" url="http://x/j/ACP7KY" players={1} />);
+    const panel = renderToStaticMarkup(<InviteCard variant="panel" code="ACP7KY" url="http://x/j/ACP7KY" />);
     expect(panel).toContain('data-testid="host-invite-card"');
     expect(panel).not.toContain("fixed");
     expect(text(panel)).toBe("Join with the code ACP7KY"); // no player count on the host's card
-    const floating = renderToStaticMarkup(<InviteCard code="ACP7KY" url="http://x/j/ACP7KY" players={3} />);
+    const floating = renderToStaticMarkup(<InviteCard code="ACP7KY" url="http://x/j/ACP7KY" />);
     expect(panel).toContain('aria-label="Copy code"');
     expect(panel).toContain('aria-label="Enlarge QR code"');
     expect(floating).toContain('data-testid="invite-card"');
     expect(floating).not.toContain("Copy code");
     expect(floating).not.toContain("Enlarge QR code");
     expect(floating).toContain("fixed");
-    expect(text(floating)).toBe("Join with the code ACP7KY 3 players");
+    expect(text(floating)).toBe("Join with the code ACP7KY"); // no player count here either
   });
 });
 
