@@ -7,6 +7,7 @@ import type { Entry, PlayerEvent, PublicGameState, SpinStarted } from "../lib/ty
 import { connectGameSocket } from "../lib/ws";
 import { useTheme } from "../lib/theme";
 import { loadSoundPref, saveSoundPref, unlockAudio } from "../lib/sound";
+import { announceOpenWheel } from "../lib/openWheels";
 import { setLastGameId } from "../lib/storage";
 import { planLoad, type SavedList } from "../lib/savedLists";
 import { SLICE_COLORS } from "../lib/palette";
@@ -149,6 +150,10 @@ export default function GamePage() {
     },
     [],
   );
+
+  // Tell new tabs this wheel is open here, so they start their own.
+  const loadedId = game?.id;
+  useEffect(() => (loadedId ? announceOpenWheel(loadedId) : undefined), [loadedId]);
 
   const handleSpinComplete = useCallback((s: SpinStarted) => {
     setAnimating(false);

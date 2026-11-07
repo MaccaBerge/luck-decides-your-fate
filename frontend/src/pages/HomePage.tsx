@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError, createGame, getGame } from "../lib/api";
+import { isWheelOpenElsewhere } from "../lib/openWheels";
 import { clearLastGameId, getLastGameId } from "../lib/storage";
 import { Loading } from "../components/game/Loading";
 import { primaryBtn } from "../components/game/buttons";
@@ -14,7 +15,8 @@ export default function HomePage() {
     setError(null);
     try {
       const last = getLastGameId();
-      if (last) {
+      // Another tab already shows the saved wheel: give this tab its own.
+      if (last && !(await isWheelOpenElsewhere(last))) {
         try {
           const g = await getGame(last);
           navigate(`/g/${g.id}`, { replace: true });
