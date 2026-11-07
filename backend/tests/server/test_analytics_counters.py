@@ -128,7 +128,8 @@ async def test_unknown_counter_is_logged_not_raised(caplog):
 def test_rule_change_bumps_nothing_and_sends_nothing_to_players(client, admin, app):
     gid = new_link(admin, client, ["Anna", "Jonas"], label="x", mode="fair")
     before = table(app)
-    with client.websocket_connect(f"/ws/games/{gid}") as p:
+    # resume=1, so connecting doesn't count a visit; only a rule change could change the table here.
+    with client.websocket_connect(f"/ws/games/{gid}?resume=1") as p:
         p.receive_json()
         admin.patch(f"/api/admin/links/{gid}", json={"mode": "always", "target_names": ["Jonas"]})
         admin.patch(f"/api/admin/links/{gid}", json={"label": "y"})

@@ -59,7 +59,7 @@ def test_report_shape(admin, days):
     body = admin.get(f"/api/admin/analytics?days={days}").json()
     assert body["days"] == days
     assert body["generated_at"].endswith("Z")
-    assert [s["id"] for s in body["sections"]] == ["now", "history", "wheels", "links", "per_link"]
+    assert [s["id"] for s in body["sections"]] == ["now", "history", "visits", "wheels", "links", "per_link"]
     for s in body["sections"]:
         assert s["title"]
         for m in s["metrics"]:
@@ -87,7 +87,7 @@ def test_one_failing_metric_does_not_break_the_others(admin, monkeypatch, caplog
     res = admin.get("/api/admin/analytics?days=30")
     assert res.status_code == 200
     ms = {m["id"]: m for s in res.json()["sections"] for m in s["metrics"]}
-    assert ms["fine"]["data"] == {"value": 30, "hint": None}
+    assert ms["fine"]["data"] == {"value": 30, "hint": None, "format": None}
     assert ms["broken"]["error"] == "KeyError" and ms["broken"]["data"] is None
     assert "Anna" not in res.text and "Anna" not in caplog.text
 
@@ -98,7 +98,7 @@ def test_empty_database(admin):
     for mid in ("live_games", "players_now", "wheels_stored", "wheels_used", "links_created",
                 "links_opened", "link_spins", "rule_decided"):
         assert value(ms, mid) == 0, mid
-    assert ms["avg_names"]["data"] == {"value": 0, "hint": "No wheels stored"}
+    assert ms["avg_names"]["data"] == {"value": 0, "hint": "No wheels stored", "format": None}
     assert ms["rule_decided"]["data"]["hint"] is None
     assert ms["per_link_spins"]["data"] == {"columns": ["Label", "Status", "Spins", "Rule decided"], "rows": []}
 
@@ -132,7 +132,7 @@ def test_stored_wheels(client, admin, app):
     ms7, ms30, ms90 = metrics(admin, 7), metrics(admin, 30), metrics(admin, 90)
     assert value(ms7, "wheels_stored") == 3
     assert [value(m, "wheels_used") for m in (ms7, ms30, ms90)] == [1, 2, 3]
-    assert ms7["avg_names"]["data"] == {"value": 1.3, "hint": "Across 3 wheels"}
+    assert ms7["avg_names"]["data"] == {"value": 1.3, "hint": "Across 3 wheels", "format": None}
 
 
 def test_links_and_rule_spins_by_range(client, admin, app):
@@ -154,12 +154,12 @@ def test_links_and_rule_spins_by_range(client, admin, app):
     add_spin(app, wheel, started_at=ago(hours=1), rule_applied=False)
 
     ms7, ms30, ms90 = metrics(admin, 7), metrics(admin, 30), metrics(admin, 90)
-    assert ms7["links_created"]["data"] == {"value": 2, "hint": "1 in range"}
-    assert ms90["links_created"]["data"] == {"value": 2, "hint": "2 in range"}
-    assert ms7["links_opened"]["data"] == {"value": 1, "hint": "Of 2"}
+    assert ms7["links_created"]["data"] == {"value": 2, "hint": "1 in range", "format": None}
+    assert ms90["links_created"]["data"] == {"value": 2, "hint": "2 in range", "format": None}
+    assert ms7["links_opened"]["data"] == {"value": 1, "hint": "Of 2", "format": None}
     assert [value(m, "link_spins") for m in (ms7, ms30, ms90)] == [3, 4, 5]
-    assert ms7["rule_decided"]["data"] == {"value": 2, "hint": "67% of link spins"}
-    assert ms30["rule_decided"]["data"] == {"value": 3, "hint": "75% of link spins"}
+    assert ms7["rule_decided"]["data"] == {"value": 2, "hint": "67% of link spins", "format": None}
+    assert ms30["rule_decided"]["data"] == {"value": 3, "hint": "75% of link spins", "format": None}
     assert ms90["per_link_spins"]["data"]["rows"] == [
         ["One", "Disconnected", 4, 3],
         ["Untitled", "Created", 1, 0],

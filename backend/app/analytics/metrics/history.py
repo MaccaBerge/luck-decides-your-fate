@@ -8,21 +8,37 @@ from app.analytics.registry import MetricContext, Section, metric
 SECTION = Section("history", "Daily totals")
 
 
-async def counter_series(ctx: MetricContext, *names: str) -> dict:
-    """A `series` of the summed daily totals for `names`, with a "since" hint."""
+async def since_hint(*names: str) -> str:
+    """"Since <first day with data>" for the named counters, or "No data yet"."""
     marks = ", ".join("?" for _ in names)
-    counts = dict(await rows(
+    first = await scalar(f"SELECT MIN(day) FROM daily_counters WHERE name IN ({marks})", *names)
+    if not first:
+        return "No data yet"
+    d = date.fromisoformat(first)
+    return f"Since {d:%b} {d.day}, {d.year}"
+
+
+async def counter_total(ctx: MetricContext, *names: str) -> int:
+    """The summed totals for `names` over the selected range."""
+    marks = ", ".join("?" for _ in names)
+    total = await scalar(
+        f"SELECT SUM(value) FROM daily_counters WHERE name IN ({marks}) AND day >= ?",
+        *names, ctx.first_day.isoformat(),
+    )
+    return int(total or 0)
+
+
+async def counter_series(ctx: MetricContext, *names: str, divide_by: int = 1) -> dict:
+    """A `series` of the summed daily totals for `names` (each day rounded after `divide_by`),
+    with a "since" hint."""
+    marks = ", ".join("?" for _ in names)
+    counts = await rows(
         f"SELECT day, SUM(value) FROM daily_counters WHERE name IN ({marks}) AND day >= ?"
         " GROUP BY day",
         *names, ctx.first_day.isoformat(),
-    ))
-    first = await scalar(f"SELECT MIN(day) FROM daily_counters WHERE name IN ({marks})", *names)
-    if first:
-        d = date.fromisoformat(first)
-        hint = f"Since {d:%b} {d.day}, {d.year}"
-    else:
-        hint = "No data yet"
-    return {**ctx.fill_days(counts), "hint": hint}
+    )
+    days = {day: round(value / divide_by) for day, value in counts}
+    return {**ctx.fill_days(days), "hint": await since_hint(*names)}
 
 
 @metric(
