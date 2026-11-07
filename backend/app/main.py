@@ -28,6 +28,7 @@ from app.errors import install_error_handlers
 from app.middleware import ResponseHeadersMiddleware
 from app.routes import admin, games, static, ws
 from app.services import views
+from app.services.backup_upload import BackupStore, backup_loop
 from app.services.cleanup import cleanup_loop
 from app.services.rate_limit import LoginRateLimiter
 
@@ -54,7 +55,12 @@ def _attach(app: FastAPI, router: APIRouter) -> None:
     app.router.routes.extend(router.routes)
 
 
-def create_app(settings: Settings | None = None, *, run_cleanup: bool = True) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    *,
+    run_cleanup: bool = True,
+    backup_store: BackupStore | None = None,
+) -> FastAPI:
     if settings is None:
         settings = load_settings()
 
@@ -65,6 +71,7 @@ def create_app(settings: Settings | None = None, *, run_cleanup: bool = True) ->
             settings.login_rate_limit_attempts, settings.login_rate_limit_window_seconds
         ),
     )
+    ctx.backup_status.enabled = settings.backups_enabled
     ctx.manager.set_dashboard_builder(lambda: views.dashboard_payload(ctx))
 
     @asynccontextmanager
@@ -80,13 +87,17 @@ def create_app(settings: Settings | None = None, *, run_cleanup: bool = True) ->
         if finished:
             log.info("marked %d interrupted spin(s) as finished", finished)
         cleanup_task = asyncio.create_task(cleanup_loop(ctx)) if run_cleanup else None
+        backup_task = (
+            asyncio.create_task(backup_loop(ctx, store=backup_store)) if settings.backups_enabled else None
+        )
         try:
             yield
         finally:
-            if cleanup_task is not None:
-                cleanup_task.cancel()
-                with contextlib.suppress(asyncio.CancelledError, Exception):
-                    await cleanup_task
+            for task in (cleanup_task, backup_task):
+                if task is not None:
+                    task.cancel()
+                    with contextlib.suppress(asyncio.CancelledError, Exception):
+                        await task
             await ctx.runtime.shutdown()
             await ctx.manager.shutdown()
 

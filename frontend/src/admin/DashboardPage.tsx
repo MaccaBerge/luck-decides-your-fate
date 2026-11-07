@@ -4,7 +4,7 @@ import { Download, Loader2, Plus, SlidersHorizontal, Users } from "lucide-react"
 import type { Mode } from "../lib/types";
 import * as adminApi from "./adminApi";
 import { errorMessage, errorStatus, parseNames } from "./adminApi";
-import type { Dashboard, LinkSummary } from "./adminTypes";
+import type { BackupStatus, Dashboard, LinkSummary } from "./adminTypes";
 import { useAdminAuth } from "./auth";
 import { useDashboardSocket } from "./useAdminSocket";
 import {
@@ -28,6 +28,20 @@ import {
   useNow,
   Wordmark,
 } from "./components/ui";
+
+function BackupStatusLine({ status }: { status: BackupStatus }) {
+  const last = status.last_success_at ? new Date(status.last_success_at).toLocaleString() : null;
+  let text = "Automatic backups are off";
+  if (status.enabled) {
+    if (status.last_error) text = `Automatic backup failed (${status.last_error})${last ? `. Last good copy: ${last}` : ""}`;
+    else text = last ? `Last automatic backup: ${last}` : "Waiting for the first automatic backup";
+  }
+  return (
+    <p data-testid="backup-status" className={`text-sm ${status.enabled && status.last_error ? "text-danger" : "text-ink-muted"}`}>
+      {text}
+    </p>
+  );
+}
 
 export default function DashboardPage() {
   const { onUnauthorized, logout } = useAdminAuth();
@@ -102,6 +116,8 @@ export default function DashboardPage() {
           games live right now
         </span>
       </p>
+
+      {dash && <BackupStatusLine status={dash.backup} />}
 
       <ErrorText>{error}</ErrorText>
 

@@ -40,8 +40,15 @@ export interface AdminGameState {
   spin_history: AdminSpinRecord[];
 }
 
+export interface BackupStatus {
+  enabled: boolean;
+  last_success_at: string | null;
+  last_error: string | null;
+}
+
 export interface Dashboard {
   live_games: number;
+  backup: BackupStatus;
   links: LinkSummary[];
 }
 

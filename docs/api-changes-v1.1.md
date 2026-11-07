@@ -15,6 +15,10 @@ Additions to the v1 contract (`docs/plan-v1.md` §8). Nothing from v1 changed sh
 |---|---|---|
 | `1012` | The server is shutting down (for example a redeploy). Replaces `1001`. | Non-fatal: reconnect with the normal backoff. Only `4401` and `4404` are final. |
 
+## v1.2: admin dashboard
+
+`Dashboard` has a new field, `backup: { enabled, last_success_at, last_error }`, for automatic backups. `last_error` is an exception class name such as `ClientError`, never a URL or key. It's only in the admin dashboard, never in public state or on player sockets.
+
 ## New endpoints
 
 | Method | Path | Auth | Success |

@@ -10,6 +10,7 @@ from starlette.requests import HTTPConnection
 from app.auth import SessionStore
 from app.config import Settings
 from app.realtime.manager import ConnectionManager
+from app.services.backup import BackupStatus
 from app.services.rate_limit import LoginRateLimiter
 from app.services.state import RuntimeRegistry
 
@@ -22,6 +23,7 @@ class AppContext:
     manager: ConnectionManager = field(default_factory=ConnectionManager)
     runtime: RuntimeRegistry = field(default_factory=RuntimeRegistry)
     rng: secrets.SystemRandom = field(default_factory=secrets.SystemRandom)
+    backup_status: BackupStatus = field(default_factory=BackupStatus)
 
 
 def get_ctx(conn: HTTPConnection) -> AppContext:

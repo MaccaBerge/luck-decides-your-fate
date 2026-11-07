@@ -189,7 +189,7 @@ def test_dashboard(client, admin):
     l1 = new_link(admin, label="one")
     l2 = new_link(admin, client, ["A", "B", "C"], label="two")
     d = admin.get("/api/admin/dashboard").json()
-    assert set(d) == {"live_games", "links"}
+    assert set(d) == {"live_games", "links", "backup"}
     assert d["live_games"] == 0
     ids = [link["id"] for link in d["links"]]
     assert ids == [l2, l1]  # newest first

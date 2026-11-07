@@ -12,9 +12,11 @@ from typing import Any, Sequence
 
 from app.db.rows import EntryRow, GameRow, SpinRow
 from app.engine.rigging import RuleStatus
+from app.services.backup import BackupStatus
 from app.models import (
     AdminGameState,
     AdminSpinRecord,
+    BackupStatusOut,
     Dashboard,
     EntryOut,
     GameSettingsOut,
@@ -165,8 +167,16 @@ def admin_game_state(
     )
 
 
-def dashboard(live_games: int, links: list[LinkSummary]) -> Dashboard:
-    return Dashboard(live_games=live_games, links=links)
+def dashboard(live_games: int, links: list[LinkSummary], backup: BackupStatus) -> Dashboard:
+    return Dashboard(
+        live_games=live_games,
+        links=links,
+        backup=BackupStatusOut(
+            enabled=backup.enabled,
+            last_success_at=backup.last_success_at,
+            last_error=backup.last_error,
+        ),
+    )
 
 
 def admin_state_event(state: AdminGameState) -> dict[str, Any]:

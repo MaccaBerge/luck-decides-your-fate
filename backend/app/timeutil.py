@@ -6,6 +6,11 @@ def _fmt(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
 
 
+def utc_iso(value: datetime) -> str:
+    """The same format as utc_now_iso, for another moment."""
+    return _fmt(value.astimezone(timezone.utc))
+
+
 def utc_now_iso() -> str:
     """ISO-8601 UTC with milliseconds and Z, e.g. 2026-11-03T18:22:05.123Z."""
     return _fmt(datetime.now(timezone.utc))

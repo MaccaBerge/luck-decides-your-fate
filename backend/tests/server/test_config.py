@@ -67,7 +67,7 @@ def test_invalid_rate_limit_settings_are_errors(env, name, raw):
 def test_summary_format(tmp_path):
     settings = make_settings(tmp_path, database_path="/data/x.db", cookie_secure=True)
     assert config_summary(settings, frontend_served=True) == (
-        "config: db=/data/x.db cookie_secure=true ttl_days=7 frontend=yes"
+        "config: db=/data/x.db cookie_secure=true ttl_days=7 frontend=yes backups=off"
     )
 
 
