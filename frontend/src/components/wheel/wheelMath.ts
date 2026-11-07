@@ -8,6 +8,17 @@ export function sliceAtPointer(rotation: number, n: number): number {
   return Math.min(n - 1, Math.floor(mod(-rotation, 360) / s));
 }
 
+/**
+ * Index of the slice at a point (`dx`, `dy` from the centre, y pointing down) on a wheel rotated
+ * `rotation` degrees clockwise. The pointer is the point straight above the centre, so
+ * `sliceAt(0, -1, r, n) === sliceAtPointer(r, n)`.
+ */
+export function sliceAt(dx: number, dy: number, rotation: number, n: number): number {
+  if (n <= 0) return -1;
+  const fromTop = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+  return Math.min(n - 1, Math.floor(mod(fromTop - rotation, 360) / (360 / n)));
+}
+
 /** Final rotation (always > current) so that the pointer lands inside `winnerIndex` at `landingOffset`. */
 export function computeFinalRotation(
   current: number,

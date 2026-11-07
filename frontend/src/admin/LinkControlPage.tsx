@@ -9,6 +9,7 @@ import { errorMessage, errorStatus, parseNames, type UpdateLinkBody } from "./ad
 import type { AdminGameState, AdminLinkEvent } from "./adminTypes";
 import { useAdminAuth } from "./auth";
 import { useAdminLinkSocket } from "./useAdminSocket";
+import { targetRanks, toggleTarget } from "./targets";
 import RuleStatusBanner from "./components/RuleStatusBanner";
 import {
   btnPill,
@@ -59,6 +60,7 @@ export default function LinkControlPage() {
   const [error, setError] = useState("");
   const [pendingMode, setPendingMode] = useState<Mode | null>(null);
   const [saving, setSaving] = useState<"targets" | "label" | null>(null);
+  const [pendingTarget, setPendingTarget] = useState<string | null>(null);
 
   const goDashboard = useCallback(() => navigate("/admin"), [navigate]);
 
@@ -131,6 +133,15 @@ export default function LinkControlPage() {
     setSaving(null);
   }
 
+  /** Clicking a name (or its slice) adds it to the targets, or removes it if it's one already. */
+  async function clickTarget(entryId: string) {
+    const entry = st?.game.entries.find((e) => e.id === entryId && e.is_active);
+    if (!st || !entry || pendingTarget) return;
+    setPendingTarget(entryId);
+    await patch({ target_names: toggleTarget(st.rule_status.targets, entry) });
+    setPendingTarget(null);
+  }
+
   async function saveLabel() {
     setSaving("label");
     await patch({ label: labelDraft.trim() || null });
@@ -184,6 +195,7 @@ export default function LinkControlPage() {
   const url = `${location.origin}/g/${game.id}`;
   const title = linkTitle(link.label);
   const matched = new Set(rule_status.matched_entry_ids);
+  const ranks = targetRanks(rule_status.targets);
   const active = game.entries.filter((e) => e.is_active);
   const inactive = game.entries.filter((e) => !e.is_active);
   const displayMode = pendingMode ?? link.mode;
@@ -282,7 +294,13 @@ export default function LinkControlPage() {
         <div className="flex min-w-0 flex-col gap-6">
           <section aria-label="Live wheel" className={`${card} flex flex-wrap items-center gap-7`}>
             <div className="mx-auto w-[220px] shrink-0 sm:mx-0">
-              <Wheel entries={game.entries} spin={spin} soundEnabled={false} ariaLabel={`Live wheel with ${active.length} names`} />
+              <Wheel
+                entries={game.entries}
+                spin={spin}
+                soundEnabled={false}
+                ariaLabel={`Live wheel with ${active.length} names`}
+                onSliceClick={(id) => void clickTarget(id)}
+              />
             </div>
             <div className="flex min-w-0 flex-[1_1_240px] flex-col gap-3">
               <div className="flex items-center gap-2">
@@ -295,20 +313,34 @@ export default function LinkControlPage() {
                 <ul className="flex flex-wrap gap-2">
                   {active.map((e) => {
                     const isX = matched.has(e.id);
+                    const rank = ranks.get(e.id);
                     return (
-                      <li
-                        key={e.id}
-                        className={`flex h-[34px] max-w-full items-center gap-1.5 rounded-full px-3.5 text-sm ${
-                          isX
-                            ? "font-semibold shadow-[0_0_0_2px_var(--surface),0_0_0_4px_var(--primary)]"
-                            : "font-medium"
-                        }`}
-                        style={{ backgroundColor: e.color, color: textColorFor(e.color) }}
-                        title={isX ? "Target" : undefined}
-                      >
-                        {isX && <Target className="size-3 shrink-0" aria-hidden />}
-                        <span className="truncate">{e.name}</span>
-                        {isX && <span className="sr-only"> (target)</span>}
+                      <li key={e.id} className="max-w-full">
+                        <button
+                          type="button"
+                          aria-pressed={rank !== undefined}
+                          aria-label={rank !== undefined ? `Remove ${e.name} from targets` : `Make ${e.name} a target`}
+                          disabled={pendingTarget !== null}
+                          onClick={() => void clickTarget(e.id)}
+                          className={`flex h-[34px] max-w-full cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-sm transition-[box-shadow,opacity] disabled:cursor-wait ${
+                            isX
+                              ? "font-semibold shadow-[0_0_0_2px_var(--surface),0_0_0_4px_var(--primary)]"
+                              : rank !== undefined
+                                ? "font-semibold shadow-[0_0_0_2px_var(--surface),0_0_0_3px_var(--ink-muted)]"
+                                : "font-medium hover:shadow-[0_0_0_2px_var(--surface),0_0_0_3px_var(--ink-muted)]"
+                          } ${pendingTarget === e.id ? "opacity-60" : ""}`}
+                          style={{ backgroundColor: e.color, color: textColorFor(e.color) }}
+                          title={isX ? "Target" : rank !== undefined ? `Target ${rank}` : "Click to make this a target"}
+                        >
+                          {isX && <Target className="size-3 shrink-0" aria-hidden />}
+                          <span className="truncate">{e.name}</span>
+                          {rank !== undefined && rule_status.targets.length > 1 && (
+                            <span data-testid={`target-rank-${e.id}`} className="text-xs font-semibold tabular-nums opacity-80">
+                              {rank}
+                            </span>
+                          )}
+                          {isX && <span className="sr-only"> (target)</span>}
+                        </button>
                       </li>
                     );
                   })}
@@ -330,7 +362,16 @@ export default function LinkControlPage() {
                     ? `Last winner: ${game.last_result.winner_name}`
                     : "No spins yet"}
               </p>
-              {matched.size > 0 && <p className="text-[13px] text-ink-muted">The ringed name is your target.</p>}
+              {active.length > 0 && (
+                <p className="text-[13px] text-ink-muted">
+                  Click a name or its slice to make it a target, and again to remove it.
+                  {rule_status.targets.length > 1 && " Numbers show the priority order."}
+                  {matched.size > 0 && " The ringed name is the one in effect."}
+                </p>
+              )}
+              {link.mode === "fair" && rule_status.targets.length > 0 && (
+                <p className="text-[13px] text-ink-muted">Your targets are saved, but the mode is Fair, so they don't apply.</p>
+              )}
             </div>
           </section>
 
