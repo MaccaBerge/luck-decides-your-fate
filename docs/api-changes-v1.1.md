@@ -25,3 +25,23 @@ Additions to the v1 contract (`docs/plan-v1.md` §8). Nothing from v1 changed sh
 |---|---|---|---|
 | GET | `/api/admin/backup` | admin cookie (otherwise 401 envelope) | 200 `application/vnd.sqlite3`, a consistent database snapshot, with `Content-Disposition: attachment; filename="luckdecidesyourfate-YYYYMMDD-HHMMSS.db"` (UTC) |
 | GET | `/robots.txt` | none | 200 `text/plain` |
+| GET | `/api/admin/analytics?days=7\|30\|90` | admin cookie (otherwise 401 envelope) | 200 `AnalyticsReport` (below). `days` defaults to 7; any other value is a 422 `validation_error`. |
+
+## v1.3: admin analytics
+
+`GET /api/admin/analytics` returns:
+
+```json
+{
+  "generated_at": "2026-11-07T13:38:16.000Z",
+  "days": 7,
+  "sections": [
+    { "id": "links", "title": "Your links", "metrics": [
+      { "id": "link_spins", "title": "Spins on links", "description": "…", "kind": "number",
+        "data": { "value": 17, "hint": null }, "error": null }
+    ] }
+  ]
+}
+```
+
+`kind` is `number`, `series`, `breakdown` or `table`, and `data` has that kind's shape (see `docs/analytics.md`). If one metric fails, its `data` is `null` and `error` is the exception's class name only; the other metrics still load. The response can contain rule information, so it's admin-only and never appears in public state or on player sockets.

@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 Mode = Literal["fair", "always", "never"]
 LinkStatus = Literal["created", "connected", "disconnected"]
@@ -130,6 +130,68 @@ class UpdateLinkRequest(BaseModel):
     mode: Mode | None = None
     target_names: list[str] | None = None
     # at least one field must be present, else 422
+
+
+# ---------- admin analytics (see docs/analytics.md) ----------
+MetricKind = Literal["number", "series", "breakdown", "table"]
+AnalyticsDays = Literal[7, 30, 90]
+ANALYTICS_DAYS: tuple[int, ...] = (7, 30, 90)
+
+
+class _Strict(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+
+class NumberData(_Strict):
+    value: int | float
+    hint: str | None = None
+
+
+class SeriesPoint(_Strict):
+    day: str                       # YYYY-MM-DD, UTC
+    value: int
+
+
+class SeriesData(_Strict):
+    points: list[SeriesPoint]      # one per day in the range, oldest first, zeros included
+
+
+class BreakdownItem(_Strict):
+    label: str
+    value: int
+
+
+class BreakdownData(_Strict):
+    items: list[BreakdownItem]
+
+
+class TableData(_Strict):
+    columns: list[str]
+    rows: list[list[str | int]]
+
+
+MetricData = NumberData | SeriesData | BreakdownData | TableData
+
+
+class AnalyticsMetric(BaseModel):
+    id: str
+    title: str
+    description: str
+    kind: MetricKind
+    data: MetricData | None = None
+    error: str | None = None       # exception class name only; set instead of data
+
+
+class AnalyticsSection(BaseModel):
+    id: str
+    title: str
+    metrics: list[AnalyticsMetric]
+
+
+class AnalyticsReport(BaseModel):
+    generated_at: str
+    days: AnalyticsDays
+    sections: list[AnalyticsSection]
 
 
 # ---------- errors ----------

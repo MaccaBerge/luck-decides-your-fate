@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Download, Loader2, Plus, SlidersHorizontal, Users } from "lucide-react";
+import { BarChart3, Download, Loader2, Plus, SlidersHorizontal, Users } from "lucide-react";
 import type { Mode } from "../lib/types";
 import * as adminApi from "./adminApi";
 import { errorMessage, errorStatus, parseNames } from "./adminApi";
@@ -45,6 +45,7 @@ function BackupStatusLine({ status }: { status: BackupStatus }) {
 
 export default function DashboardPage() {
   const { onUnauthorized, logout } = useAdminAuth();
+  const navigate = useNavigate();
   const [dash, setDash] = useState<Dashboard | null>(null);
   const [error, setError] = useState("");
   const [backingUp, setBackingUp] = useState(false);
@@ -93,6 +94,10 @@ export default function DashboardPage() {
           <Wordmark>Controller</Wordmark>
         </h1>
         <div className="flex flex-wrap items-center gap-2">
+          <button type="button" aria-label="Analytics" className={btnSecondary} onClick={() => navigate("/admin/analytics")}>
+            <BarChart3 className="size-4" aria-hidden />
+            <span className="hidden sm:inline">Analytics</span>
+          </button>
           <button
             type="button"
             aria-label="Download backup"

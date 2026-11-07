@@ -70,6 +70,10 @@ class ConnectionManager:
     def player_count(self, game_id: str) -> int:
         return len(self._players.get(game_id, ()))
 
+    def player_total(self) -> int:
+        """Player sockets across all games (one per open wheel page; admin sockets never count)."""
+        return sum(len(sockets) for sockets in self._players.values())
+
     def live_games(self) -> int:
         return sum(1 for sockets in self._players.values() if sockets)
 
