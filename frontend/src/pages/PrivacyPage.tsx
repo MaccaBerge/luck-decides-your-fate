@@ -24,7 +24,9 @@ export default function PrivacyPage() {
       <div className={`${card} flex flex-col gap-5 p-6`}>
         <h1 className="font-display text-[30px] leading-tight font-semibold">Privacy</h1>
         <Section title="What's stored">
-          The server stores the names people type, their colours, wheel settings and spin results.
+          The server stores the names people type, their colours, wheel settings and spin results. The server also
+          counts how many times wheel pages are opened and how long they stay visible, as daily totals with no names or
+          identifiers.
         </Section>
         <Section title="Who can see it">
           Anyone with a wheel's link can see and change that wheel. The site's operator can view, change and delete
