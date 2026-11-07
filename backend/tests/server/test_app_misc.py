@@ -67,6 +67,8 @@ def test_static_serving_and_spa_fallback(tmp_path):
         assert c.get("/assets/index-abc.js").text == "console.log(1)"
         assert c.get("/assets/missing.js").status_code == 404
         assert c.get("/favicon.svg").text == "<svg/>"
+        r = c.get("/favicon.ico")  # missing file: a 404, not the HTML page
+        assert r.status_code == 404 and "Luck Decides Your Fate" not in r.text
         assert c.get("/../../etc/passwd").status_code in (200, 404)
         assert "root:" not in c.get("/../../etc/passwd").text
         # API keeps precedence and the JSON envelope

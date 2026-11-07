@@ -2,8 +2,9 @@
 
 - `/assets/*` is a StaticFiles mount (registered after all API/WS routes).
 - Any other GET/HEAD that matches no route and does not start with /api or /ws is answered from
-  the 404 handler (app.errors): a top-level file in dist (favicon etc.) if it exists, otherwise
-  index.html. Unknown /api/* and /ws/* paths keep the JSON 404 envelope.
+  the 404 handler (app.errors): a top-level file in dist (favicon etc.) if it exists, a 404 for
+  any other path whose last segment looks like a file name, otherwise index.html. Unknown /api/*
+  and /ws/* paths keep the JSON 404 envelope.
 """
 from __future__ import annotations
 
@@ -64,4 +65,8 @@ def spa_fallback(request: Request) -> Response | None:
         candidate = (dist / rel).resolve()
         if candidate.is_file() and candidate.is_relative_to(dist.resolve()):
             return FileResponse(candidate)
+    # A missing file (e.g. /favicon.ico) is a real 404, not the HTML page: browsers cache what a
+    # file URL returns, and no SPA route has a dot in its last segment.
+    if "." in rel.rsplit("/", 1)[-1]:
+        return None
     return FileResponse(dist / "index.html", headers={"Cache-Control": "no-cache"})
