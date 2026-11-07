@@ -133,9 +133,12 @@ export function InviteCard({ code, url, players, variant = "floating" }: Props) 
             </button>
           )}
         </span>
-        <span className="text-xs text-ink-muted">
-          {players} {players === 1 ? "player" : "players"}
-        </span>
+        {!panel && (
+          // On the TV only: the host sees everyone in the player row.
+          <span className="text-xs text-ink-muted">
+            {players} {players === 1 ? "player" : "players"}
+          </span>
+        )}
       </div>
     </div>
   );

@@ -114,7 +114,7 @@ describe("InviteCard", () => {
     const panel = renderToStaticMarkup(<InviteCard variant="panel" code="ACP7KY" url="http://x/j/ACP7KY" players={1} />);
     expect(panel).toContain('data-testid="host-invite-card"');
     expect(panel).not.toContain("fixed");
-    expect(text(panel)).toBe("Join with the code ACP7KY 1 player");
+    expect(text(panel)).toBe("Join with the code ACP7KY"); // no player count on the host's card
     const floating = renderToStaticMarkup(<InviteCard code="ACP7KY" url="http://x/j/ACP7KY" players={3} />);
     expect(panel).toContain('aria-label="Copy code"');
     expect(panel).toContain('aria-label="Enlarge QR code"');
