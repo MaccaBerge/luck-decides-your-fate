@@ -44,4 +44,4 @@ Additions to the v1 contract (`docs/plan-v1.md` §8). Nothing from v1 changed sh
 }
 ```
 
-`kind` is `number`, `series`, `breakdown` or `table`, and `data` has that kind's shape (see `docs/analytics.md`). If one metric fails, its `data` is `null` and `error` is the exception's class name only; the other metrics still load. The response can contain rule information, so it's admin-only and never appears in public state or on player sockets.
+`kind` is `number`, `series`, `breakdown` or `table` (a `series` may carry an optional `hint`), and `data` has that kind's shape (see `docs/analytics.md`). If one metric fails, its `data` is `null` and `error` is the exception's class name only; the other metrics still load. The response can contain rule information, so it's admin-only and never appears in public state or on player sockets.
