@@ -20,6 +20,8 @@ interface Props {
   onShuffle: () => void;
   onRestore: () => void;
   onRemoveWinnerChange: (v: boolean) => void;
+  /** Names that can't be deleted from this list (the host's own name: they leave instead). */
+  undeletableIds?: Set<string>;
 }
 
 export const MAX_ENTRIES = 100;
@@ -88,7 +90,7 @@ export function EntryPanel(p: Props) {
                 onRename={(n) => p.onRename(e, n)}
                 onColor={(c) => p.onColor(e, c)}
                 onToggle={() => p.onToggle(e)}
-                onRemove={() => p.onRemove(e)}
+                onRemove={p.undeletableIds?.has(e.id) ? undefined : () => p.onRemove(e)}
               />
             ))}
           </ul>

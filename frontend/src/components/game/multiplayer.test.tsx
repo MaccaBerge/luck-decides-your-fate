@@ -7,6 +7,8 @@ import { PlayerSetup } from "./PlayerSetup";
 import { JoinCodeDialog } from "./JoinCodeDialog";
 import { JoinScreen } from "./JoinScreen";
 import { HostDialog } from "./HostDialog";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { EntryPanel } from "./EntryPanel";
 
 const noop = () => {};
 const players: Player[] = [
@@ -105,5 +107,44 @@ describe("HostDialog", () => {
 
   it("words one name in the singular", () => {
     expect(text(dialog(["Anna"]))).toContain("This wheel has 1 name. What should the game start with? Keep these names Anna stays on the wheel, and players are added to it.");
+  });
+});
+
+describe("leaving", () => {
+  it("asks before leaving", () => {
+    const html = renderToStaticMarkup(
+      <ConfirmDialog open title="Leave the game?" message="You're the only player, so the game ends." confirmLabel="Leave" onConfirm={noop} onClose={noop} />,
+    );
+    expect(html).toMatch(/role="dialog"[^>]*aria-label="Leave the game\?"/);
+    expect(text(html)).toContain("Leave the game? You're the only player, so the game ends. Cancel Leave");
+  });
+
+  it("the host can't delete their own name, but can delete other players'", () => {
+    const entries = [
+      { id: "e1", name: "Hanna", color: "#C9B8FF", position: 0, is_active: true },
+      { id: "e2", name: "Mia", color: "#FFC9A8", position: 1, is_active: true },
+    ];
+    const html = renderToStaticMarkup(
+      <EntryPanel
+        entries={entries}
+        recentSpins={[]}
+        removeWinner={false}
+        disabled={false}
+        onAdd={async () => true}
+        onOpenPaste={noop}
+        onOpenSavedLists={noop}
+        onRename={noop}
+        onColor={noop}
+        onToggle={noop}
+        onRemove={noop}
+        onShuffle={noop}
+        onRestore={noop}
+        onRemoveWinnerChange={noop}
+        undeletableIds={new Set(["e1"])}
+      />,
+    );
+    expect(html).not.toContain('aria-label="Remove Hanna"');
+    expect(html).toContain('aria-label="Remove Mia"');
+    expect(html).toContain('aria-label="Edit Hanna"'); // renaming your own name still works
   });
 });

@@ -88,10 +88,12 @@ export const hostGame = (id: string, name: string, avatar: string) =>
   request<JoinResponse>("POST", `${g(id)}/host`, { name, avatar }, as(id));
 export const joinGame = (id: string, name: string, avatar: string) =>
   request<JoinResponse>("POST", `${g(id)}/players`, { name, avatar });
-export const leaveGame = (id: string) => request<PublicGameState>("DELETE", `${g(id)}/players/me`, undefined, as(id));
+/** Leaving as the last player ends the game (`ended`, and no state). */
+export const leaveGame = (id: string) =>
+  request<{ ended: boolean; state: PublicGameState | null }>("DELETE", `${g(id)}/players/me`, undefined, as(id));
 export const removePlayer = (id: string, playerId: string) =>
   request<PublicGameState>("DELETE", `${g(id)}/players/${encodeURIComponent(playerId)}`, undefined, as(id));
 export const socketTicket = (id: string) =>
   request<{ ticket: string }>("POST", `${g(id)}/socket-ticket`, undefined, as(id));
 export const findGameByCode = (code: string) =>
-  request<{ game_id: string }>("GET", `/api/join/${encodeURIComponent(code.trim().toUpperCase())}`);
+  request<{ game_id: string; players: number }>("GET", `/api/join/${encodeURIComponent(code.trim().toUpperCase())}`);
