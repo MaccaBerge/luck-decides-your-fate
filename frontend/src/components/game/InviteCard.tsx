@@ -6,7 +6,6 @@ import { card } from "./buttons";
 interface Props {
   code: string;
   url: string;
-  players: number;
   /** "floating": a corner card for big-screen mode. "panel": a card in the host's side column. */
   variant?: "floating" | "panel";
 }
@@ -38,8 +37,8 @@ async function copyText(text: string): Promise<boolean> {
   return ok;
 }
 
-/** The code and a QR code, so people can join from their phones. */
-export function InviteCard({ code, url, players, variant = "floating" }: Props) {
+/** The code and a QR code, so people can join from their own devices. */
+export function InviteCard({ code, url, variant = "floating" }: Props) {
   const [src, setSrc] = useState<string | null>(null);
 
   useEffect(() => {
@@ -133,12 +132,6 @@ export function InviteCard({ code, url, players, variant = "floating" }: Props) 
             </button>
           )}
         </span>
-        {!panel && (
-          // On the TV only: the host sees everyone in the player row.
-          <span className="text-xs text-ink-muted">
-            {players} {players === 1 ? "player" : "players"}
-          </span>
-        )}
       </div>
     </div>
   );

@@ -557,10 +557,15 @@ export default function GamePage() {
             >
               <Users className="size-4" aria-hidden="true" />
               Multiplayer
-              <span aria-hidden="true">·</span>
-              <span>
-                Code <span className="font-display tracking-[0.12em]">{game.join_code}</span>
-              </span>
+              {!canControl && (
+                // The host has the code on their invite card.
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span>
+                    Code <span className="font-display tracking-[0.12em]">{game.join_code}</span>
+                  </span>
+                </>
+              )}
             </p>
           )}
           <h1 className={`text-center font-display text-2xl font-semibold tracking-[-0.005em] sm:text-[30px] ${bigScreen ? "hidden" : ""}`}>Who's it gonna be?</h1>
@@ -619,7 +624,7 @@ export default function GamePage() {
           <div className="flex min-w-0 flex-col gap-4">
           {multiplayer && game.join_code && (
             // The host's invite card: guests have nobody to invite.
-            <InviteCard variant="panel" code={game.join_code} url={wheelUrl} players={game.players.length} />
+            <InviteCard variant="panel" code={game.join_code} url={wheelUrl} />
           )}
           <EntryPanel
             entries={game.entries}
@@ -655,7 +660,7 @@ export default function GamePage() {
       </footer>
 
       {bigScreen && multiplayer && game.join_code && (
-        <InviteCard code={game.join_code} url={wheelUrl} players={game.players.length} />
+        <InviteCard code={game.join_code} url={wheelUrl} />
       )}
       {bigScreen && (
         <button
