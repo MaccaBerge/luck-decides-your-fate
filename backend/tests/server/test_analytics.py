@@ -59,7 +59,7 @@ def test_report_shape(admin, days):
     body = admin.get(f"/api/admin/analytics?days={days}").json()
     assert body["days"] == days
     assert body["generated_at"].endswith("Z")
-    assert [s["id"] for s in body["sections"]] == ["now", "wheels", "links", "per_link"]
+    assert [s["id"] for s in body["sections"]] == ["now", "history", "wheels", "links", "per_link"]
     for s in body["sections"]:
         assert s["title"]
         for m in s["metrics"]:

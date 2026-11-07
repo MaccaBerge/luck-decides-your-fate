@@ -69,6 +69,7 @@ export interface NumberData {
 }
 export interface SeriesData {
   points: { day: string; value: number }[];
+  hint?: string | null;
 }
 export interface BreakdownData {
   items: { label: string; value: number }[];

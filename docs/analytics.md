@@ -15,6 +15,7 @@ Statistics are designed to be easy to add and remove:
 | `@metric` decorator, `Section`, `MetricContext`, shape checks | `backend/app/analytics/registry.py` |
 | One module per section; the package `__init__` imports them all | `backend/app/analytics/metrics/` |
 | `scalar(sql, ...)` and `rows(sql, ...)` read-only query helpers | `backend/app/analytics/query.py` |
+| Daily counters (names and `bump()`) | `backend/app/analytics/counters.py` |
 | Runs every metric and builds the response | `backend/app/analytics/report.py` |
 | Response models (`AnalyticsReport` and the four data shapes) | `backend/app/models.py` |
 | The page, and one renderer per kind | `frontend/src/admin/analytics/` |
@@ -28,7 +29,7 @@ Each function returns a dict in the shape for its kind. The server checks the sh
 | Kind | Returns | Drawn as |
 |---|---|---|
 | `number` | `{"value": int or float, "hint": str or None}` (`hint` is optional) | a big number with a small line under it |
-| `series` | `{"points": [{"day": "YYYY-MM-DD", "value": int}]}`, exactly one point per day in the range, oldest first. Use `ctx.fill_days(counts)` to build it, which adds the zeros. | a bar chart with the total and UTC day labels |
+| `series` | `{"points": [{"day": "YYYY-MM-DD", "value": int}], "hint": str or None}`, exactly one point per day in the range, oldest first (`hint` is optional). Use `ctx.fill_days(counts)` to build it, which adds the zeros. | a bar chart with the total, the hint and UTC day labels |
 | `breakdown` | `{"items": [{"label": str, "value": int}]}` | horizontal bars |
 | `table` | `{"columns": [str], "rows": [[str or int]]}` | a table that scrolls sideways on small screens |
 
@@ -77,9 +78,40 @@ Add a test for the new metric next to the others in `backend/tests/server/test_a
 
 To remove "Names per wheel", delete the `avg_names` function and its `@metric(...)` decorator from `metrics/wheels.py`, then remove `"avg_names"` from the layout test and delete its assertions. Nothing else refers to it. If you remove a section's last metric, the section disappears from the page too. You can then delete its module and its entry in `metrics/__init__.py`.
 
+## Daily counters
+
+Some history can't be read from the other tables, because the hourly cleanup deletes idle ordinary wheels along with their names and spins. For that, the `daily_counters` table keeps one number per UTC day per counter name:
+
+```sql
+CREATE TABLE daily_counters (day TEXT, name TEXT, value INTEGER, PRIMARY KEY (day, name))
+```
+
+It holds numbers only: `name` is a counter name such as `spins_wheels`, never a person's name, a label or an ID. History starts when the table was deployed; nothing was backfilled.
+
+| Counter | Goes up when |
+|---|---|
+| `wheels_created` | `POST /api/games` creates an ordinary wheel |
+| `links_created` | the admin creates a link |
+| `spins_wheels`, `spins_links` | a spin finishes, by where it ran |
+| `spins_rule_decided` | a finished spin's result was picked by the rule |
+| `names_added` | names are added through `POST /api/games/{id}/entries` (by the number added) |
+
+The "Daily totals" section reads these with `counter_series(ctx, *names)` from `metrics/history.py`, which sums the named counters per day and adds a "Since <first day>" hint.
+
+**Adding a counter:** add a constant to `counters.py` (and to `ALL`), then call `await counters.bump(counters.MY_COUNTER)` right after the action has succeeded, never before or inside a failing path. `bump` never raises: a failure is logged with its class name only, and the action carries on. A spin is counted after its broadcasts, outside the game's lock, and every spin makes the same writes whether or not a rule decided it. The table is created at startup (`schema.sql`), so new counters need no schema change. Then add a metric, for example:
+
+```python
+@metric(id="links_created_per_day", title="Links created per day",
+        description="Links you created each day.", section=SECTION, kind="series")
+async def links_created_per_day(ctx: MetricContext) -> dict:
+    return await counter_series(ctx, counters.LINKS_CREATED)
+```
+
+Backups include `daily_counters` automatically, because a backup is a copy of the whole database.
+
 ## Rules
 
 - **Admin only.** Never import from `app.analytics` in public routes, serializers or player sockets. Analytics may show rule information, such as how often a rule decided a spin, but only here.
 - **Numbers, not people.** Count what the site already stores. Don't add visitor tracking: no cookies, IP addresses, user agents, page-view logging or third-party services. A statistic that needs the browser to report events counts as visitor tracking, so the privacy page has to change first.
-- **Deleted wheels.** Ordinary wheels and their names and spins are deleted after `GAME_TTL_DAYS` without activity, so statistics read from those tables only cover wheels still stored. Say so in the metric's `description`. Admin links are never deleted automatically, so their history is complete.
+- **Deleted wheels.** Ordinary wheels and their names and spins are deleted after `GAME_TTL_DAYS` without activity, so statistics read from those tables only cover wheels still stored. Say so in the metric's `description`, or use a daily counter instead. Admin links are never deleted automatically, so their history is complete.
 - **Days are UTC**, and charts label them so.

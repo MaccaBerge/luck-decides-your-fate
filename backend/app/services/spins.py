@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from app.analytics import counters
 from app.context import AppContext
 from app.db import repository as repo
 from app.engine.rigging import pick_winner
@@ -85,15 +86,23 @@ async def _finish_after(ctx: AppContext, game_id: str, spin_id: int, delay_s: fl
 
 
 async def finish_spin(ctx: AppContext, game_id: str, spin_id: int) -> None:
+    finished = await _finish_locked(ctx, game_id, spin_id)
+    if finished is not None:
+        # After the broadcasts and outside the lock, so counting never delays what players see.
+        await counters.bump_spin(*finished)
+
+
+async def _finish_locked(ctx: AppContext, game_id: str, spin_id: int) -> tuple[str, bool] | None:
+    """Finish the spin; returns (origin, rule_applied) if it finished, for the daily totals."""
     async with ctx.runtime.locked(game_id) as rt:
         if rt.current_spin is None or rt.current_spin.spin_id != spin_id:
-            return
+            return None
         spin = rt.current_spin
         row = await repo.finish_spin(spin_id)
         game = await repo.get_game(game_id)
         if game is None:  # deleted mid-spin
             rt.current_spin = None
-            return
+            return None
         if game.remove_winner:
             await repo.update_entry(game_id, spin.winner_entry_id, is_active=False)
         result = ser.last_result_from_spin(row)
@@ -109,3 +118,4 @@ async def finish_spin(ctx: AppContext, game_id: str, spin_id: int) -> None:
             if game.origin == "admin_link":
                 await ctx.manager.send_admins(game_id, event)
         await views.notify_public_change(ctx, game_id)
+    return game.origin, row.rule_applied

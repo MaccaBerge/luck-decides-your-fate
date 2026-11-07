@@ -122,6 +122,7 @@ def test_default_registry_has_the_starting_metrics_in_order():
     layout = [(s.id, [m.id for m in ms]) for s, ms in reg.default_registry.sections()]
     assert layout == [
         ("now", ["live_games", "players_now"]),
+        ("history", ["wheels_created_per_day", "spins_per_day", "names_added_per_day"]),
         ("wheels", ["wheels_stored", "wheels_used", "avg_names"]),
         ("links", ["links_created", "links_opened", "link_spins", "rule_decided"]),
         ("per_link", ["per_link_spins"]),
