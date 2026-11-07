@@ -94,7 +94,7 @@ It holds numbers only: `name` is a counter name such as `spins_wheels`, never a 
 | `links_created` | the admin creates a link |
 | `spins_wheels`, `spins_links` | a spin finishes, by where it ran |
 | `spins_rule_decided` | a finished spin's result was picked by the rule |
-| `names_added` | names are added through `POST /api/games/{id}/entries` (by the number added) |
+| `names_added` | names are added through `POST /api/games/{id}/entries` (by the number added), or someone hosts or joins a multiplayer game (1) |
 | `visits` | a wheel page's player socket closes, unless it was a resume (see "Visits" below) |
 | `active_seconds` | a player socket closes (by how long it was open, at most 2 hours) |
 
