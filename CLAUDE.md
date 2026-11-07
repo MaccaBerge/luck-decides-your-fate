@@ -49,6 +49,7 @@ Production: `npm run build`, then uvicorn serves `frontend/dist` (SPA fallback) 
 - `services/views.py`: builds full states and broadcasts. `notify_public_change` → players + admin + dashboard; `notify_admin_change` (rule/label/presence) → admin + dashboard **only**. A rule change must produce zero player-socket traffic (no timing side channel).
 - `services/spins.py` + `services/state.py`: in-memory per-game runtime (lock, `current_spin`, `last_result`). The spin holds the lock for `duration_ms + 300`, then finishes it, applies remove-winner, and broadcasts `spin_finished` + state. Mutations during a spin → 409 `spin_in_progress`.
 - `realtime/manager.py`: socket registry. Only player sockets count as players/presence; admin sockets never do. Dashboard pushes are throttled.
+- `analytics/`: admin-only statistics for `/admin/analytics`. Each statistic is one `@metric` function in `analytics/metrics/`, and the page renders by `kind`. See `docs/analytics.md`. Never use it from public routes or player sockets.
 - `context.py`: `AppContext` on `app.state.ctx`; `main.create_app(settings)` builds an isolated app (tests use one per test).
 - Live state, admin sessions and spin locks are in process memory → **always run one worker / one instance.**
 
