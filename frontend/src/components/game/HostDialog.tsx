@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Modal } from "./Modal";
 import { PlayerSetup } from "./PlayerSetup";
+import { InfoTip } from "./InfoTip";
 import { textBtn } from "./buttons";
 
 /** "keep": host this wheel with its names. "fresh": host a new, empty wheel; this one stays as it is. */
@@ -37,11 +38,11 @@ export function HostDialog({ open, busy, names, onClose, onHost }: Props) {
       // Tall with the names question: scroll inside the screen rather than run off it.
       className="flex max-h-[calc(100dvh-2rem)] flex-col gap-5 overflow-y-auto"
     >
-      <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-1">
         <p className="font-display text-[23px] font-semibold">Play together</p>
-        <p className="text-sm leading-relaxed text-ink-muted">
+        <InfoTip label="About playing together">
           Friends join from their own phones with a code, and each of them gets a slice on the wheel. You spin.
-        </p>
+        </InfoTip>
       </div>
       {ask && (
         <fieldset className="flex flex-col gap-2">

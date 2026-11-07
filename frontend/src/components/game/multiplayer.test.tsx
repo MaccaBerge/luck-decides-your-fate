@@ -96,6 +96,12 @@ describe("HostDialog", () => {
     expect(html).toMatch(/type="submit"[^>]*disabled/);
   });
 
+  it("keeps the explanation behind an info button", () => {
+    const html = dialog(["Anna"]);
+    expect(html).toMatch(/aria-label="About playing together"[^>]*aria-expanded="false"|aria-expanded="false"[^>]*aria-label="About playing together"/);
+    expect(html).not.toContain("Friends join from their own phones");
+  });
+
   it("asks nothing on an empty wheel", () => {
     const html = dialog([]);
     expect(html).not.toContain("Names to start with");
