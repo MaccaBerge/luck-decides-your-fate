@@ -58,6 +58,7 @@ def test_unknown_kind_fails():
     [
         ("number", {"value": 3}),
         ("number", {"value": 2.5, "hint": "Across 2 wheels"}),
+        ("number", {"value": 200, "hint": None, "format": "duration"}),
         ("breakdown", {"items": [{"label": "Fair", "value": 2}]}),
         ("breakdown", {"items": []}),
         ("table", {"columns": ["Label", "Spins"], "rows": [["One", 3]]}),
@@ -79,6 +80,7 @@ def test_valid_series_shape():
         ("number", {}),
         ("number", {"value": "3"}),
         ("number", {"value": 3, "extra": 1}),
+        ("number", {"value": 3, "format": "minutes"}),
         ("series", {"points": [{"day": "2026-11-07"}]}),
         ("breakdown", {"items": [{"value": 2}]}),
         ("table", {"columns": ["A"], "rows": [[{"nested": 1}]]}),
@@ -123,6 +125,7 @@ def test_default_registry_has_the_starting_metrics_in_order():
     assert layout == [
         ("now", ["live_games", "players_now"]),
         ("history", ["wheels_created_per_day", "spins_per_day", "names_added_per_day"]),
+        ("visits", ["active_time_per_visit", "spins_per_visit", "visits_per_day", "active_minutes_per_day"]),
         ("wheels", ["wheels_stored", "wheels_used", "avg_names"]),
         ("links", ["links_created", "links_opened", "link_spins", "rule_decided"]),
         ("per_link", ["per_link_spins"]),

@@ -145,6 +145,8 @@ class _Strict(BaseModel):
 class NumberData(_Strict):
     value: int | float
     hint: str | None = None
+    # "duration": `value` is seconds, shown as e.g. "3m 20s".
+    format: Literal["duration"] | None = None
 
 
 class SeriesPoint(_Strict):

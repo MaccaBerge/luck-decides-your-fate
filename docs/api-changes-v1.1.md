@@ -44,4 +44,8 @@ Additions to the v1 contract (`docs/plan-v1.md` §8). Nothing from v1 changed sh
 }
 ```
 
-`kind` is `number`, `series`, `breakdown` or `table` (a `series` may carry an optional `hint`), and `data` has that kind's shape (see `docs/analytics.md`). If one metric fails, its `data` is `null` and `error` is the exception's class name only; the other metrics still load. The response can contain rule information, so it's admin-only and never appears in public state or on player sockets.
+`kind` is `number`, `series`, `breakdown` or `table` (a `series` may carry an optional `hint`, and a `number` an optional `format`, which is `"duration"` when `value` is seconds), and `data` has that kind's shape (see `docs/analytics.md`). If one metric fails, its `data` is `null` and `error` is the exception's class name only; the other metrics still load. The response can contain rule information, so it's admin-only and never appears in public state or on player sockets.
+
+## v1.3: visits
+
+`/ws/games/{id}` accepts an optional `?resume=1`. The wheel page adds it to every connection after its first one (after the tab was hidden for 15 seconds, or an automatic reconnect), so the server counts one visit per page load. It's a flag, not an identifier; anything other than `1` counts as a new visit. The socket behaves the same either way: it marks the link opened, sends `state` and updates presence.

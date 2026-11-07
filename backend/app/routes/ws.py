@@ -5,8 +5,12 @@ and test clients observe a clean close code.
 """
 from __future__ import annotations
 
+import asyncio
+from time import monotonic
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from app.analytics import counters
 from app.auth import is_admin
 from app.context import AppContext, get_ctx
 from app.db import repository as repo
@@ -42,8 +46,12 @@ async def player_socket(ws: WebSocket, game_id: str) -> None:
     if game is None:
         await _reject(ws, CLOSE_NOT_FOUND)
         return
+    # The wheel page adds ?resume=1 to every connection after its first (after the tab was hidden,
+    # or an automatic reconnect), so only a fresh page load counts as a visit. It's a flag, not an ID.
+    resume = ws.query_params.get("resume") == "1"
     await ws.accept()
     registered = False
+    started = 0.0
     try:
         async with ctx.runtime.locked(game_id):
             if await repo.get_game(game_id) is None:  # deleted while we waited
@@ -51,6 +59,7 @@ async def player_socket(ws: WebSocket, game_id: str) -> None:
                 return
             ctx.manager.add_player(game_id, ws)
             registered = True
+            started = monotonic()
             await repo.mark_opened(game_id)
             game = await repo.get_game(game_id)
             assert game is not None
@@ -61,6 +70,11 @@ async def player_socket(ws: WebSocket, game_id: str) -> None:
         if registered and ctx.manager.remove_player(game_id, ws):
             # Detached: the handler may be cancelled while tearing down.
             ctx.manager.spawn(views.notify_admin_change(ctx, game_id))
+        if registered:
+            # Recorded here, when the connection ends, because a tab closed at once or a shutdown
+            # can cancel this handler at any await. Shielded so the writes still finish.
+            seconds = counters.active_seconds(started, monotonic())
+            await asyncio.shield(counters.record_connection(resumed=resume, seconds=seconds))
 
 
 @router.websocket("/ws/admin")
