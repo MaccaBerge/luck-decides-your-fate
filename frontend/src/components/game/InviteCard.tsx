@@ -82,8 +82,9 @@ export function InviteCard({ code, url, variant = "floating" }: Props) {
       data-testid={panel ? "host-invite-card" : "invite-card"}
       className={
         panel
-          ? `${card} flex items-center gap-4 p-5`
-          : "fixed top-3 left-3 z-40 flex items-center gap-3 rounded-2xl border border-border bg-surface p-2.5 pr-4 text-ink max-sm:hidden"
+          ? // Shares its view-transition name with the big-screen card, so one glides into the other.
+            `${card} flex items-center gap-4 p-5 [view-transition-name:invite-card]`
+          : "fixed top-3 left-3 z-40 flex items-center gap-3 rounded-2xl border border-border bg-surface p-2.5 pr-4 text-ink max-sm:hidden [view-transition-name:invite-card]"
       }
     >
       {panel ? (

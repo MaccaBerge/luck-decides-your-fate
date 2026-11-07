@@ -71,7 +71,7 @@ export function GameToolbar(p: Props) {
         <button type="button" aria-label="Toggle dark mode" aria-pressed={p.dark} onClick={p.onToggleTheme} className={square}>
           {p.dark ? <Sun className="size-[18px]" aria-hidden="true" /> : <Moon className="size-[18px]" aria-hidden="true" />}
         </button>
-        <button type="button" aria-label="Big screen" onClick={p.onBigScreen} className={square}>
+        <button type="button" aria-label="Big screen" onClick={p.onBigScreen} className={`${square} [view-transition-name:size-toggle]`}>
           <Maximize className="size-[18px]" aria-hidden="true" />
         </button>
       </nav>

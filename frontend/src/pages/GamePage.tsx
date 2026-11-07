@@ -7,6 +7,7 @@ import { ApiError } from "../lib/api";
 import type { Entry, Player, PlayerEvent, PublicGameState, SpinStarted } from "../lib/types";
 import { clearMe, getMe, setMe, type Me } from "../lib/players";
 import { setRecentGame } from "../lib/recentGame";
+import { afterResize, withViewTransition } from "../lib/viewTransition";
 import { connectGameSocket } from "../lib/ws";
 import { useTheme } from "../lib/theme";
 import { loadSoundPref, saveSoundPref, unlockAudio } from "../lib/sound";
@@ -72,6 +73,9 @@ export default function GamePage() {
   const [newBusy, setNewBusy] = useState(false);
   const [spinRequested, setSpinRequested] = useState(false);
   const [bigScreen, setBigScreen] = useState(false);
+  // Leaving big-screen mode animates: the wheel, the invite card and the size button glide back
+  // to their places. (Entering is instant.)
+  const switchBigScreen = useCallback((next: boolean) => withViewTransition(() => setBigScreen(next)), []);
   // Multiplayer: which player this browser is (from local storage), and the dialogs around it.
   const [me, setMeState] = useState<Me | null>(() => getMe(gameId));
   const [watching, setWatching] = useState(false);
@@ -240,11 +244,13 @@ export default function GamePage() {
     if (!bigScreen) return;
     const onKey = (e: KeyboardEvent) => {
       // Capture phase, so this sees an open dialog before Modal's own listener closes it.
-      if (e.key === "Escape" && !document.querySelector('[role="dialog"]')) setBigScreen(false);
+      // (In fullscreen the browser takes Escape itself and fullscreenchange handles it.)
+      if (e.key === "Escape" && !document.querySelector('[role="dialog"]') && !document.fullscreenElement) switchBigScreen(false);
     };
     const onFullscreenChange = () => {
       // Browsers use Escape to leave fullscreen. An open dialog keeps the big-screen layout, which works without it.
-      if (!document.fullscreenElement && !document.querySelector('[role="dialog"]')) setBigScreen(false);
+      // Animate only once the window has its new size: a resize during the transition cancels it.
+      if (!document.fullscreenElement && !document.querySelector('[role="dialog"]')) afterResize(() => switchBigScreen(false));
     };
     document.addEventListener("keydown", onKey, true);
     document.addEventListener("fullscreenchange", onFullscreenChange);
@@ -253,7 +259,7 @@ export default function GamePage() {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
       if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => {});
     };
-  }, [bigScreen]);
+  }, [bigScreen, switchBigScreen]);
 
   useEffect(() => {
     if (notFound) setBigScreen(false);
@@ -437,9 +443,16 @@ export default function GamePage() {
   };
 
   const enterBigScreen = () => {
+    // Opening is instant (an animation here added friction); closing animates back.
     setBigScreen(true);
     // The root element keeps dialogs and confetti visible. iPhone Safari has no fullscreen; the layout works without it.
     void document.documentElement.requestFullscreen?.().catch(() => {});
+  };
+
+  // Leave fullscreen first; its fullscreenchange handler then animates back to the normal layout.
+  const exitBigScreen = () => {
+    if (document.fullscreenElement && document.exitFullscreen) void document.exitFullscreen().catch(() => switchBigScreen(false));
+    else switchBigScreen(false);
   };
 
   const toggleSound = () => {
@@ -570,7 +583,7 @@ export default function GamePage() {
           )}
           <h1 className={`text-center font-display text-2xl font-semibold tracking-[-0.005em] sm:text-[30px] ${bigScreen ? "hidden" : ""}`}>Who's it gonna be?</h1>
           <div
-            className={`group @container relative ${
+            className={`group @container relative [view-transition-name:big-wheel] ${
               bigScreen
                 ? // As large as fits without scrolling: leaves room for the caption and its gap.
                   "w-[min(calc(100dvw-1rem),calc(100dvh-4.5rem))]"
@@ -666,8 +679,8 @@ export default function GamePage() {
         <button
           type="button"
           aria-label="Exit big screen"
-          onClick={() => setBigScreen(false)}
-          className={`${secondaryBtn} fixed top-3 right-3 z-40 w-11 !px-0`}
+          onClick={exitBigScreen}
+          className={`${secondaryBtn} fixed top-3 right-3 z-40 w-11 !px-0 [view-transition-name:size-toggle]`}
         >
           <Minimize className="size-[18px]" aria-hidden="true" />
         </button>
