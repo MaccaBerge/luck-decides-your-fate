@@ -71,6 +71,8 @@ jobs:
           exit 1
       - name: Link preview image is in the image
         run: curl -fsS -o /dev/null http://localhost:8000/og-image.png
+      - name: Tab icon is in the image
+        run: curl -fsS http://localhost:8000/favicon.svg | grep -q '<svg'
       - name: Install smoke test dependencies
         run: pip install httpx websockets
       - name: API smoke test
