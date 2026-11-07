@@ -14,8 +14,11 @@ from app.context import AppContext, ctx_dep
 from app.db import repository as repo
 from app.db.rows import GameRow
 from app.errors import game_not_found, invalid_password, too_many_attempts, validation_error
+from app.analytics.report import build_report
 from app.models import (
     AdminGameState,
+    ANALYTICS_DAYS,
+    AnalyticsReport,
     CreateLinkRequest,
     Dashboard,
     LoginRequest,
@@ -109,6 +112,14 @@ async def backup(ctx: AppContext = Depends(ctx_dep)) -> FileResponse:
         filename=backup_filename(),
         background=BackgroundTask(os.unlink, path),
     )
+
+
+# ---------------------------------------------------------------- analytics
+@protected.get("/analytics", response_model=AnalyticsReport)
+async def analytics(days: int = 7, ctx: AppContext = Depends(ctx_dep)) -> AnalyticsReport:
+    if days not in ANALYTICS_DAYS:
+        raise validation_error("days: Input should be 7, 30 or 90")
+    return await build_report(ctx, days)
 
 
 # ---------------------------------------------------------------- dashboard + links

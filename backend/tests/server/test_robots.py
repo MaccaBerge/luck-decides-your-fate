@@ -35,14 +35,14 @@ def test_robots_works_without_a_built_frontend(client):
     assert client.get("/robots.txt").status_code == 200
 
 
-@pytest.mark.parametrize("path", ["/admin", "/admin/", "/admin/links/abcdefgh"])
+@pytest.mark.parametrize("path", ["/admin", "/admin/", "/admin/links/abcdefgh", "/admin/analytics"])
 def test_noindex_on_admin_pages(spa, path):
     r = spa.get(path)
     assert r.status_code == 200
     assert r.headers["x-robots-tag"] == "noindex, nofollow"
 
 
-@pytest.mark.parametrize("path", ["/api/admin/me", "/api/admin/dashboard", "/api/admin/backup"])
+@pytest.mark.parametrize("path", ["/api/admin/me", "/api/admin/dashboard", "/api/admin/backup", "/api/admin/analytics"])
 def test_noindex_on_admin_api(spa, path):
     assert spa.get(path).headers["x-robots-tag"] == "noindex, nofollow"
 
