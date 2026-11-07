@@ -14,6 +14,7 @@ from app.context import AppContext, ctx_dep
 from app.db import repository as repo
 from app.db.rows import GameRow
 from app.errors import game_not_found, invalid_password, too_many_attempts, validation_error
+from app.analytics import counters
 from app.analytics.report import build_report
 from app.models import (
     AdminGameState,
@@ -134,6 +135,7 @@ async def create_link(body: CreateLinkRequest, ctx: AppContext = Depends(ctx_dep
     targets = clean_targets(body.target_names)
     game = await repo.create_game("admin_link", label=label, mode=body.mode, target_names=targets)
     ctx.manager.request_dashboard()
+    await counters.bump(counters.LINKS_CREATED)
     return await views.admin_state(ctx, game)
 
 

@@ -34,3 +34,12 @@ CREATE TABLE IF NOT EXISTS spins (
     finished_at     TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_spins_game ON spins(game_id, id);
+
+-- Admin analytics: daily totals that survive the cleanup of idle wheels. Numbers only:
+-- `name` is a counter name from app/analytics/counters.py, never a person's name or an ID.
+CREATE TABLE IF NOT EXISTS daily_counters (
+    day   TEXT NOT NULL,      -- YYYY-MM-DD, UTC
+    name  TEXT NOT NULL,
+    value INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, name)
+);

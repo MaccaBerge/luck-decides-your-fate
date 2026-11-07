@@ -6,6 +6,7 @@ import logging
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse, Response
 
+from app.analytics import counters
 from app.context import AppContext, ctx_dep
 from app.db import repository as repo
 from app.db.connection import ping
@@ -80,6 +81,7 @@ async def health() -> Response:
 async def create_game(ctx: AppContext = Depends(ctx_dep)) -> PublicGameState:
     game = await repo.create_game("public")
     ctx.manager.request_dashboard()
+    await counters.bump(counters.WHEELS_CREATED)
     return await views.public_state(ctx, game, [])
 
 
@@ -104,7 +106,9 @@ async def add_entries(
         if len(existing) + len(names) > MAX_ENTRIES:
             raise entries_limit()
         await repo.add_entries(game_id, names)
-        return await _after_mutation(ctx, game_id)
+        state = await _after_mutation(ctx, game_id)
+    await counters.bump(counters.NAMES_ADDED, len(names))
+    return state
 
 
 @router.patch("/games/{game_id}/entries/{entry_id}", response_model=PublicGameState)
