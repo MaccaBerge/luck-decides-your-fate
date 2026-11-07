@@ -116,7 +116,9 @@ describe("InviteCard", () => {
     expect(panel).not.toContain("fixed");
     expect(text(panel)).toBe("Join with the code ACP7KY 1 player");
     const floating = renderToStaticMarkup(<InviteCard code="ACP7KY" url="http://x/j/ACP7KY" players={3} />);
+    expect(panel).toContain('aria-label="Copy code"');
     expect(floating).toContain('data-testid="invite-card"');
+    expect(floating).not.toContain("Copy code");
     expect(floating).toContain("fixed");
     expect(text(floating)).toBe("Join with the code ACP7KY 3 players");
   });
