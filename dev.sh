@@ -125,7 +125,8 @@ vite_args=(--port "$FRONTEND_PORT" --strictPort)
 pids+=($!)
 
 wait_for "http://127.0.0.1:$BACKEND_PORT/api/health" "backend"
-wait_for "http://127.0.0.1:$FRONTEND_PORT/" "frontend"
+# "localhost", not 127.0.0.1: on macOS, Vite listens only on IPv6 (::1) unless --phone is used.
+wait_for "http://localhost:$FRONTEND_PORT/" "frontend"
 
 lan_ip=""
 if [[ $phone == 1 ]]; then
