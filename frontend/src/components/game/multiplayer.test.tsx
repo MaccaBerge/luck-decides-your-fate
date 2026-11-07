@@ -9,6 +9,7 @@ import { JoinScreen } from "./JoinScreen";
 import { HostDialog } from "./HostDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { EntryPanel } from "./EntryPanel";
+import { InviteCard } from "./InviteCard";
 
 const noop = () => {};
 const players: Player[] = [
@@ -93,10 +94,15 @@ describe("HostDialog", () => {
     const html = dialog(["Anna", "Jonas", "Mia", "Leo"]);
     expect(html).toMatch(/role="radiogroup"[^>]*aria-label="Names to start with"/);
     expect(text(html)).toContain("This wheel has 4 names. What should the game start with?");
-    expect(text(html)).toContain("Keep these names Anna, Jonas and 2 more stay on the wheel");
-    expect(text(html)).toContain("Start fresh Host a new, empty wheel. This one stays as it is.");
+    expect(text(html)).toContain("Keep names from current wheel Create new wheel");
     expect(html.match(/aria-checked="false"/g)?.length).toBeGreaterThanOrEqual(2);
     expect(html).toMatch(/type="submit"[^>]*disabled/);
+  });
+
+  it("keeps the explanation behind an info button", () => {
+    const html = dialog(["Anna"]);
+    expect(html).toMatch(/aria-label="About playing together"[^>]*aria-expanded="false"|aria-expanded="false"[^>]*aria-label="About playing together"/);
+    expect(html).not.toContain("Friends join from their own phones");
   });
 
   it("asks nothing on an empty wheel", () => {
@@ -106,7 +112,24 @@ describe("HostDialog", () => {
   });
 
   it("words one name in the singular", () => {
-    expect(text(dialog(["Anna"]))).toContain("This wheel has 1 name. What should the game start with? Keep these names Anna stays on the wheel, and players are added to it.");
+    expect(text(dialog(["Anna"]))).toContain("This wheel has 1 name. What should the game start with?");
+  });
+});
+
+describe("InviteCard", () => {
+  it("shows the code and player count, in the side column or floating in big-screen mode", () => {
+    const panel = renderToStaticMarkup(<InviteCard variant="panel" code="ACP7KY" url="http://x/j/ACP7KY" players={1} />);
+    expect(panel).toContain('data-testid="host-invite-card"');
+    expect(panel).not.toContain("fixed");
+    expect(text(panel)).toBe("Join with the code ACP7KY"); // no player count on the host's card
+    const floating = renderToStaticMarkup(<InviteCard code="ACP7KY" url="http://x/j/ACP7KY" players={3} />);
+    expect(panel).toContain('aria-label="Copy code"');
+    expect(panel).toContain('aria-label="Enlarge QR code"');
+    expect(floating).toContain('data-testid="invite-card"');
+    expect(floating).not.toContain("Copy code");
+    expect(floating).not.toContain("Enlarge QR code");
+    expect(floating).toContain("fixed");
+    expect(text(floating)).toBe("Join with the code ACP7KY 3 players");
   });
 });
 

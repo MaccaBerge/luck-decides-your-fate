@@ -1,7 +1,45 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Copy } from "lucide-react";
+import { QrZoom } from "./QrZoom";
+import { card } from "./buttons";
 
-/** The code and a QR code, for big-screen mode on a TV: people join from their phones. */
-export function InviteCard({ code, url, players }: { code: string; url: string; players: number }) {
+interface Props {
+  code: string;
+  url: string;
+  players: number;
+  /** "floating": a corner card for big-screen mode. "panel": a card in the host's side column. */
+  variant?: "floating" | "panel";
+}
+
+/** Copy text: the Clipboard API where allowed, else the older copy command. True if it worked. */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    // Some browsers leave the request waiting on a permission prompt; don't wait forever.
+    const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 1000));
+    await Promise.race([navigator.clipboard.writeText(text), timeout]);
+    return true;
+  } catch {
+    /* blocked, missing or no answer: try the fallback */
+  }
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.setAttribute("readonly", "");
+  area.style.position = "fixed";
+  area.style.opacity = "0";
+  document.body.appendChild(area);
+  area.select();
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch {
+    ok = false;
+  }
+  area.remove();
+  return ok;
+}
+
+/** The code and a QR code, so people can join from their phones. */
+export function InviteCard({ code, url, players, variant = "floating" }: Props) {
   const [src, setSrc] = useState<string | null>(null);
 
   useEffect(() => {
@@ -15,18 +53,92 @@ export function InviteCard({ code, url, players }: { code: string; url: string; 
     };
   }, [url]);
 
+  const panel = variant === "panel";
+  const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+  }, []);
+
+  const codeRef = useRef<HTMLSpanElement>(null);
+  const qrRef = useRef<HTMLButtonElement>(null);
+  const [zoomed, setZoomed] = useState(false);
+
+  const copyCode = async () => {
+    if (!(await copyText(code))) {
+      // Copying isn't allowed here: select the code so Cmd/Ctrl+C works.
+      const el = codeRef.current;
+      const sel = window.getSelection();
+      if (el && sel) {
+        sel.selectAllChildren(el);
+      }
+      return;
+    }
+    setCopied(true);
+    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setCopied(false), 1500);
+  };
   return (
     <div
-      data-testid="invite-card"
-      className="fixed top-3 left-3 z-40 flex items-center gap-3 rounded-2xl border border-border bg-surface p-2.5 pr-4 text-ink max-sm:hidden"
+      data-testid={panel ? "host-invite-card" : "invite-card"}
+      className={
+        panel
+          ? `${card} flex items-center gap-4 p-5`
+          : "fixed top-3 left-3 z-40 flex items-center gap-3 rounded-2xl border border-border bg-surface p-2.5 pr-4 text-ink max-sm:hidden"
+      }
     >
-      {src && <img src={src} alt="QR code to join this game" className="size-24 rounded-lg bg-white lg:size-32" />}
-      <div className="flex flex-col">
+      {panel ? (
+        <button
+          ref={qrRef}
+          type="button"
+          aria-label="Enlarge QR code"
+          title="Enlarge QR code"
+          disabled={!src}
+          onClick={() => setZoomed(true)}
+          // Hidden while enlarged, so the big code looks like this one moving.
+          className={`size-28 shrink-0 cursor-zoom-in overflow-hidden rounded-lg bg-white transition-transform hover:scale-[1.03] ${zoomed ? "invisible" : ""}`}
+        >
+          {src && <img src={src} alt="" className="size-full" />}
+        </button>
+      ) : (
+        <div className="size-24 shrink-0 overflow-hidden rounded-lg bg-white lg:size-32">
+          {src && <img src={src} alt="QR code to join this game" className="size-full" />}
+        </div>
+      )}
+      {zoomed && src && <QrZoom src={src} code={code} from={qrRef} onClose={() => setZoomed(false)} />}
+      <div className="flex min-w-0 flex-col">
         <span className="text-xs font-medium text-ink-muted">Join with the code</span>
-        <span className="font-display text-[28px] leading-tight font-semibold tracking-[0.12em] lg:text-[36px]">{code}</span>
-        <span className="text-xs text-ink-muted">
-          {players} {players === 1 ? "player" : "players"}
+        <span className="flex items-center gap-1">
+          <span
+            ref={codeRef}
+            className={`font-display leading-tight font-semibold tracking-[0.12em] text-ink ${
+              panel ? "text-[30px]" : "text-[28px] lg:text-[36px]"
+            }`}
+          >
+            {code}
+          </span>
+          {panel && (
+            <button
+              type="button"
+              aria-label={copied ? "Code copied" : "Copy code"}
+              title={copied ? "Copied" : "Copy code"}
+              onClick={() => void copyCode()}
+              className="flex size-9 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface-tint hover:text-ink"
+            >
+              {copied ? (
+                <Check className="size-[18px] text-primary-strong" aria-hidden="true" />
+              ) : (
+                <Copy className="size-[18px]" aria-hidden="true" />
+              )}
+            </button>
+          )}
         </span>
+        {!panel && (
+          // On the TV only: the host sees everyone in the player row.
+          <span className="text-xs text-ink-muted">
+            {players} {players === 1 ? "player" : "players"}
+          </span>
+        )}
       </div>
     </div>
   );

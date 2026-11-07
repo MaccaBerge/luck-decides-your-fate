@@ -484,6 +484,7 @@ export default function GamePage() {
   const toolbar = (
     <GameToolbar
       multiplayer={multiplayer}
+      hideQr={multiplayer && canControl}
       onHost={() => setHostOpen(true)}
       onJoinCode={() => {
         setJoinCodeError(null);
@@ -615,6 +616,11 @@ export default function GamePage() {
 
         <div className={bigScreen ? "hidden" : "contents"}>
           {canControl ? (
+          <div className="flex min-w-0 flex-col gap-4">
+          {multiplayer && game.join_code && (
+            // The host's invite card: guests have nobody to invite.
+            <InviteCard variant="panel" code={game.join_code} url={wheelUrl} players={game.players.length} />
+          )}
           <EntryPanel
             entries={game.entries}
             // The server's state can list a spin before this viewer's wheel lands.
@@ -634,6 +640,7 @@ export default function GamePage() {
             // The host leaves with "Leave" rather than deleting their own name.
             undeletableIds={myPlayer?.is_host ? new Set([myPlayer.entry_id]) : undefined}
           />
+          </div>
           ) : (
             <GuestPanel
               recentSpins={game.recent_spins.filter((s) => !(animating && s.spin_id === activeSpin?.spin_id))}
