@@ -694,6 +694,7 @@ export default function GamePage() {
         message={leaveMessage}
         confirmLabel={confirming === "newWheel" ? "Leave and start" : "Leave"}
         busy={playerBusy}
+        danger
         onConfirm={() => void (confirming === "newWheel" ? newWheel(true) : leave())}
         onClose={() => setConfirming(null)}
       />

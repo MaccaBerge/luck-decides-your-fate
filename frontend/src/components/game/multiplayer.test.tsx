@@ -117,6 +117,9 @@ describe("leaving", () => {
     );
     expect(html).toMatch(/role="dialog"[^>]*aria-label="Leave the game\?"/);
     expect(text(html)).toContain("Leave the game? You're the only player, so the game ends. Cancel Leave");
+    const red = renderToStaticMarkup(<ConfirmDialog open danger title="Leave the game?" confirmLabel="Leave" onConfirm={noop} onClose={noop} />);
+    expect(red).toContain("bg-danger");
+    expect(html).not.toContain("bg-danger");
   });
 
   it("the host can't delete their own name, but can delete other players'", () => {
