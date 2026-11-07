@@ -492,7 +492,11 @@ export default function GamePage() {
           {multiplayer && game.join_code && (
             <p
               data-testid="join-code"
-              className={`-mt-3 inline-flex items-center gap-2 rounded-full bg-primary-soft px-3.5 py-1.5 text-sm font-semibold text-primary-soft-ink ${bigScreen ? "hidden" : ""}`}
+              className={
+                bigScreen
+                  ? "hidden" // the invite card shows the code in big-screen mode
+                  : "-mt-3 inline-flex items-center gap-2 rounded-full bg-primary-soft px-3.5 py-1.5 text-sm font-semibold text-primary-soft-ink"
+              }
             >
               <Users className="size-4" aria-hidden="true" />
               Multiplayer
@@ -517,7 +521,8 @@ export default function GamePage() {
                 spin={activeSpin}
                 onSpinComplete={handleSpinComplete}
                 soundEnabled={sound}
-                showHub={false}
+                // The Spin button covers the centre; guests in a multiplayer game don't get one.
+                showHub={!canControl}
               />
             </div>
             {canControl && (
