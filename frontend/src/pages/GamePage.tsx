@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import confetti from "canvas-confetti";
+import { Minimize } from "lucide-react";
 import * as api from "../lib/api";
 import { ApiError } from "../lib/api";
 import type { Entry, PlayerEvent, PublicGameState, SpinStarted } from "../lib/types";
@@ -14,6 +15,7 @@ import { SLICE_COLORS } from "../lib/palette";
 import { BRAND_TITLE, GAME_TITLE } from "../lib/brand";
 import Wheel from "../components/wheel/Wheel";
 import { GameToolbar } from "../components/game/GameToolbar";
+import { secondaryBtn } from "../components/game/buttons";
 import { EntryPanel, MAX_ENTRIES } from "../components/game/EntryPanel";
 import { PasteNamesDialog } from "../components/game/PasteNamesDialog";
 import { QrDialog } from "../components/game/QrDialog";
@@ -59,6 +61,7 @@ export default function GamePage() {
   const [removing, setRemoving] = useState(false);
   const [newBusy, setNewBusy] = useState(false);
   const [spinRequested, setSpinRequested] = useState(false);
+  const [bigScreen, setBigScreen] = useState(false);
 
   const seenSpinIds = useRef<Set<number>>(new Set());
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -175,6 +178,30 @@ export default function GamePage() {
     [showToast],
   );
 
+  // Leaving big-screen mode also leaves fullscreen, and the other way round.
+  useEffect(() => {
+    if (!bigScreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      // Capture phase, so this sees an open dialog before Modal's own listener closes it.
+      if (e.key === "Escape" && !document.querySelector('[role="dialog"]')) setBigScreen(false);
+    };
+    const onFullscreenChange = () => {
+      // Browsers use Escape to leave fullscreen. An open dialog keeps the big-screen layout, which works without it.
+      if (!document.fullscreenElement && !document.querySelector('[role="dialog"]')) setBigScreen(false);
+    };
+    document.addEventListener("keydown", onKey, true);
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => {
+      document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => {});
+    };
+  }, [bigScreen]);
+
+  useEffect(() => {
+    if (notFound) setBigScreen(false);
+  }, [notFound]);
+
   if (notFound) return <NotFoundPage />;
   if (!game) return <Loading />;
 
@@ -249,6 +276,12 @@ export default function GamePage() {
     return true;
   };
 
+  const enterBigScreen = () => {
+    setBigScreen(true);
+    // The root element keeps dialogs and confetti visible. iPhone Safari has no fullscreen; the layout works without it.
+    void document.documentElement.requestFullscreen?.().catch(() => {});
+  };
+
   const toggleSound = () => {
     const next = !sound;
     setSound(next);
@@ -272,31 +305,60 @@ export default function GamePage() {
     )
   ) : game.last_result ? (
     <>
-      Last pick{" "}
-      <strong className="font-display text-[15px] font-semibold text-primary-strong">{game.last_result.winner_name}</strong>
+      <span className="shrink-0">Last pick</span>
+      <strong className="min-w-0 truncate font-display text-[15px] font-semibold text-primary-strong">
+        {game.last_result.winner_name}
+      </strong>
     </>
   ) : null;
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[1180px] flex-col gap-7 px-4 pt-7 pb-12 text-ink sm:px-6">
-      <GameToolbar
-        soundEnabled={sound}
-        dark={theme === "dark"}
-        onToggleSound={toggleSound}
-        onToggleTheme={toggleTheme}
-        onNewWheel={() => void newWheel()}
-        onCopyLink={() => void copyLink()}
-        onShowQr={() => setQrOpen(true)}
-        newBusy={newBusy}
-      />
+    // Big-screen mode changes only classes around the wheel: remounting Wheel would break a running spin.
+    <div
+      className={
+        bigScreen
+          ? "flex h-dvh w-full flex-col overflow-hidden text-ink"
+          : "mx-auto flex min-h-screen w-full max-w-[1180px] flex-col gap-7 px-4 pt-7 pb-12 text-ink sm:px-6"
+      }
+    >
+      <div className={bigScreen ? "hidden" : "contents"}>
+        <GameToolbar
+          soundEnabled={sound}
+          dark={theme === "dark"}
+          onToggleSound={toggleSound}
+          onToggleTheme={toggleTheme}
+          onNewWheel={() => void newWheel()}
+          onCopyLink={() => void copyLink()}
+          onShowQr={() => setQrOpen(true)}
+          newBusy={newBusy}
+          onBigScreen={enterBigScreen}
+        />
+      </div>
 
-      <main className="grid grid-cols-1 items-start gap-7 md:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
+      <main
+        className={
+          bigScreen
+            ? "min-h-0 flex-1"
+            : "grid grid-cols-1 items-start gap-7 md:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]"
+        }
+      >
         <section
           aria-label="Wheel"
-          className="flex min-w-0 flex-col items-center gap-6 rounded-[28px] border border-border bg-surface px-4 pt-9 pb-8 sm:px-6"
+          className={`flex min-w-0 flex-col items-center ${
+            bigScreen
+              ? "h-full justify-center gap-2 py-2"
+              : "gap-6 rounded-[28px] border border-border bg-surface px-4 pt-9 pb-8 sm:px-6"
+          }`}
         >
-          <h1 className="text-center font-display text-2xl font-semibold tracking-[-0.005em] sm:text-[30px]">Who's it gonna be?</h1>
-          <div className="group @container relative w-full max-w-[min(500px,calc(100dvh-19rem))] min-w-[240px]">
+          <h1 className={`text-center font-display text-2xl font-semibold tracking-[-0.005em] sm:text-[30px] ${bigScreen ? "hidden" : ""}`}>Who's it gonna be?</h1>
+          <div
+            className={`group @container relative ${
+              bigScreen
+                ? // As large as fits without scrolling: leaves room for the caption and its gap.
+                  "w-[min(calc(100dvw-1rem),calc(100dvh-4.5rem))]"
+                : "w-full max-w-[min(500px,calc(100dvh-19rem))] min-w-[240px]"
+            }`}
+          >
             <div className={canSpin ? "cursor-pointer" : ""} onClick={() => void doSpin()}>
               <Wheel
                 entries={game.entries}
@@ -319,32 +381,47 @@ export default function GamePage() {
           <p
             role="status"
             aria-live="polite"
-            className={`inline-flex min-h-9 items-center gap-2 rounded-full bg-bg px-4 py-2 text-center text-sm text-ink-muted ${caption ? "" : "invisible"}`}
+            className={`inline-flex min-h-9 max-w-full items-center gap-2 rounded-full bg-bg px-4 py-2 text-center text-sm text-ink-muted ${caption ? "" : "invisible"}`}
           >
             {caption}
           </p>
         </section>
 
-        <EntryPanel
-          entries={game.entries}
-          removeWinner={game.settings.remove_winner}
-          disabled={spinning}
-          onAdd={(names) => mutate(() => api.addEntries(game.id, names))}
-          onOpenPaste={() => setPasteOpen(true)}
-          onOpenSavedLists={() => setSavedListsOpen(true)}
-          onRename={(e, name) => onEntry(e, { name })}
-          onColor={(e, color) => onEntry(e, { color })}
-          onToggle={(e) => onEntry(e, { is_active: !e.is_active })}
-          onRemove={(e) => void mutate(() => api.deleteEntry(game.id, e.id))}
-          onShuffle={() => void mutate(() => api.shuffleEntries(game.id))}
-          onRestore={() => void mutate(() => api.restoreEntries(game.id))}
-          onRemoveWinnerChange={(v) => void mutate(() => api.updateSettings(game.id, { remove_winner: v }))}
-        />
+        <div className={bigScreen ? "hidden" : "contents"}>
+          <EntryPanel
+            entries={game.entries}
+            // The server's state can list a spin before this viewer's wheel lands.
+            recentSpins={game.recent_spins.filter((s) => !(animating && s.spin_id === activeSpin?.spin_id))}
+            removeWinner={game.settings.remove_winner}
+            disabled={spinning}
+            onAdd={(names) => mutate(() => api.addEntries(game.id, names))}
+            onOpenPaste={() => setPasteOpen(true)}
+            onOpenSavedLists={() => setSavedListsOpen(true)}
+            onRename={(e, name) => onEntry(e, { name })}
+            onColor={(e, color) => onEntry(e, { color })}
+            onToggle={(e) => onEntry(e, { is_active: !e.is_active })}
+            onRemove={(e) => void mutate(() => api.deleteEntry(game.id, e.id))}
+            onShuffle={() => void mutate(() => api.shuffleEntries(game.id))}
+            onRestore={() => void mutate(() => api.restoreEntries(game.id))}
+            onRemoveWinnerChange={(v) => void mutate(() => api.updateSettings(game.id, { remove_winner: v }))}
+          />
+        </div>
       </main>
 
-      <footer className="-mt-4 flex justify-center">
+      <footer className={bigScreen ? "hidden" : "-mt-4 flex justify-center"}>
         <PrivacyLink />
       </footer>
+
+      {bigScreen && (
+        <button
+          type="button"
+          aria-label="Exit big screen"
+          onClick={() => setBigScreen(false)}
+          className={`${secondaryBtn} fixed top-3 right-3 z-40 w-11 !px-0`}
+        >
+          <Minimize className="size-[18px]" aria-hidden="true" />
+        </button>
+      )}
 
       <PasteNamesDialog
         open={pasteOpen}

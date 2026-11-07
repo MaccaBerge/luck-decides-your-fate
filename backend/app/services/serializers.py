@@ -23,6 +23,7 @@ from app.models import (
     LastResult,
     LinkSummary,
     PublicGameState,
+    RecentSpin,
     RuleStatusOut,
     SpinStarted,
 )
@@ -38,6 +39,7 @@ def public_game_state(
     entries: Sequence[EntryRow],
     current_spin: SpinStarted | None,
     last_result: LastResult | None,
+    recent_spins: Sequence[SpinRow],
 ) -> PublicGameState:
     # Only id + remove_winner are read from the game row. Nothing else of `game` may be used here.
     return PublicGameState(
@@ -47,6 +49,12 @@ def public_game_state(
         settings=GameSettingsOut(remove_winner=game.remove_winner),
         current_spin=current_spin,
         last_result=last_result,
+        recent_spins=[
+            # Copies only these fields: a SpinRow also carries mode and rule_applied.
+            RecentSpin(spin_id=s.id, winner_name=s.winner_name, finished_at=s.finished_at)
+            for s in recent_spins
+            if s.finished_at is not None
+        ],
     )
 
 

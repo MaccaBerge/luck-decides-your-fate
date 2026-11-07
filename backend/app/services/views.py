@@ -16,6 +16,7 @@ from app.models import AdminGameState, Dashboard, LastResult, LinkSummary, Publi
 from app.services import serializers as ser
 
 SPIN_HISTORY_LIMIT = 50
+PUBLIC_HISTORY_LIMIT = 10
 
 
 async def last_result(ctx: AppContext, game_id: str) -> LastResult | None:
@@ -32,7 +33,11 @@ async def public_state(
     if entries is None:
         entries = await repo.list_entries(game.id)
     return ser.public_game_state(
-        game, entries, ctx.runtime.current_spin(game.id), await last_result(ctx, game.id)
+        game,
+        entries,
+        ctx.runtime.current_spin(game.id),
+        await last_result(ctx, game.id),
+        await repo.list_finished_spins(game.id, PUBLIC_HISTORY_LIMIT),
     )
 
 

@@ -1,11 +1,13 @@
 import { useState } from "react";
-import type { Entry } from "../../lib/types";
+import type { Entry, RecentSpin } from "../../lib/types";
 import { EntryRow } from "./EntryRow";
+import { RecentSpins } from "./RecentSpins";
 import { Switch } from "./Switch";
 import { card, darkBtn, pillBtn } from "./buttons";
 
 interface Props {
   entries: Entry[];
+  recentSpins: RecentSpin[];
   removeWinner: boolean;
   disabled: boolean;
   onAdd: (names: string[]) => Promise<boolean>;
@@ -134,6 +136,8 @@ export function EntryPanel(p: Props) {
           onChange={p.onRemoveWinnerChange}
         />
       </label>
+
+      <RecentSpins spins={p.recentSpins} />
     </aside>
   );
 }
