@@ -40,6 +40,30 @@ def entries_limit() -> ApiError:
     return ApiError(409, "entries_limit", "A wheel can have at most 100 names")
 
 
+def not_host() -> ApiError:
+    return ApiError(403, "not_host", "Only the host can do that")
+
+
+def not_a_player() -> ApiError:
+    return ApiError(403, "not_a_player", "Join the game first")
+
+
+def not_multiplayer() -> ApiError:
+    return ApiError(409, "not_multiplayer", "This wheel isn't a multiplayer game")
+
+
+def already_multiplayer() -> ApiError:
+    return ApiError(409, "already_multiplayer", "This wheel is already a multiplayer game")
+
+
+def code_not_found() -> ApiError:
+    return ApiError(404, "code_not_found", "No game with that code")
+
+
+def player_not_found() -> ApiError:
+    return ApiError(404, "player_not_found", "Player not found")
+
+
 def unauthorized() -> ApiError:
     return ApiError(401, "unauthorized", "Not logged in")
 

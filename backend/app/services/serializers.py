@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from app.db.rows import EntryRow, GameRow, SpinRow
+from app.db.rows import EntryRow, GameRow, PlayerRow, SpinRow
 from app.engine.rigging import RuleStatus
 from app.services.backup import BackupStatus
 from app.models import (
@@ -22,6 +22,7 @@ from app.models import (
     GameSettingsOut,
     LastResult,
     LinkSummary,
+    PlayerOut,
     PublicGameState,
     RecentSpin,
     RuleStatusOut,
@@ -41,11 +42,18 @@ def public_game_state(
     current_spin: SpinStarted | None,
     last_result: LastResult | None,
     recent_spins: Sequence[SpinRow],
+    players: Sequence[PlayerRow] = (),
+    here: set[str] | frozenset[str] = frozenset(),
 ) -> PublicGameState:
-    # Only id + remove_winner are read from the game row. Nothing else of `game` may be used here.
+    # Only id, remove_winner, kind and join_code are read from the game row. Nothing else of
+    # `game` may be used here (never origin, label, mode or target_names).
+    multiplayer = game.kind == "multiplayer"
     return PublicGameState(
         id=game.id,
         game_type="wheel",
+        kind=game.kind,
+        join_code=game.join_code if multiplayer else None,
+        players=[player_out(p, p.id in here) for p in players] if multiplayer else [],
         entries=[entry_out(e) for e in sorted(entries, key=lambda e: e.position)],
         settings=GameSettingsOut(remove_winner=game.remove_winner),
         current_spin=current_spin,
@@ -56,6 +64,18 @@ def public_game_state(
             for s in recent_spins
             if s.finished_at is not None
         ],
+    )
+
+
+def player_out(p: PlayerRow, is_here: bool) -> PlayerOut:
+    # Never the token hash.
+    return PlayerOut(
+        id=p.id,
+        entry_id=p.entry_id,
+        name=p.name,
+        avatar=p.avatar,
+        status="here" if is_here else "away",
+        is_host=p.is_host,
     )
 
 

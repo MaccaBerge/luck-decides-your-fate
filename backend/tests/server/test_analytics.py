@@ -7,7 +7,8 @@ from app.analytics import registry as reg
 
 from .helpers import assert_no_leak, new_game, new_link, wait_spin
 
-ANALYTICS_KEYS = {"sections", "metrics", "generated_at", "kind"}
+# Top-level keys of the analytics report. ("kind" isn't one: public state has its own kind, solo/multiplayer.)
+ANALYTICS_KEYS = {"sections", "metrics", "generated_at"}
 
 
 def ago(**kw) -> str:

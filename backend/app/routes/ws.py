@@ -49,6 +49,9 @@ async def player_socket(ws: WebSocket, game_id: str) -> None:
     # The wheel page adds ?resume=1 to every connection after its first (after the tab was hidden,
     # or an automatic reconnect), so only a fresh page load counts as a visit. It's a flag, not an ID.
     resume = ws.query_params.get("resume") == "1"
+    # A joined multiplayer player connects with a single-use ticket from POST .../socket-ticket
+    # (never their key). Without a valid one the socket just watches, like on a solo wheel.
+    player_id = ctx.tickets.consume(game_id, ws.query_params.get("ticket"))
     await ws.accept()
     registered = False
     started = 0.0
@@ -57,24 +60,41 @@ async def player_socket(ws: WebSocket, game_id: str) -> None:
             if await repo.get_game(game_id) is None:  # deleted while we waited
                 await ws.close(code=CLOSE_NOT_FOUND)
                 return
-            ctx.manager.add_player(game_id, ws)
+            if player_id is not None and await repo.get_player(game_id, player_id) is None:
+                player_id = None  # removed since the ticket was issued
+            ctx.manager.add_player(game_id, ws, player_id)
             registered = True
             started = monotonic()
             await repo.mark_opened(game_id)
             game = await repo.get_game(game_id)
             assert game is not None
-            await ctx.manager.send(ws, ser.player_state_event(await views.public_state(ctx, game)))
-            await views.notify_admin_change(ctx, game_id)  # presence -> admins + dashboard only
+            if player_id is not None:
+                # The player is "here" now: a public change, sent to everyone in the game.
+                await repo.touch_player(player_id)
+                await views.notify_public_change(ctx, game_id)
+            else:
+                await ctx.manager.send(ws, ser.player_state_event(await views.public_state(ctx, game)))
+                await views.notify_admin_change(ctx, game_id)  # presence -> admins + dashboard only
         await _drain(ws)
     finally:
         if registered and ctx.manager.remove_player(game_id, ws):
             # Detached: the handler may be cancelled while tearing down.
-            ctx.manager.spawn(views.notify_admin_change(ctx, game_id))
+            if player_id is not None:
+                ctx.manager.spawn(_player_went_away(ctx, game_id, player_id))
+            else:
+                ctx.manager.spawn(views.notify_admin_change(ctx, game_id))
         if registered:
             # Recorded here, when the connection ends, because a tab closed at once or a shutdown
             # can cancel this handler at any await. Shielded so the writes still finish.
             seconds = counters.active_seconds(started, monotonic())
             await asyncio.shield(counters.record_connection(resumed=resume, seconds=seconds))
+
+
+async def _player_went_away(ctx: AppContext, game_id: str, player_id: str) -> None:
+    """Their socket closed: they're "away" unless another of their sockets is still open. The
+    sweep in app.services.players removes them after 10 minutes away."""
+    await repo.touch_player(player_id)
+    await views.notify_public_change(ctx, game_id)
 
 
 @router.websocket("/ws/admin")

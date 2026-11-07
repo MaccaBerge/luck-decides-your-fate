@@ -6,8 +6,8 @@ from typing import Any
 import aiosqlite
 
 from app.db.connection import connect
-from app.db.ids import new_entry_id, new_game_id, next_color
-from app.db.rows import EntryRow, GameRow, Mode, Origin, SpinRow
+from app.db.ids import new_entry_id, new_game_id, new_join_code, new_player_id, next_color
+from app.db.rows import EntryRow, GameRow, Mode, Origin, PlayerRow, SpinRow
 from app.timeutil import utc_iso_days_ago, utc_now_iso
 
 
@@ -39,6 +39,8 @@ def _game(r: aiosqlite.Row) -> GameRow:
         created_at=r["created_at"],
         first_opened_at=r["first_opened_at"],
         last_activity_at=r["last_activity_at"],
+        kind=r["kind"],
+        join_code=r["join_code"],
     )
 
 
@@ -181,35 +183,41 @@ async def list_entries(game_id: str) -> list[EntryRow]:
         return await _fetch_entries(db, game_id)
 
 
-async def add_entries(game_id: str, names: list[str]) -> list[EntryRow]:
+async def _insert_entries(db: aiosqlite.Connection, game_id: str, names: list[str]) -> list[str]:
+    """Append entries after the last one, with palette colours. Returns their new IDs."""
     now = utc_now_iso()
+    async with db.execute(
+        "SELECT COALESCE(MAX(position), -1) FROM entries WHERE game_id = ?", (game_id,)
+    ) as cur:
+        (max_pos,) = await cur.fetchone()
+    async with db.execute(
+        "SELECT color FROM entries WHERE game_id = ? ORDER BY position LIMIT 1", (game_id,)
+    ) as cur:
+        row = await cur.fetchone()
+        first = row[0] if row else None
+    async with db.execute(
+        "SELECT color FROM entries WHERE game_id = ? ORDER BY position DESC LIMIT 1", (game_id,)
+    ) as cur:
+        row = await cur.fetchone()
+        previous = row[0] if row else None
+    rows = []
+    for i, name in enumerate(names):
+        pos = max_pos + 1 + i
+        color = next_color(pos, previous, first)
+        first = first or color
+        previous = color
+        rows.append((new_entry_id(), game_id, name, color, pos, now))
+    await db.executemany(
+        "INSERT INTO entries (id, game_id, name, color, position, is_active, created_at)"
+        " VALUES (?, ?, ?, ?, ?, 1, ?)",
+        rows,
+    )
+    return [r[0] for r in rows]
+
+
+async def add_entries(game_id: str, names: list[str]) -> list[EntryRow]:
     async with connect() as db:
-        async with db.execute(
-            "SELECT COALESCE(MAX(position), -1) FROM entries WHERE game_id = ?", (game_id,)
-        ) as cur:
-            (max_pos,) = await cur.fetchone()
-        async with db.execute(
-            "SELECT color FROM entries WHERE game_id = ? ORDER BY position LIMIT 1", (game_id,)
-        ) as cur:
-            row = await cur.fetchone()
-            first = row[0] if row else None
-        async with db.execute(
-            "SELECT color FROM entries WHERE game_id = ? ORDER BY position DESC LIMIT 1", (game_id,)
-        ) as cur:
-            row = await cur.fetchone()
-            previous = row[0] if row else None
-        rows = []
-        for i, name in enumerate(names):
-            pos = max_pos + 1 + i
-            color = next_color(pos, previous, first)
-            first = first or color
-            previous = color
-            rows.append((new_entry_id(), game_id, name, color, pos, now))
-        await db.executemany(
-            "INSERT INTO entries (id, game_id, name, color, position, is_active, created_at)"
-            " VALUES (?, ?, ?, ?, ?, 1, ?)",
-            rows,
-        )
+        await _insert_entries(db, game_id, names)
         return await _fetch_entries(db, game_id)
 
 
@@ -339,3 +347,133 @@ async def delete_inactive_public_games(older_than_days: int) -> list[str]:
             (cutoff,),
         ) as cur:
             return [r["id"] for r in await cur.fetchall()]
+
+
+# ---------- multiplayer ----------
+_PLAYER_SELECT = (
+    "SELECT p.id, p.game_id, p.entry_id, e.name, p.avatar, p.is_host, p.joined_at, p.last_seen_at"
+    " FROM players p JOIN entries e ON e.id = p.entry_id"
+)
+
+
+def _player(r: aiosqlite.Row) -> PlayerRow:
+    return PlayerRow(
+        id=r["id"],
+        game_id=r["game_id"],
+        entry_id=r["entry_id"],
+        name=r["name"],
+        avatar=r["avatar"],
+        is_host=bool(r["is_host"]),
+        joined_at=r["joined_at"],
+        last_seen_at=r["last_seen_at"],
+    )
+
+
+async def make_multiplayer(game_id: str) -> GameRow | None:
+    """Turn a solo game multiplayer with a new, unique join code. No-op if it already is."""
+    async with connect() as db:
+        game = await _fetch_game(db, game_id)
+        if game is None or game.kind == "multiplayer":
+            return game
+        while True:
+            try:
+                await db.execute(
+                    "UPDATE games SET kind = 'multiplayer', join_code = ? WHERE id = ?",
+                    (new_join_code(), game_id),
+                )
+                break
+            except aiosqlite.IntegrityError:
+                continue  # code already taken by another game: draw again
+        return await _fetch_game(db, game_id)
+
+
+async def game_id_for_code(code: str) -> str | None:
+    async with connect() as db:
+        async with db.execute(
+            "SELECT id FROM games WHERE join_code = ? AND kind = 'multiplayer'", (code,)
+        ) as cur:
+            r = await cur.fetchone()
+    return r["id"] if r else None
+
+
+async def add_player(game_id: str, *, name: str, avatar: str, is_host: bool,
+                     token_hash: str) -> PlayerRow:
+    """Add the player's entry to the wheel and the player, in one transaction."""
+    now = utc_now_iso()
+    async with connect() as db:
+        (entry_id,) = await _insert_entries(db, game_id, [name])
+        pid = new_player_id()
+        await db.execute(
+            "INSERT INTO players (id, game_id, entry_id, avatar, is_host, token_hash, joined_at,"
+            " last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (pid, game_id, entry_id, avatar, 1 if is_host else 0, token_hash, now, now),
+        )
+        async with db.execute(_PLAYER_SELECT + " WHERE p.id = ?", (pid,)) as cur:
+            return _player(await cur.fetchone())
+
+
+async def list_players(game_id: str) -> list[PlayerRow]:
+    async with connect() as db:
+        async with db.execute(
+            _PLAYER_SELECT + " WHERE p.game_id = ? ORDER BY p.joined_at, p.rowid", (game_id,)
+        ) as cur:
+            return [_player(r) for r in await cur.fetchall()]
+
+
+async def get_player(game_id: str, player_id: str) -> PlayerRow | None:
+    async with connect() as db:
+        async with db.execute(
+            _PLAYER_SELECT + " WHERE p.game_id = ? AND p.id = ?", (game_id, player_id)
+        ) as cur:
+            r = await cur.fetchone()
+    return _player(r) if r else None
+
+
+async def player_by_token_hash(game_id: str, token_hash: str) -> PlayerRow | None:
+    async with connect() as db:
+        async with db.execute(
+            _PLAYER_SELECT + " WHERE p.game_id = ? AND p.token_hash = ?", (game_id, token_hash)
+        ) as cur:
+            r = await cur.fetchone()
+    return _player(r) if r else None
+
+
+async def player_for_entry(game_id: str, entry_id: str) -> PlayerRow | None:
+    async with connect() as db:
+        async with db.execute(
+            _PLAYER_SELECT + " WHERE p.game_id = ? AND p.entry_id = ?", (game_id, entry_id)
+        ) as cur:
+            r = await cur.fetchone()
+    return _player(r) if r else None
+
+
+async def remove_player(game_id: str, player_id: str) -> bool:
+    """Delete the player's entry; the player row goes with it (ON DELETE CASCADE)."""
+    async with connect() as db:
+        cur = await db.execute(
+            "DELETE FROM entries WHERE id = (SELECT entry_id FROM players WHERE game_id = ? AND id = ?)",
+            (game_id, player_id),
+        )
+        return cur.rowcount > 0
+
+
+async def set_host(game_id: str, player_id: str | None) -> None:
+    """Make `player_id` the only host of the game (None: nobody)."""
+    async with connect() as db:
+        await db.execute("UPDATE players SET is_host = 0 WHERE game_id = ?", (game_id,))
+        if player_id is not None:
+            await db.execute("UPDATE players SET is_host = 1 WHERE game_id = ? AND id = ?",
+                             (game_id, player_id))
+
+
+async def touch_player(player_id: str) -> None:
+    async with connect() as db:
+        await db.execute("UPDATE players SET last_seen_at = ? WHERE id = ?", (utc_now_iso(), player_id))
+
+
+async def players_last_seen_before(cutoff: str) -> list[PlayerRow]:
+    async with connect() as db:
+        async with db.execute(
+            _PLAYER_SELECT + " WHERE p.last_seen_at < ? ORDER BY p.game_id, p.joined_at", (cutoff,)
+        ) as cur:
+            return [_player(r) for r in await cur.fetchall()]

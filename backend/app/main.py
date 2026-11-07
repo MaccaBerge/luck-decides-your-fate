@@ -27,7 +27,7 @@ from app.db.connection import init_db
 from app.errors import install_error_handlers
 from app.middleware import ResponseHeadersMiddleware
 from app.routes import admin, games, static, ws
-from app.services import views
+from app.services import players, views
 from app.services.backup_upload import BackupStore, backup_loop
 from app.services.cleanup import cleanup_loop
 from app.services.rate_limit import LoginRateLimiter
@@ -87,13 +87,14 @@ def create_app(
         if finished:
             log.info("marked %d interrupted spin(s) as finished", finished)
         cleanup_task = asyncio.create_task(cleanup_loop(ctx)) if run_cleanup else None
+        sweep_task = asyncio.create_task(players.sweep_loop(ctx)) if run_cleanup else None
         backup_task = (
             asyncio.create_task(backup_loop(ctx, store=backup_store)) if settings.backups_enabled else None
         )
         try:
             yield
         finally:
-            for task in (cleanup_task, backup_task):
+            for task in (cleanup_task, sweep_task, backup_task):
                 if task is not None:
                     task.cancel()
                     with contextlib.suppress(asyncio.CancelledError, Exception):
