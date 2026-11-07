@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { WheelMark } from "../components/game/WheelMark";
 import { card, secondaryBtn } from "../components/game/buttons";
 
@@ -13,6 +13,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export default function PrivacyPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-[640px] flex-col gap-6 px-4 pt-7 pb-12 text-ink sm:px-6">
       <div className="flex items-center gap-2.5">
@@ -48,8 +50,17 @@ export default function PrivacyPage() {
           .
         </Section>
       </div>
-      <Link to="/" className={`${secondaryBtn} self-start`}>
-        Back to the wheel
+      <Link
+        to="/"
+        // Return to the page the visitor came from (e.g. "This wheel doesn't exist"), not the saved wheel.
+        onClick={(e) => {
+          if (location.key === "default") return; // opened directly: there's nothing to go back to
+          e.preventDefault();
+          navigate(-1);
+        }}
+        className={`${secondaryBtn} self-start`}
+      >
+        Back
       </Link>
     </main>
   );

@@ -1,12 +1,36 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { createGame } from "../lib/api";
-import { primaryBtn } from "../components/game/buttons";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { ApiError, createGame, getGame } from "../lib/api";
+import { clearLastGameId, getLastGameId } from "../lib/storage";
+import { primaryBtn, secondaryBtn } from "../components/game/buttons";
 import { PrivacyLink } from "../components/game/PrivacyLink";
 import { WheelMark } from "../components/game/WheelMark";
 
+/** The id of the wheel saved in this browser, once we know it still exists (and isn't this page's). */
+function useLastWheel(): string | null {
+  const { gameId } = useParams();
+  const [lastId, setLastId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const last = getLastGameId();
+    if (!last || last === gameId) return;
+    let alive = true;
+    getGame(last)
+      .then((g) => alive && setLastId(g.id))
+      .catch((e) => {
+        if (e instanceof ApiError && e.status === 404) clearLastGameId();
+      });
+    return () => {
+      alive = false;
+    };
+  }, [gameId]);
+
+  return lastId;
+}
+
 export default function NotFoundPage() {
   const navigate = useNavigate();
+  const lastId = useLastWheel();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,14 +55,21 @@ export default function NotFoundPage() {
       <p className="max-w-sm text-ink-muted">
         The link may be wrong, or the wheel was removed.
       </p>
-      <button
-        type="button"
-        onClick={() => void create()}
-        disabled={busy}
-        className={primaryBtn}
-      >
-        Create a new wheel
-      </button>
+      <div className="flex flex-wrap justify-center gap-3">
+        <button
+          type="button"
+          onClick={() => void create()}
+          disabled={busy}
+          className={primaryBtn}
+        >
+          Create a new wheel
+        </button>
+        {lastId && (
+          <button type="button" onClick={() => navigate(`/g/${lastId}`)} className={secondaryBtn}>
+            Open your last wheel
+          </button>
+        )}
+      </div>
       {error && <p className="text-sm text-danger">{error}</p>}
       <PrivacyLink />
     </main>

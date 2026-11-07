@@ -14,9 +14,9 @@ describe("/privacy", () => {
   const html = render("/privacy");
   const text = html.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'");
 
-  it("is routed and links back to the wheel", () => {
+  it("is routed and has a way back", () => {
     expect(html).toContain(">Privacy</h1>");
-    expect(html).toMatch(/href="\/"[^>]*>Back to the wheel</);
+    expect(html).toMatch(/href="\/"[^>]*>Back</);
   });
 
   it("states who can see wheels and how long they are kept", () => {
