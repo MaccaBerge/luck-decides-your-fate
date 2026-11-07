@@ -27,6 +27,11 @@ export interface LastResult {
   winner_name: string;
   finished_at: string;
 }
+export interface RecentSpin {
+  spin_id: number;
+  winner_name: string;
+  finished_at: string;
+}
 export interface PublicGameState {
   id: string;
   game_type: "wheel";
@@ -34,6 +39,7 @@ export interface PublicGameState {
   settings: GameSettings;
   current_spin: SpinStarted | null;
   last_result: LastResult | null;
+  recent_spins: RecentSpin[];
 }
 export interface ApiErrorBody {
   error: { code: string; message: string };

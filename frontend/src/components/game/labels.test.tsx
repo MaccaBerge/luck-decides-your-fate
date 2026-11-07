@@ -19,6 +19,7 @@ describe("§11.8 accessible names", () => {
     const html = renderToStaticMarkup(
       <EntryPanel
         entries={entries}
+        recentSpins={[{ spin_id: 1, winner_name: "Anna", finished_at: "2026-01-01T12:00:00Z" }]}
         removeWinner={false}
         disabled={false}
         onAdd={async () => true}
@@ -47,14 +48,16 @@ describe("§11.8 accessible names", () => {
       'aria-label="Hide Anna"',
       'aria-label="Remove Anna"',
       'aria-label="Show Jonas"',
+      'data-testid="recent-spins"',
+      ">Recent spins<",
     ])
       expect(html).toContain(l);
   });
   it("toolbar", () => {
     const html = renderToStaticMarkup(
-      <GameToolbar soundEnabled dark={false} onToggleSound={noop} onToggleTheme={noop} onNewWheel={noop} onCopyLink={noop} onShowQr={noop} newBusy={false} />,
+      <GameToolbar soundEnabled dark={false} onToggleSound={noop} onToggleTheme={noop} onNewWheel={noop} onCopyLink={noop} onShowQr={noop} newBusy={false} onBigScreen={noop} />,
     );
-    for (const l of ["Toggle sound", "Toggle dark mode", "New wheel", "Copy link", "Show QR code"]) expect(html).toContain(`aria-label="${l}"`);
+    for (const l of ["Toggle sound", "Toggle dark mode", "New wheel", "Copy link", "Show QR code", "Big screen"]) expect(html).toContain(`aria-label="${l}"`);
   });
   it("dialogs", () => {
     const paste = renderToStaticMarkup(<PasteNamesDialog open onClose={noop} onSubmit={async () => true} />);

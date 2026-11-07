@@ -300,6 +300,17 @@ async def list_spins(game_id: str, limit: int = 50) -> list[SpinRow]:
             return [_spin(r) for r in await cur.fetchall()]
 
 
+async def list_finished_spins(game_id: str, limit: int) -> list[SpinRow]:
+    """Newest first. Unfinished spins are excluded: their winner isn't public until the wheel lands."""
+    async with connect() as db:
+        async with db.execute(
+            "SELECT * FROM spins WHERE game_id = ? AND finished_at IS NOT NULL"
+            " ORDER BY id DESC LIMIT ?",
+            (game_id, limit),
+        ) as cur:
+            return [_spin(r) for r in await cur.fetchall()]
+
+
 async def get_last_finished_spin(game_id: str) -> SpinRow | None:
     async with connect() as db:
         async with db.execute(
