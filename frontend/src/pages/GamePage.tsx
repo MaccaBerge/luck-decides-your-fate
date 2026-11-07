@@ -442,27 +442,15 @@ export default function GamePage() {
   };
 
   const enterBigScreen = () => {
-    // The root element keeps dialogs and confetti visible. iPhone Safari has no fullscreen; the layout works without it.
-    // Go fullscreen first and animate once the window has its new size: a resize during a view
-    // transition cancels it.
-    const el = document.documentElement;
-    if (!el.requestFullscreen || document.fullscreenElement) {
-      switchBigScreen(true);
-      return;
-    }
-    // Some browsers never answer the fullscreen request (e.g. while asking permission): don't wait for ever.
-    let done = false;
-    const go = (resized: boolean) => {
-      if (done) return;
-      done = true;
-      if (resized) afterResize(() => switchBigScreen(true));
-      else switchBigScreen(true);
-    };
-    setTimeout(() => go(false), 700);
-    el.requestFullscreen().then(
-      () => go(true),
-      () => go(false),
-    );
+    // Animate into the big-screen layout inside the window first, then go fullscreen. The other
+    // order hides the animation: on macOS, fullscreen slides to a new space, and a resize during a
+    // view transition cancels it. (Leaving is the mirror image: fullscreen first, then animate.)
+    // The root element keeps dialogs and confetti visible. iPhone Safari has no fullscreen; the
+    // layout works without it, and so it does if the browser refuses.
+    void switchBigScreen(true).then(() => {
+      const el = document.documentElement;
+      if (el.requestFullscreen && !document.fullscreenElement) void el.requestFullscreen().catch(() => {});
+    });
   };
 
   // Leave fullscreen first; its fullscreenchange handler then animates back to the normal layout.
