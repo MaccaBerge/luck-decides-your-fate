@@ -28,6 +28,7 @@ from app.models import (
     JoinCodeLookup,
     JoinRequest,
     JoinResponse,
+    LeaveResponse,
     PublicGameState,
     SocketTicket,
     SpinStarted,
@@ -241,14 +242,19 @@ async def join_game(game_id: str, body: JoinRequest, ctx: AppContext = Depends(c
     return await _join(ctx, game_id, body, host=False)
 
 
-@router.delete("/games/{game_id}/players/me", response_model=PublicGameState)
+@router.delete("/games/{game_id}/players/me", response_model=LeaveResponse)
 async def leave_game(
     game_id: str, ctx: AppContext = Depends(ctx_dep), token: str | None = PlayerToken
-) -> PublicGameState:
-    player = await players.require_player(await load_game(game_id), token)
+) -> LeaveResponse:
+    """Leave the game. The last player leaving ends it (see players.end_game)."""
+    game = await load_game(game_id)
+    player = await players.require_player(game, token)
     async with ctx.runtime.mutation(game_id):
         await players.remove(ctx, game_id, player.id)
-        return await _after_mutation(ctx, game_id)
+        if await repo.count_players(game_id) == 0:
+            await players.end_game(ctx, game)
+            return LeaveResponse(ended=True, state=None)
+        return LeaveResponse(ended=False, state=await _after_mutation(ctx, game_id))
 
 
 @router.delete("/games/{game_id}/players/{player_id}", response_model=PublicGameState)
@@ -281,4 +287,4 @@ async def find_by_code(code: str) -> JoinCodeLookup:
     game_id = await repo.game_id_for_code(code) if len(code) == JOIN_CODE_LENGTH else None
     if game_id is None:
         raise code_not_found()
-    return JoinCodeLookup(game_id=game_id)
+    return JoinCodeLookup(game_id=game_id, players=await repo.count_players(game_id))

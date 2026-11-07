@@ -82,7 +82,7 @@ def test_join_by_code(client):
     code = h["state"]["join_code"]
     for typed in (code, code.lower(), f"  {code} "):
         r = client.get(f"/api/join/{typed}")
-        assert r.status_code == 200 and r.json() == {"game_id": gid}
+        assert r.status_code == 200 and r.json() == {"game_id": gid, "players": 1}
     for bad in ("ZZZZZZ", "ABC", "toolongcode"):
         r = client.get(f"/api/join/{bad}")
         assert r.status_code == 404 and r.json()["error"]["code"] == "code_not_found"
@@ -166,8 +166,8 @@ def test_a_key_only_works_in_its_own_game(client):
 def test_leaving_removes_the_player_and_their_name(client):
     gid, _, (anna, jonas) = lobby(client)
     r = client.delete(f"/api/games/{gid}/players/me", headers=tok(anna["player_token"]))
-    assert r.status_code == 200
-    s = r.json()
+    assert r.status_code == 200 and r.json()["ended"] is False
+    s = r.json()["state"]
     assert [p["name"] for p in s["players"]] == ["Hanna", "Jonas"]
     assert "Anna" not in [e["name"] for e in s["entries"]]
     r = client.delete(f"/api/games/{gid}/players/me", headers=tok(anna["player_token"]))
@@ -180,14 +180,10 @@ def test_host_role_passes_to_the_earliest_player_who_is_here(client):
     with client.websocket_connect(f"/ws/games/{gid}?ticket={ticket(client, gid, jonas['player_token'])}") as ws:
         ws.receive_json()
         r = client.delete(f"/api/games/{gid}/players/me", headers=tok(h["player_token"]))
-        hosts = [p["name"] for p in r.json()["players"] if p["is_host"]]
+        hosts = [p["name"] for p in r.json()["state"]["players"] if p["is_host"]]
         assert hosts == ["Jonas"]  # Anna joined first but is away
     r = client.delete(f"/api/games/{gid}/players/me", headers=tok(jonas["player_token"]))
-    assert [p["name"] for p in r.json()["players"] if p["is_host"]] == ["Anna"]  # nobody here: earliest
-    r = client.delete(f"/api/games/{gid}/players/me", headers=tok(anna["player_token"]))
-    assert r.json()["players"] == []
-    # An empty game: the next person to join becomes host.
-    assert join(client, gid, "Mia")["state"]["players"][0]["is_host"] is True
+    assert [p["name"] for p in r.json()["state"]["players"] if p["is_host"]] == ["Anna"]  # nobody here: earliest
 
 
 def test_host_removes_a_player(client):
@@ -371,3 +367,57 @@ def test_old_databases_get_the_new_columns(tmp_path):
 def test_every_avatar_is_accepted(client, avatar):
     gid = new_game(client)
     assert host(client, gid, avatar=avatar)["state"]["players"][0]["avatar"] == avatar
+
+
+# ---------------------------------------------------------------- ending a game
+def test_last_player_leaving_deletes_an_ordinary_game(client):
+    gid, h, (anna,) = lobby(client, ("Anna",))
+    code = h["state"]["join_code"]
+    assert client.get(f"/api/join/{code}").json()["players"] == 2
+    r = client.delete(f"/api/games/{gid}/players/me", headers=tok(anna["player_token"]))
+    assert r.json()["ended"] is False
+    with client.websocket_connect(f"/ws/games/{gid}") as tv:  # someone just watching
+        tv.receive_json()
+        r = client.delete(f"/api/games/{gid}/players/me", headers=tok(h["player_token"]))
+        assert r.status_code == 200 and r.json() == {"ended": True, "state": None}
+        assert tv.receive_json() == {"type": "game_deleted"}
+    assert client.get(f"/api/games/{gid}").status_code == 404
+    assert client.get(f"/api/join/{code}").status_code == 404
+
+
+def test_last_player_leaving_only_closes_a_controller_link(client, admin):
+    gid = new_link(admin, client, ["Anna", "Jonas"], mode="always", target_names=["Jonas"], label="Mine")
+    h = host(client, gid)
+    code = h["state"]["join_code"]
+    r = client.delete(f"/api/games/{gid}/players/me", headers=tok(h["player_token"]))
+    assert r.status_code == 200 and r.json() == {"ended": True, "state": None}
+    s = state(client, gid)
+    assert s["kind"] == "solo" and s["join_code"] is None and s["players"] == []
+    assert [e["name"] for e in s["entries"]] == ["Anna", "Jonas"]
+    assert client.get(f"/api/join/{code}").status_code == 404
+    link = admin.get(f"/api/admin/links/{gid}").json()
+    assert link["link"]["label"] == "Mine" and link["link"]["mode"] == "always"
+    # It can be hosted again, and its rule still applies.
+    h2 = host(client, gid)
+    assert client.post(f"/api/games/{gid}/spin", headers=tok(h2["player_token"])).json()["winner_name"] == "Jonas"
+    wait_spin()
+
+
+def test_ending_looks_the_same_for_a_link_and_a_wheel(client, admin):
+    wheel = new_game(client, ["Anna", "Jonas"])
+    link = new_link(admin, client, ["Anna", "Jonas"], mode="always", target_names=["Anna"])
+    bodies = []
+    for gid in (wheel, link):
+        h = host(client, gid)
+        r = client.delete(f"/api/games/{gid}/players/me", headers=tok(h["player_token"]))
+        bodies.append((r.status_code, r.json()))
+    assert bodies[0] == bodies[1] == (200, {"ended": True, "state": None})
+
+
+def test_join_lookup_counts_players(client):
+    gid, h, (anna, jonas) = lobby(client)
+    code = h["state"]["join_code"]
+    assert client.get(f"/api/join/{code}").json() == {"game_id": gid, "players": 3}
+    client.delete(f"/api/games/{gid}/players/me", headers=tok(jonas["player_token"]))
+    assert client.get(f"/api/join/{code}").json()["players"] == 2
+    assert anna

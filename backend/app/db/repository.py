@@ -387,6 +387,19 @@ async def make_multiplayer(game_id: str) -> GameRow | None:
         return await _fetch_game(db, game_id)
 
 
+async def close_multiplayer(game_id: str) -> None:
+    """Turn a multiplayer game back into a solo wheel: no code. (Its players are already gone.)"""
+    async with connect() as db:
+        await db.execute("UPDATE games SET kind = 'solo', join_code = NULL WHERE id = ?", (game_id,))
+
+
+async def count_players(game_id: str) -> int:
+    async with connect() as db:
+        async with db.execute("SELECT COUNT(*) FROM players WHERE game_id = ?", (game_id,)) as cur:
+            (n,) = await cur.fetchone()
+    return n
+
+
 async def game_id_for_code(code: str) -> str | None:
     async with connect() as db:
         async with db.execute(
