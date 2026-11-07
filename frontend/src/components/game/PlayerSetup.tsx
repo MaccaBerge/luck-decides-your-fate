@@ -6,11 +6,13 @@ import { primaryBtn } from "./buttons";
 interface Props {
   submitLabel: string;
   busy: boolean;
+  /** False keeps the submit button disabled (e.g. until another choice is made). */
+  ready?: boolean;
   onSubmit: (name: string, avatar: string) => void;
 }
 
 /** Name + avatar, for hosting or joining a multiplayer game. */
-export function PlayerSetup({ submitLabel, busy, onSubmit }: Props) {
+export function PlayerSetup({ submitLabel, busy, ready = true, onSubmit }: Props) {
   const [name, setName] = useState("");
   const [avatar, setAvatar] = useState<string>(randomAvatar);
   const trimmed = name.trim();
@@ -20,7 +22,7 @@ export function PlayerSetup({ submitLabel, busy, onSubmit }: Props) {
       className="flex flex-col gap-5 text-left"
       onSubmit={(e) => {
         e.preventDefault();
-        if (trimmed && !busy) onSubmit(trimmed, avatar);
+        if (trimmed && !busy && ready) onSubmit(trimmed, avatar);
       }}
     >
       <label className="flex flex-col gap-2">
@@ -60,7 +62,7 @@ export function PlayerSetup({ submitLabel, busy, onSubmit }: Props) {
           })}
         </div>
       </fieldset>
-      <button type="submit" disabled={!trimmed || busy} className={`${primaryBtn} w-full`}>
+      <button type="submit" disabled={!trimmed || busy || !ready} className={`${primaryBtn} w-full`}>
         {busy && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
         {submitLabel}
       </button>
