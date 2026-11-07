@@ -9,7 +9,7 @@ SPIN_WAIT_S = 0.08 + 0.3 + 0.25  # max duration + server grace + slack
 
 FORBIDDEN_KEYS = {
     "mode", "target_names", "label", "origin", "rule_status", "rule_applied",
-    "matched_target", "matched_entry_ids",
+    "matched_target", "matched_entry_ids", "targets",
 }
 
 
