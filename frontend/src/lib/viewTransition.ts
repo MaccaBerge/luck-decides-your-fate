@@ -6,7 +6,7 @@ interface ViewTransition {
 }
 type WithViewTransitions = Document & { startViewTransition?: (update: () => void) => ViewTransition };
 
-/** Never wait longer than this for a transition: fullscreen must follow soon after the click. */
+/** Never wait longer than this for a transition to finish. */
 const MAX_WAIT_MS = 700;
 
 /**

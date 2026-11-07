@@ -73,7 +73,8 @@ export default function GamePage() {
   const [newBusy, setNewBusy] = useState(false);
   const [spinRequested, setSpinRequested] = useState(false);
   const [bigScreen, setBigScreen] = useState(false);
-  // Experimental: the wheel, the invite card and the size button glide between the two layouts.
+  // Leaving big-screen mode animates: the wheel, the invite card and the size button glide back
+  // to their places. (Entering is instant.)
   const switchBigScreen = useCallback((next: boolean) => withViewTransition(() => setBigScreen(next)), []);
   // Multiplayer: which player this browser is (from local storage), and the dialogs around it.
   const [me, setMeState] = useState<Me | null>(() => getMe(gameId));
@@ -442,15 +443,10 @@ export default function GamePage() {
   };
 
   const enterBigScreen = () => {
-    // Animate into the big-screen layout inside the window first, then go fullscreen. The other
-    // order hides the animation: on macOS, fullscreen slides to a new space, and a resize during a
-    // view transition cancels it. (Leaving is the mirror image: fullscreen first, then animate.)
-    // The root element keeps dialogs and confetti visible. iPhone Safari has no fullscreen; the
-    // layout works without it, and so it does if the browser refuses.
-    void switchBigScreen(true).then(() => {
-      const el = document.documentElement;
-      if (el.requestFullscreen && !document.fullscreenElement) void el.requestFullscreen().catch(() => {});
-    });
+    // Opening is instant (an animation here added friction); closing animates back.
+    setBigScreen(true);
+    // The root element keeps dialogs and confetti visible. iPhone Safari has no fullscreen; the layout works without it.
+    void document.documentElement.requestFullscreen?.().catch(() => {});
   };
 
   // Leave fullscreen first; its fullscreenchange handler then animates back to the normal layout.
