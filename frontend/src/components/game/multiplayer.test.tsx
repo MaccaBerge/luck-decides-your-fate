@@ -7,6 +7,7 @@ import { PlayerSetup } from "./PlayerSetup";
 import { JoinCodeDialog } from "./JoinCodeDialog";
 import { JoinScreen } from "./JoinScreen";
 import { HostDialog } from "./HostDialog";
+import { InviteCard } from "./InviteCard";
 
 const noop = () => {};
 const players: Player[] = [
@@ -105,5 +106,18 @@ describe("HostDialog", () => {
 
   it("words one name in the singular", () => {
     expect(text(dialog(["Anna"]))).toContain("This wheel has 1 name. What should the game start with? Keep these names Anna stays on the wheel, and players are added to it.");
+  });
+});
+
+describe("InviteCard", () => {
+  it("shows the code and player count, in the side column or floating in big-screen mode", () => {
+    const panel = renderToStaticMarkup(<InviteCard variant="panel" code="ACP7KY" url="http://x/j/ACP7KY" players={1} />);
+    expect(panel).toContain('data-testid="host-invite-card"');
+    expect(panel).not.toContain("fixed");
+    expect(text(panel)).toBe("Join with the code ACP7KY 1 player");
+    const floating = renderToStaticMarkup(<InviteCard code="ACP7KY" url="http://x/j/ACP7KY" players={3} />);
+    expect(floating).toContain('data-testid="invite-card"');
+    expect(floating).toContain("fixed");
+    expect(text(floating)).toBe("Join with the code ACP7KY 3 players");
   });
 });
