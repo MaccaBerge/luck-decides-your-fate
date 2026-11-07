@@ -366,7 +366,7 @@ export default function LinkControlPage() {
                 <p className="text-[13px] text-ink-muted">
                   Click a name or its slice to make it a target, and again to remove it.
                   {rule_status.targets.length > 1 && " Numbers show the priority order."}
-                  {matched.size > 0 && " The ringed name is the one in effect."}
+                  {matched.size > 0 && link.mode !== "fair" && " The ringed name is the one in effect."}
                 </p>
               )}
               {link.mode === "fair" && rule_status.targets.length > 0 && (
