@@ -9,7 +9,7 @@ import { errorMessage, errorStatus, parseNames, type UpdateLinkBody } from "./ad
 import type { AdminGameState, AdminLinkEvent } from "./adminTypes";
 import { useAdminAuth } from "./auth";
 import { useAdminLinkSocket } from "./useAdminSocket";
-import { targetRanks, toggleTarget } from "./targets";
+import { sortByTarget, targetRanks, toggleTarget } from "./targets";
 import RuleStatusBanner from "./components/RuleStatusBanner";
 import {
   btnPill,
@@ -311,7 +311,7 @@ export default function LinkControlPage() {
                 <p className="text-sm text-ink-muted">The wheel is empty.</p>
               ) : (
                 <ul className="flex flex-wrap gap-2">
-                  {active.map((e) => {
+                  {sortByTarget(active, ranks).map((e) => {
                     const isX = matched.has(e.id);
                     const rank = ranks.get(e.id);
                     return (

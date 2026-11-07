@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { targetRanks, toggleTarget } from "./targets";
+import { sortByTarget, targetRanks, toggleTarget } from "./targets";
 
 const targets = [
   { name: "Erik", entry_ids: [] },
@@ -25,5 +25,17 @@ describe("click-to-target", () => {
   it("removes every target that matches the clicked entry, using the server's matches", () => {
     expect(toggleTarget(targets, { id: "e3", name: "Jonas!" })).toEqual(["Erik", "Anna"]);
     expect(toggleTarget(targets, { id: "e1", name: "Anna" })).toEqual(["Erik", "jonas", "JONAS"]);
+  });
+
+  it("sorts targets first by priority, then the rest in wheel order", () => {
+    const entries = ["e0", "e1", "e2", "e3", "e4", "e5"].map((id) => ({ id }));
+    const ranks = new Map([
+      ["e4", 1],
+      ["e1", 2],
+      ["e5", 2],
+    ]);
+    expect(sortByTarget(entries, ranks).map((e) => e.id)).toEqual(["e4", "e1", "e5", "e0", "e2", "e3"]);
+    expect(sortByTarget(entries, new Map()).map((e) => e.id)).toEqual(["e0", "e1", "e2", "e3", "e4", "e5"]);
+    expect(entries.map((e) => e.id)).toEqual(["e0", "e1", "e2", "e3", "e4", "e5"]); // input untouched
   });
 });
