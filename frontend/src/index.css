@@ -136,3 +136,9 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Big-screen mode (experimental): how the shared elements glide between the two layouts. */
+::view-transition-group(*) {
+  animation-duration: 420ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
