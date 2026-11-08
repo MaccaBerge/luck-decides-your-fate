@@ -423,57 +423,87 @@ def test_join_lookup_counts_players(client):
     assert anna
 
 
-# ---------------------------------------------------------------- kick, ban, lock, rejoin
+# ---------------------------------------------------------------- kick, ban, requests, join policy
 def me(client, gid, token):
     return client.get(f"/api/games/{gid}/players/me", headers=tok(token)).json()
 
 
-def test_kicked_player_can_ask_to_join_again(client):
+def kick(client, gid, h, p, ban=False):
+    r = client.delete(f"/api/games/{gid}/players/{p['player_id']}" + ("?ban=true" if ban else ""), headers=tok(h["player_token"]))
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def answer(client, gid, h, player_id, verb):
+    return client.post(f"/api/games/{gid}/join-requests/{player_id}/{verb}", headers=tok(h["player_token"]))
+
+
+def policy(client, gid, h, value):
+    r = client.patch(f"/api/games/{gid}/settings", json={"join_policy": value}, headers=tok(h["player_token"]))
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_kicked_player_asks_is_accepted_and_confirms(client):
     gid, h, (anna, _) = lobby(client)
-    r = client.delete(f"/api/games/{gid}/players/{anna['player_id']}", headers=tok(h["player_token"]))
-    assert r.status_code == 200 and "Anna" not in [p["name"] for p in r.json()["players"]]
+    s = kick(client, gid, h, anna)
+    assert "Anna" not in [p["name"] for p in s["players"]]
     assert me(client, gid, anna["player_token"]) == {"status": "kicked", "request": None}
     # A kicked browser can't just join again under another name.
     r = client.post(f"/api/games/{gid}/players", json={"name": "Not Anna", "avatar": "cat"}, headers=tok(anna["player_token"]))
     assert r.status_code == 403 and r.json()["error"]["code"] == "kicked"
-    # It asks instead; the host sees the request.
+    # It asks; the host sees a pending request.
     r = client.post(f"/api/games/{gid}/rejoin", headers=tok(anna["player_token"]))
-    assert r.status_code == 200 and r.json()["rejoined"] is False and r.json()["request"] == "pending"
-    assert r.json()["state"]["join_requests"] == [{"player_id": anna["player_id"], "name": "Anna", "avatar": "cat"}]
-    assert me(client, gid, anna["player_token"]) == {"status": "kicked", "request": "pending"}
+    assert r.json()["rejoined"] is False and r.json()["request"] == "pending"
+    assert r.json()["state"]["join_requests"] == [{"player_id": anna["player_id"], "name": "Anna", "avatar": "cat", "state": "pending"}]
+    assert client.post(f"/api/games/{gid}/rejoin", headers=tok(anna["player_token"])).json()["request"] == "pending"  # asking twice is fine
+    # Confirming before the host says yes doesn't work.
+    r = client.post(f"/api/games/{gid}/join-requests/me/confirm", headers=tok(anna["player_token"]))
+    assert r.status_code == 409 and r.json()["error"]["code"] == "request_not_accepted"
     # Only the host answers.
-    r = client.post(f"/api/games/{gid}/join-requests/{anna['player_id']}/accept", headers=tok(anna["player_token"]))
-    assert r.status_code == 403
-    r = client.post(f"/api/games/{gid}/join-requests/{anna['player_id']}/accept", headers=tok(h["player_token"]))
-    assert r.status_code == 200
-    s = r.json()
-    assert s["join_requests"] == []
-    back = next(p for p in s["players"] if p["name"] == "Anna")
-    assert back["id"] == anna["player_id"] and back["avatar"] == "cat" and back["is_host"] is False
-    # Same key works again.
-    assert me(client, gid, anna["player_token"]) == {"status": "player", "request": None}
-    assert client.post(f"/api/games/{gid}/socket-ticket", headers=tok(anna["player_token"])).status_code == 200
-
-
-def test_declined_request_cant_be_repeated(client):
-    gid, h, (anna, _) = lobby(client)
-    client.delete(f"/api/games/{gid}/players/{anna['player_id']}", headers=tok(h["player_token"]))
-    client.post(f"/api/games/{gid}/rejoin", headers=tok(anna["player_token"]))
-    r = client.post(f"/api/games/{gid}/join-requests/{anna['player_id']}/decline", headers=tok(h["player_token"]))
+    assert answer(client, gid, anna, anna["player_id"], "accept").status_code == 403
+    r = answer(client, gid, h, anna["player_id"], "accept")
+    assert r.json()["join_requests"][0]["state"] == "accepted"  # the host sees "waiting for Anna"
+    assert "Anna" not in [p["name"] for p in r.json()["players"]]
+    assert me(client, gid, anna["player_token"]) == {"status": "kicked", "request": "accepted"}
+    # Anna still wants in: she confirms and is back, same player and key.
+    r = client.post(f"/api/games/{gid}/join-requests/me/confirm", headers=tok(anna["player_token"]))
     assert r.status_code == 200 and r.json()["join_requests"] == []
+    back = next(p for p in r.json()["players"] if p["name"] == "Anna")
+    assert back["id"] == anna["player_id"] and back["avatar"] == "cat" and back["is_host"] is False
+    assert me(client, gid, anna["player_token"]) == {"status": "player", "request": None}
+
+
+def test_accepted_player_can_say_no_thanks(client):
+    gid, h, (anna, _) = lobby(client)
+    kick(client, gid, h, anna)
+    client.post(f"/api/games/{gid}/rejoin", headers=tok(anna["player_token"]))
+    answer(client, gid, h, anna["player_id"], "accept")
+    r = client.delete(f"/api/games/{gid}/join-requests/me", headers=tok(anna["player_token"]))
+    assert r.status_code == 200 and r.json()["join_requests"] == []
+    assert me(client, gid, anna["player_token"]) == {"status": "kicked", "request": None}
+    assert client.delete(f"/api/games/{gid}/join-requests/me", headers=tok(anna["player_token"])).status_code == 404
+
+
+def test_declined_request(client):
+    gid, h, (anna, _) = lobby(client)
+    kick(client, gid, h, anna)
+    client.post(f"/api/games/{gid}/rejoin", headers=tok(anna["player_token"]))
+    r = answer(client, gid, h, anna["player_id"], "decline")
+    assert r.status_code == 200 and r.json()["join_requests"] == []  # declined ones aren't listed
     assert me(client, gid, anna["player_token"]) == {"status": "kicked", "request": "declined"}
     r = client.post(f"/api/games/{gid}/rejoin", headers=tok(anna["player_token"]))
     assert r.status_code == 409 and r.json()["error"]["code"] == "request_declined"
-    r = client.post(f"/api/games/{gid}/join-requests/{anna['player_id']}/accept", headers=tok(h["player_token"]))
-    assert r.status_code == 404 and r.json()["error"]["code"] == "request_not_found"
-    r = client.post(f"/api/games/{gid}/join-requests/{anna['player_id']}/maybe", headers=tok(h["player_token"]))
-    assert r.status_code == 422
+    assert answer(client, gid, h, anna["player_id"], "accept").status_code == 404
+    assert answer(client, gid, h, anna["player_id"], "maybe").status_code == 422
+    # Acknowledging the "no" removes the request; she still can't ask again (kicked, no request).
+    client.delete(f"/api/games/{gid}/join-requests/me", headers=tok(anna["player_token"]))
+    assert me(client, gid, anna["player_token"]) == {"status": "kicked", "request": None}
 
 
 def test_banned_player_cant_come_back(client):
     gid, h, (anna, _) = lobby(client)
-    r = client.delete(f"/api/games/{gid}/players/{anna['player_id']}?ban=true", headers=tok(h["player_token"]))
-    assert r.status_code == 200
+    kick(client, gid, h, anna, ban=True)
     assert me(client, gid, anna["player_token"]) == {"status": "banned", "request": None}
     for call in (
         lambda: client.post(f"/api/games/{gid}/rejoin", headers=tok(anna["player_token"])),
@@ -481,78 +511,101 @@ def test_banned_player_cant_come_back(client):
     ):
         r = call()
         assert r.status_code == 403 and r.json()["error"]["code"] == "banned"
-    # Another browser (no key) can still join: the ban is per browser.
-    assert join(client, gid, "Someone")["state"]["players"][-1]["name"] == "Someone"
+    assert join(client, gid, "Someone")["state"]["players"][-1]["name"] == "Someone"  # per browser
 
 
 def test_deleting_a_players_name_kicks_them(client):
     gid, h, (anna, _) = lobby(client)
-    entry = anna["state"]["players"][1]["entry_id"]
-    client.delete(f"/api/games/{gid}/entries/{entry}", headers=tok(h["player_token"]))
+    client.delete(f"/api/games/{gid}/entries/{anna['state']['players'][1]['entry_id']}", headers=tok(h["player_token"]))
     assert me(client, gid, anna["player_token"])["status"] == "kicked"
 
 
-def test_timed_out_player_rejoins_straight_away(client, app):
-    gid, h, (anna, jonas) = lobby(client)
+def test_timed_out_player_rejoins_straight_away_in_an_open_game(client, app):
+    gid, h, (anna, _) = lobby(client)
     later = datetime.now(timezone.utc) + timedelta(minutes=11)
     with client.websocket_connect(f"/ws/games/{gid}?ticket={ticket(client, gid, h['player_token'])}") as w:
         w.receive_json()
         client.portal.call(players_service.sweep_once, app.state.ctx, later)
     assert me(client, gid, anna["player_token"]) == {"status": "timed_out", "request": None}
     r = client.post(f"/api/games/{gid}/rejoin", headers=tok(anna["player_token"]))
-    assert r.status_code == 200 and r.json()["rejoined"] is True and r.json()["request"] is None
-    assert "Anna" in [p["name"] for p in r.json()["state"]["players"]]
-    assert me(client, gid, anna["player_token"])["status"] == "player"
-    assert jonas
+    assert r.json()["rejoined"] is True and "Anna" in [p["name"] for p in r.json()["state"]["players"]]
 
 
-def test_lock_keeps_new_players_out(client):
-    gid, h, (anna, _) = lobby(client)
-    r = client.patch(f"/api/games/{gid}/settings", json={"locked": True}, headers=tok(anna["player_token"]))
-    assert r.status_code == 403
-    r = client.patch(f"/api/games/{gid}/settings", json={"locked": True}, headers=tok(h["player_token"]))
-    assert r.status_code == 200 and r.json()["locked"] is True
-    r = client.post(f"/api/games/{gid}/players", json={"name": "Late", "avatar": "cat"})
-    assert r.status_code == 409 and r.json()["error"]["code"] == "game_locked"
-    # The host can still let a kicked player back in.
-    client.delete(f"/api/games/{gid}/players/{anna['player_id']}", headers=tok(h["player_token"]))
-    client.post(f"/api/games/{gid}/rejoin", headers=tok(anna["player_token"]))
-    r = client.post(f"/api/games/{gid}/join-requests/{anna['player_id']}/accept", headers=tok(h["player_token"]))
-    assert r.status_code == 200 and "Anna" in [p["name"] for p in r.json()["players"]]
-    r = client.patch(f"/api/games/{gid}/settings", json={"locked": False}, headers=tok(h["player_token"]))
-    assert r.json()["locked"] is False
-    assert join(client, gid, "Late")
-
-
-def test_timed_out_player_cant_rejoin_a_locked_game(client, app):
+def test_timed_out_player_asks_when_the_game_needs_the_hosts_ok(client, app):
     gid, h, (anna, _) = lobby(client)
     later = datetime.now(timezone.utc) + timedelta(minutes=11)
     with client.websocket_connect(f"/ws/games/{gid}?ticket={ticket(client, gid, h['player_token'])}") as w:
         w.receive_json()
         client.portal.call(players_service.sweep_once, app.state.ctx, later)
-    client.patch(f"/api/games/{gid}/settings", json={"locked": True}, headers=tok(h["player_token"]))
+    policy(client, gid, h, "ask")
     r = client.post(f"/api/games/{gid}/rejoin", headers=tok(anna["player_token"]))
-    assert r.status_code == 409 and r.json()["error"]["code"] == "game_locked"
+    assert r.json()["rejoined"] is False and r.json()["request"] == "pending"
+    policy(client, gid, h, "closed")
+    client.delete(f"/api/games/{gid}/join-requests/me", headers=tok(anna["player_token"]))
+    r = client.post(f"/api/games/{gid}/rejoin", headers=tok(anna["player_token"]))
+    assert r.status_code == 409 and r.json()["error"]["code"] == "game_closed"
 
 
-def test_an_empty_locked_game_lets_the_next_person_in(client, app):
+def test_must_ask_newcomers_wait_for_the_host(client):
+    gid, h, _ = lobby(client, ())
+    assert policy(client, gid, h, "ask")["join_policy"] == "ask"
+    r = client.post(f"/api/games/{gid}/players", json={"name": "Mia", "avatar": "owl"})
+    assert r.status_code == 201
+    mia = r.json()
+    assert mia["requested"] is True and [p["name"] for p in mia["state"]["players"]] == ["Hanna"]
+    assert mia["state"]["join_requests"] == [{"player_id": mia["player_id"], "name": "Mia", "avatar": "owl", "state": "pending"}]
+    assert me(client, gid, mia["player_token"]) == {"status": "none", "request": "pending"}
+    answer(client, gid, h, mia["player_id"], "accept")
+    r = client.post(f"/api/games/{gid}/join-requests/me/confirm", headers=tok(mia["player_token"]))
+    assert [p["name"] for p in r.json()["players"]] == ["Hanna", "Mia"]
+    assert me(client, gid, mia["player_token"])["status"] == "player"
+
+
+def test_closed_game_lets_nobody_new_in(client):
+    gid, h, (anna, _) = lobby(client)
+    assert client.patch(f"/api/games/{gid}/settings", json={"join_policy": "closed"}, headers=tok(anna["player_token"])).status_code == 403
+    assert policy(client, gid, h, "closed")["join_policy"] == "closed"
+    r = client.post(f"/api/games/{gid}/players", json={"name": "Late", "avatar": "cat"})
+    assert r.status_code == 409 and r.json()["error"]["code"] == "game_closed"
+    # A kicked player can't ask while it's closed either.
+    kick(client, gid, h, anna)
+    r = client.post(f"/api/games/{gid}/rejoin", headers=tok(anna["player_token"]))
+    assert r.status_code == 409 and r.json()["error"]["code"] == "game_closed"
+    assert policy(client, gid, h, "open")["join_policy"] == "open"
+    assert join(client, gid, "Late")
+
+
+def test_accepted_request_joins_even_a_closed_game(client):
+    gid, h, (anna, _) = lobby(client)
+    kick(client, gid, h, anna)
+    client.post(f"/api/games/{gid}/rejoin", headers=tok(anna["player_token"]))
+    answer(client, gid, h, anna["player_id"], "accept")
+    policy(client, gid, h, "closed")
+    r = client.post(f"/api/games/{gid}/join-requests/me/confirm", headers=tok(anna["player_token"]))
+    assert r.status_code == 200 and "Anna" in [p["name"] for p in r.json()["players"]]
+
+
+def test_an_empty_game_lets_the_next_person_in(client, app):
     gid, h, (anna,) = lobby(client, ("Anna",))
-    client.patch(f"/api/games/{gid}/settings", json={"locked": True}, headers=tok(h["player_token"]))
+    policy(client, gid, h, "closed")
     later = datetime.now(timezone.utc) + timedelta(minutes=11)
     client.portal.call(players_service.sweep_once, app.state.ctx, later)  # both time out
     assert state(client, gid)["players"] == []
     p = join(client, gid, "Mia")
-    assert p["state"]["players"][0]["is_host"] is True
+    assert p["requested"] is False and p["state"]["players"][0]["is_host"] is True
     assert anna
 
 
-def test_lock_and_settings_validation(client):
+def test_join_policy_validation(client):
     solo = new_game(client)
-    r = client.patch(f"/api/games/{solo}/settings", json={"locked": True})
+    r = client.patch(f"/api/games/{solo}/settings", json={"join_policy": "closed"})
     assert r.status_code == 409 and r.json()["error"]["code"] == "not_multiplayer"
-    r = client.patch(f"/api/games/{solo}/settings", json={})
+    assert client.patch(f"/api/games/{solo}/settings", json={}).status_code == 422
+    gid, h, _ = lobby(client, ())
+    r = client.patch(f"/api/games/{gid}/settings", json={"join_policy": "invited"}, headers=tok(h["player_token"]))
     assert r.status_code == 422
-    assert client.patch(f"/api/games/{solo}/settings", json={"remove_winner": True}).json()["settings"]["remove_winner"] is True
+    assert state(client, gid)["join_policy"] == "open"  # the default
+    assert state(client, solo)["join_policy"] == "open"
 
 
 def test_status_without_a_key_or_in_a_closed_link(client, admin):
@@ -562,15 +615,19 @@ def test_status_without_a_key_or_in_a_closed_link(client, admin):
     link = new_link(admin, client, ["A", "B"])
     hl = host(client, link)
     p = join(client, link, "Kim")
-    client.delete(f"/api/games/{link}/players/{p['player_id']}?ban=true", headers=tok(hl["player_token"]))
+    kick(client, link, hl, p, ban=True)
     client.delete(f"/api/games/{link}/players/me", headers=tok(hl["player_token"]))  # last one: closed
     assert me(client, link, p["player_token"])["status"] == "none"  # a closed game forgets removals
 
 
-def test_removals_store_no_more_than_needed(client, app):
-    gid, h, (anna, _) = lobby(client)
-    client.delete(f"/api/games/{gid}/players/{anna['player_id']}?ban=true", headers=tok(h["player_token"]))
-    (row,) = db_rows(app, "SELECT * FROM player_removals")
-    assert anna["player_token"] not in repr(row)
+def test_removals_and_requests_store_no_key(client, app):
+    gid, h, (anna, jonas) = lobby(client)
+    kick(client, gid, h, anna)
+    client.post(f"/api/games/{gid}/rejoin", headers=tok(anna["player_token"]))
+    kick(client, gid, h, jonas, ban=True)
+    rows = db_rows(app, "SELECT * FROM player_removals") + db_rows(app, "SELECT * FROM join_requests")
+    assert len(rows) == 3
+    for key in (anna["player_token"], jonas["player_token"]):
+        assert key not in repr(rows)
     assert "token" not in keys_deep(state(client, gid))
     assert_no_leak(state(client, gid))

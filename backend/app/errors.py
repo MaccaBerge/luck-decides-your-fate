@@ -74,8 +74,12 @@ def removed(reason: str) -> ApiError:
     return ApiError(403, reason, messages[reason])
 
 
-def game_locked() -> ApiError:
-    return ApiError(409, "game_locked", "This game is locked: nobody new can join")
+def game_closed() -> ApiError:
+    return ApiError(409, "game_closed", "This game is closed to new players")
+
+
+def request_not_accepted() -> ApiError:
+    return ApiError(409, "request_not_accepted", "The host hasn't accepted this request")
 
 
 def request_declined() -> ApiError:
@@ -83,7 +87,7 @@ def request_declined() -> ApiError:
 
 
 def request_not_found() -> ApiError:
-    return ApiError(404, "request_not_found", "Nobody is asking to join with that ID")
+    return ApiError(404, "request_not_found", "No request to join found")
 
 
 def unauthorized() -> ApiError:

@@ -15,11 +15,12 @@ from app.db import repository as repo
 from app.db.rows import GameRow, PlayerRow
 from app.errors import (
     entries_limit,
-    game_locked,
+    game_closed,
     not_a_player,
     not_host,
     removed,
     request_declined,
+    request_not_accepted,
     request_not_found,
     validation_error,
 )
@@ -97,63 +98,95 @@ async def remove(ctx: AppContext, game_id: str, player_id: str, reason: str | No
     return True
 
 
-# ---------------------------------------------------------------- removed players
+# ---------------------------------------------------------------- joining, removals and requests
 async def my_status(game: GameRow, token: str | None) -> tuple[str, str | None]:
-    """(status, request) for this browser's key: player, kicked, banned, timed_out or none."""
+    """(status, request) for this browser's key. status: player, kicked, banned, timed_out or
+    none; request: the state of its request to join (pending, accepted, declined) or None."""
     if not token:
         return "none", None
     h = hash_token(token)
     if await repo.player_by_token_hash(game.id, h) is not None:
         return "player", None
     r = await repo.removal_by_token_hash(game.id, h)
-    return (r.reason, r.request) if r else ("none", None)
+    q = await repo.request_by_token_hash(game.id, h)
+    return (r.reason if r else "none"), (q.state if q else None)
 
 
-async def check_can_join(game: GameRow, token: str | None) -> None:
-    """A banned browser can't join again; a kicked one must ask the host (POST .../rejoin)."""
+async def effective_policy(game: GameRow) -> str:
+    """Who can join now. An empty game lets the next person in (they become host), whatever its
+    setting, so it can never be shut for good."""
+    if game.join_policy != "open" and await repo.count_players(game.id) == 0:
+        return "open"
+    return game.join_policy
+
+
+async def check_join(game: GameRow, token: str | None) -> str:
+    """Before someone joins: "open" (join now) or "ask" (send the host a request). A kicked browser
+    must use rejoin, a banned one can't come back, and nobody joins a closed game."""
     status, _ = await my_status(game, token)
     if status in ("kicked", "banned"):
         raise removed(status)
-    # An empty locked game would be shut for ever: the next person in becomes host as usual.
-    if game.locked and await repo.count_players(game.id) > 0:
-        raise game_locked()
+    policy = await effective_policy(game)
+    if policy == "closed":
+        raise game_closed()
+    return policy
 
 
 async def rejoin(ctx: AppContext, game: GameRow, token: str | None) -> bool:
-    """Come back after being removed. Timed out: straight back in (unless locked). Kicked: asks the
-    host. Banned: refused. Returns True if back in, False if the host has been asked. Call with the
-    game's lock held and no spin running."""
-    r = await repo.removal_by_token_hash(game.id, hash_token(token)) if token else None
+    """Come back after being removed. Kicked, or a game that needs the host's OK: send a request.
+    Timed out from an open game: straight back in. Banned or closed: refused. Returns True if back
+    in. Call with the game's lock held and no spin running."""
+    h = hash_token(token) if token else ""
+    r = await repo.removal_by_token_hash(game.id, h) if token else None
     if r is None:
         raise not_a_player()
     if r.reason == "banned":
         raise removed("banned")
-    if r.reason == "kicked":
-        if r.request == "declined":
-            raise request_declined()
-        await repo.set_request(game.id, r.player_id, "pending")
+    q = await repo.request_by_token_hash(game.id, h)
+    if q is not None and q.state == "declined":
+        raise request_declined()
+    if q is not None:
+        return False  # already asked
+    policy = await effective_policy(game)
+    if policy == "closed":
+        raise game_closed()
+    if r.reason == "kicked" or policy == "ask":
+        await repo.add_request(game.id, token_hash=h, player_id=r.player_id, name=r.name, avatar=r.avatar)
         return False
-    if game.locked:
-        raise game_locked()
-    await _readd(ctx, game.id, r.player_id)
+    await _add(ctx, game.id, h, r.player_id, r.name, r.avatar)
     return True
 
 
-async def answer_request(ctx: AppContext, game_id: str, player_id: str, accept: bool) -> None:
-    """The host accepts (back in, even if locked) or declines a kicked player's request."""
-    r = await repo.removal_by_player(game_id, player_id)
-    if r is None or r.request != "pending":
+async def answer_request(game_id: str, player_id: str, accept: bool) -> None:
+    """The host accepts or declines a pending request. Accepted players still confirm (confirm)."""
+    q = await repo.request_by_player(game_id, player_id)
+    if q is None or q.state != "pending":
         raise request_not_found()
-    if accept:
-        await _readd(ctx, game_id, player_id)
-    else:
-        await repo.set_request(game_id, player_id, "declined")
+    await repo.set_request_state(game_id, player_id, "accepted" if accept else "declined")
 
 
-async def _readd(ctx: AppContext, game_id: str, player_id: str) -> None:
+async def confirm(ctx: AppContext, game: GameRow, token: str | None) -> None:
+    """The player still wants in after being accepted: they join, whatever the game's setting."""
+    q = await repo.request_by_token_hash(game.id, hash_token(token)) if token else None
+    if q is None:
+        raise request_not_found()
+    if q.state != "accepted":
+        raise request_not_accepted()
+    await _add(ctx, game.id, q.token_hash, q.player_id, q.name, q.avatar)
+
+
+async def cancel(game: GameRow, token: str | None) -> None:
+    """Withdraw a request, or acknowledge a declined one."""
+    q = await repo.request_by_token_hash(game.id, hash_token(token)) if token else None
+    if q is None:
+        raise request_not_found()
+    await repo.delete_request(game.id, q.token_hash)
+
+
+async def _add(ctx: AppContext, game_id: str, token_hash: str, player_id: str, name: str, avatar: str) -> None:
     if len(await repo.list_entries(game_id)) + 1 > MAX_ENTRIES:
         raise entries_limit()
-    await repo.readd_player(game_id, player_id)
+    await repo.add_known_player(game_id, token_hash=token_hash, player_id=player_id, name=name, avatar=avatar)
     await ensure_host(ctx, game_id)
 
 

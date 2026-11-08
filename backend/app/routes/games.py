@@ -22,7 +22,7 @@ from app.errors import (
     player_not_found,
     validation_error,
 )
-from app.db.ids import JOIN_CODE_LENGTH, new_player_token
+from app.db.ids import JOIN_CODE_LENGTH, new_player_id, new_player_token
 from app.models import (
     AddEntriesRequest,
     JoinCodeLookup,
@@ -192,15 +192,15 @@ async def update_settings(
 ) -> PublicGameState:
     game = await load_game(game_id)
     await players.require_control(game, token)
-    if body.remove_winner is None and body.locked is None:
-        raise validation_error("Provide remove_winner or locked")
-    if body.locked is not None and game.kind != "multiplayer":
+    if body.remove_winner is None and body.join_policy is None:
+        raise validation_error("Provide remove_winner or join_policy")
+    if body.join_policy is not None and game.kind != "multiplayer":
         raise not_multiplayer()
     async with ctx.runtime.mutation(game_id):
         if body.remove_winner is not None:
             await repo.update_settings(game_id, remove_winner=body.remove_winner)
-        if body.locked is not None:
-            await repo.set_locked(game_id, body.locked)
+        if body.join_policy is not None:
+            await repo.set_join_policy(game_id, body.join_policy)
         return await _after_mutation(ctx, game_id)
 
 
@@ -252,11 +252,19 @@ async def join_game(
     game_id: str, body: JoinRequest, ctx: AppContext = Depends(ctx_dep),
     token: str | None = PlayerToken,
 ) -> JoinResponse:
-    """Join. The browser sends its old key if it has one: a kicked or banned key can't simply join
-    again, and nobody new can join a locked game."""
+    """Join, or ask to join if the game needs the host's OK (`requested`: keep the key and confirm
+    once accepted). The browser sends its old key if it has one: a kicked or banned key can't
+    simply join again, and nobody joins a closed game."""
     game = await load_game(game_id)
-    if game.kind == "multiplayer":
-        await players.check_can_join(game, token)
+    if game.kind == "multiplayer" and await players.check_join(game, token) == "ask":
+        name = clean_name(body.name)
+        avatar = players.check_avatar(body.avatar)
+        key = new_player_token()
+        pid = new_player_id()
+        async with ctx.runtime.mutation(game_id):
+            await repo.add_request(game_id, token_hash=players.hash_token(key), player_id=pid, name=name, avatar=avatar)
+            state = await _after_mutation(ctx, game_id)
+        return JoinResponse(requested=True, player_id=pid, player_token=key, state=state)
     return await _join(ctx, game_id, body, host=False)
 
 
@@ -302,7 +310,8 @@ async def my_status(game_id: str, token: str | None = PlayerToken) -> MyStatus:
 async def rejoin(
     game_id: str, ctx: AppContext = Depends(ctx_dep), token: str | None = PlayerToken
 ) -> RejoinResponse:
-    """Come back after being removed: timed out goes straight back in, kicked asks the host."""
+    """Come back after being removed: straight back in from an open game after timing out;
+    otherwise (kicked, or the game needs the host's OK) the host is asked."""
     async with ctx.runtime.mutation(game_id):
         game = await load_game(game_id)
         back = await players.rejoin(ctx, game, token)
@@ -310,17 +319,37 @@ async def rejoin(
     return RejoinResponse(rejoined=back, request=None if back else "pending", state=state)
 
 
+@router.post("/games/{game_id}/join-requests/me/confirm", response_model=PublicGameState)
+async def confirm_join(
+    game_id: str, ctx: AppContext = Depends(ctx_dep), token: str | None = PlayerToken
+) -> PublicGameState:
+    """Accepted by the host, and still want in: join now."""
+    async with ctx.runtime.mutation(game_id):
+        await players.confirm(ctx, await load_game(game_id), token)
+        return await _after_mutation(ctx, game_id)
+
+
+@router.delete("/games/{game_id}/join-requests/me", response_model=PublicGameState)
+async def cancel_join_request(
+    game_id: str, ctx: AppContext = Depends(ctx_dep), token: str | None = PlayerToken
+) -> PublicGameState:
+    """Withdraw a request ("No thanks"), or acknowledge that it was declined."""
+    async with ctx.runtime.mutation(game_id):
+        await players.cancel(await load_game(game_id), token)
+        return await _after_mutation(ctx, game_id)
+
+
 @router.post("/games/{game_id}/join-requests/{player_id}/{answer}", response_model=PublicGameState)
 async def answer_join_request(
     game_id: str, player_id: str, answer: str, ctx: AppContext = Depends(ctx_dep),
     token: str | None = PlayerToken,
 ) -> PublicGameState:
-    """The host accepts or declines a kicked player's request to join again."""
+    """The host accepts (the player then confirms) or declines a request to join."""
     if answer not in ("accept", "decline"):
         raise validation_error("answer: accept or decline")
     await players.require_control(await load_game(game_id), token)
     async with ctx.runtime.mutation(game_id):
-        await players.answer_request(ctx, game_id, player_id, answer == "accept")
+        await players.answer_request(game_id, player_id, answer == "accept")
         return await _after_mutation(ctx, game_id)
 
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from app.db.rows import EntryRow, GameRow, PlayerRow, RemovalRow, SpinRow
+from app.db.rows import EntryRow, GameRow, JoinRequestRow, PlayerRow, SpinRow
 from app.engine.rigging import RuleStatus
 from app.services.backup import BackupStatus
 from app.models import (
@@ -45,9 +45,9 @@ def public_game_state(
     recent_spins: Sequence[SpinRow],
     players: Sequence[PlayerRow] = (),
     here: set[str] | frozenset[str] = frozenset(),
-    requests: Sequence[RemovalRow] = (),
+    requests: Sequence[JoinRequestRow] = (),
 ) -> PublicGameState:
-    # Only id, remove_winner, kind, join_code and locked are read from the game row. Nothing else
+    # Only id, remove_winner, kind, join_code and join_policy are read from the game row. Nothing else
     # of `game` may be used here (never origin, label, mode or target_names).
     multiplayer = game.kind == "multiplayer"
     return PublicGameState(
@@ -55,8 +55,12 @@ def public_game_state(
         game_type="wheel",
         kind=game.kind,
         join_code=game.join_code if multiplayer else None,
-        locked=game.locked if multiplayer else False,
-        join_requests=[JoinRequestOut(player_id=r.player_id, name=r.name, avatar=r.avatar) for r in requests]
+        join_policy=game.join_policy if multiplayer else "open",
+        join_requests=[
+            JoinRequestOut(player_id=r.player_id, name=r.name, avatar=r.avatar, state=r.state)  # type: ignore[arg-type]
+            for r in requests
+            if r.state in ("pending", "accepted")
+        ]
         if multiplayer
         else [],
         players=[player_out(p, p.id in here) for p in players] if multiplayer else [],
