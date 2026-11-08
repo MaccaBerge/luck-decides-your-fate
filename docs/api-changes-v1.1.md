@@ -96,7 +96,8 @@ Controller links are solo games until the controller part of multiplayer (2b); a
 | Field | Value |
 |---|---|
 | `join_policy` | who can join: `"open"` (anyone with the code), `"ask"` (the host accepts each one), `"closed"` (nobody new). `"open"` for solo wheels and by default. |
-| `join_requests` | people asking to join, oldest first: `{ "player_id", "name", "avatar", "state" }`, where `state` is `"pending"` (waiting for the host) or `"accepted"` (the host said yes; waiting for the player to confirm). Declined requests aren't listed. `[]` for solo wheels. |
+| `join_requests` | people asking to join, oldest first: `{ "player_id", "name", "avatar", "state" }`, where `state` is `"pending"` (waiting for the host) or `"accepted"` (the host said yes; waiting for the player to confirm). Declined requests and invitations aren't listed. `[]` for solo wheels. |
+| `removed_players` | kicked and banned players (not those away too long), newest first: `{ "player_id", "name", "avatar", "reason", "invited" }`; `reason` is `"kicked"` or `"banned"`, and `invited` is true once the host has invited them back. `[]` for solo wheels. |
 
 The server remembers why a player was removed (`kicked`, `banned`, or `timed_out` after 10 minutes away), and each request to join, keyed by the hash of the key the browser holds. Leaving on your own records nothing. A closed controller link forgets its removals and requests.
 
@@ -106,9 +107,11 @@ The server remembers why a player was removed (`kicked`, `banned`, or `timed_out
 |---|---|---|---|---|
 | POST | `/api/games/{id}/players` | `{ "name", "avatar" }` | 201 `{ "requested", "player_id", "player_token", "state" }`. `requested: true` in an `"ask"` game: keep the key and confirm once accepted. Sends the browser's old key: a kicked key gets 403 `kicked` (use rejoin), a banned one 403 `banned`. | 409 `game_closed`, as before |
 | DELETE | `/api/games/{id}/players/{player_id}?ban=true` | none | As before; without `ban` the player is **kicked**, with it **banned** (that browser can't come back). Deleting a player's name kicks them. | as before |
-| GET | `/api/games/{id}/players/me` | none | 200 `{ "status", "request" }`: `status` is `player`, `kicked`, `banned`, `timed_out` or `none`; `request` is `pending`, `accepted`, `declined` or null | 404 |
+| GET | `/api/games/{id}/players/me` | none | 200 `{ "status", "request", "invited" }`: `status` is `player`, `kicked`, `banned`, `timed_out` or `none`; `request` is `pending`, `accepted`, `declined` or null; `invited` is true when the accepted request is the host's invitation | 404 |
 | POST | `/api/games/{id}/rejoin` | none | 200 `{ "rejoined", "request", "state" }`: timed out from an `"open"` game goes straight back in; otherwise a request is made (`request: "pending"`; asking twice is fine) | 403 `banned`, 403 `not_a_player`, 409 `request_declined`, 409 `game_closed`, 409 `entries_limit`, 409 `spin_in_progress` |
 | POST | `/api/games/{id}/join-requests/{player_id}/accept` or `/decline` | none | 200 `PublicGameState` (host only) | 403 `not_host`, 404 `request_not_found`, 422 |
+| POST | `/api/games/{id}/removed/{player_id}/invite` | none | 200 `PublicGameState` (host only): invites a kicked or banned player back. A ban is lifted, and they get an accepted request, so they join by confirming it. | 403 `not_host`, 404 `player_not_found`, 409 `not_multiplayer`, 422 |
+| POST | `/api/games/{id}/removed/{player_id}/unban` | none | 200 `PublicGameState` (host only): lifts a ban; that browser is a stranger again and can join (or ask) normally | 403 `not_host`, 404 `player_not_found` (not banned), 409 `not_multiplayer`, 422 |
 | POST | `/api/games/{id}/join-requests/me/confirm` | none | 200 `PublicGameState`: an accepted request joins | 404 `request_not_found`, 409 `request_not_accepted`, 409 `entries_limit` |
 | DELETE | `/api/games/{id}/join-requests/me` | none | 200 `PublicGameState`: withdraw a request ("No thanks"), or acknowledge a "no" | 404 `request_not_found` |
 | PATCH | `/api/games/{id}/settings` | `{ "remove_winner"?, "join_policy"? }` | Both optional now (at least one); `join_policy` is multiplayer only and host only | 409 `not_multiplayer`, 422 |
