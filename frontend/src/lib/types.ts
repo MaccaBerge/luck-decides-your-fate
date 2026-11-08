@@ -55,6 +55,17 @@ export interface JoinRequest {
 export interface MyStatus {
   status: "player" | "kicked" | "banned" | "timed_out" | "none";
   request: "pending" | "accepted" | "declined" | null;
+  /** The accepted request is the host's invitation (after being kicked or banned). */
+  invited: boolean;
+}
+/** A kicked or banned player, for the host's list. */
+export interface RemovedPlayer {
+  player_id: string;
+  name: string;
+  avatar: string;
+  reason: "kicked" | "banned";
+  /** Invited back; waiting for their answer. */
+  invited: boolean;
 }
 export interface PublicGameState {
   id: string;
@@ -68,6 +79,8 @@ export interface PublicGameState {
   join_policy: JoinPolicy;
   /** Multiplayer: people asking to join ("accepted": waiting for them to confirm). */
   join_requests: JoinRequest[];
+  /** Multiplayer: kicked and banned players, newest first (the host's list). */
+  removed_players: RemovedPlayer[];
   entries: Entry[];
   settings: GameSettings;
   current_spin: SpinStarted | null;

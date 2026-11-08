@@ -9,7 +9,8 @@ interface Props {
   policy?: JoinPolicy;
   busy: boolean;
   onJoin: (name: string, avatar: string) => void;
-  onWatch: () => void;
+  /** Offered only in games anyone can join. */
+  onWatch?: () => void;
 }
 
 /** What someone who hasn't joined a multiplayer game sees first. */
@@ -43,9 +44,11 @@ export function JoinScreen({ players, policy = "open", busy, onJoin, onWatch }: 
           <PlayerSetup submitLabel={policy === "ask" ? "Ask to join" : "Join"} busy={busy} onSubmit={onJoin} />
         )}
       </section>
-      <button type="button" onClick={onWatch} className={`${textBtn} self-center`}>
-        Just watch
-      </button>
+      {onWatch && (
+        <button type="button" onClick={onWatch} className={`${textBtn} self-center`}>
+          Just watch
+        </button>
+      )}
     </main>
   );
 }

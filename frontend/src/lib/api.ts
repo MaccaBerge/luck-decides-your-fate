@@ -110,6 +110,9 @@ export const confirmJoin = (id: string) =>
 /** Withdraw a request ("No thanks"), or acknowledge a "no". */
 export const cancelJoinRequest = (id: string) =>
   request<PublicGameState>("DELETE", `${g(id)}/join-requests/me`, undefined, as(id));
+/** The host invites a kicked or banned player back, or lifts a ban. */
+export const removedPlayerAction = (id: string, playerId: string, action: "invite" | "unban") =>
+  request<PublicGameState>("POST", `${g(id)}/removed/${encodeURIComponent(playerId)}/${action}`, undefined, as(id));
 export const answerJoinRequest = (id: string, playerId: string, accept: boolean) =>
   request<PublicGameState>(
     "POST",

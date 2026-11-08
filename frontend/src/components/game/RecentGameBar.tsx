@@ -47,12 +47,12 @@ export function RecentGameBar({ currentGameId }: { currentGameId: string }) {
           clearRecentGame();
           return;
         }
-        const st: MyStatus = getMe(recent.gameId) ? await myStatus(recent.gameId) : { status: "none", request: null };
+        const st: MyStatus = getMe(recent.gameId)
+          ? await myStatus(recent.gameId)
+          : { status: "none", request: null, invited: false };
         if (!alive) return;
-        if (st.status === "banned") {
-          clearRecentGame();
-          return;
-        }
+        // Banned: no bar. The game stays remembered, so an invitation back can still reach them.
+        if (st.status === "banned" && st.request !== "accepted") return;
         setStatus(st);
         setGame(recent);
       })
@@ -110,7 +110,7 @@ export function RecentGameBar({ currentGameId }: { currentGameId: string }) {
   if (status.request === "accepted" || status.request === "declined") {
     return (
       <StatusDialog
-        standing={{ status: status.status === "player" ? "none" : status.status, request: status.request }}
+        standing={{ status: status.status === "player" ? "none" : status.status, request: status.request, invited: status.invited }}
         code={game.code}
         policy="open"
         busy={busy}
@@ -130,7 +130,7 @@ export function RecentGameBar({ currentGameId }: { currentGameId: string }) {
   if (waiting) {
     message = <>You asked to join game {code}. Waiting for the host…</>;
   } else if (removed) {
-    message = status.status === "kicked" ? <>You were removed from game {code}.</> : <>You left game {code} after being away.</>;
+    message = status.status === "kicked" ? <>You were kicked from game {code}.</> : <>You left game {code} after being away.</>;
     action = (
       <button type="button" onClick={() => void ask()} disabled={busy} className={barBtn}>
         {status.status === "kicked" ? "Ask to join again" : "Join again"}

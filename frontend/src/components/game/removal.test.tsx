@@ -7,6 +7,7 @@ import { JoinRequests } from "./JoinRequests";
 import { InviteCard } from "./InviteCard";
 import { JoinScreen } from "./JoinScreen";
 import { NoticeDialog } from "./NoticeDialog";
+import { RemovedPlayers } from "./RemovedPlayers";
 
 const noop = () => {};
 const text = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/\s+/g, " ").trim();
@@ -33,16 +34,47 @@ describe("removed players and requests", () => {
   });
 
   it("kicked: ask to join again (not while the game is closed)", () => {
-    expect(dialog({ status: "kicked", request: null })).toBe("You were removed The host removed you from the game. OK Ask to join again");
+    expect(dialog({ status: "kicked", request: null })).toBe(
+      "You were kicked The host kicked you from the game. You can ask to join again. OK Ask to join again",
+    );
     expect(dialog({ status: "kicked", request: null }, "closed")).toBe(
-      "You were removed The host removed you from the game, and it's closed to new players right now. OK",
+      "You were kicked The host kicked you from the game, and it's closed to new players right now. OK",
     );
   });
 
-  it("banned: no way back", () => {
-    expect(dialog({ status: "banned", request: null })).toBe(
-      "You were removed The host removed you from the game, and you can't join it again. OK",
+  it("banned: clearly different, in red, with no way back", () => {
+    const html = renderToStaticMarkup(
+      <StatusDialog standing={{ status: "banned", request: null }} code="ABC123" policy="open" busy={false} onAsk={noop} onConfirm={noop} onNoThanks={noop} onOk={noop} />,
     );
+    expect(text(html)).toBe("You were banned The host banned you from this game, so you can't join it again. OK");
+    expect(html).toContain('data-tone="danger"');
+    expect(html).toContain("text-danger");
+  });
+
+  it("an invitation back", () => {
+    expect(dialog({ status: "kicked", request: "accepted", invited: true })).toBe(
+      "You're invited back! The host invited you back to game ABC123. Do you want to join? No thanks Join",
+    );
+  });
+
+  it("can be a card on the page instead of a dialog", () => {
+    const html = renderToStaticMarkup(
+      <StatusDialog inline standing={{ status: "banned", request: null }} code="ABC123" policy="open" busy={false} onAsk={noop} onConfirm={noop} onNoThanks={noop} onOk={noop} />,
+    );
+    expect(html).not.toContain('role="dialog"');
+    expect(html).toMatch(/<section aria-label="You were banned"/);
+  });
+
+  it("the host's removed players: kicked, banned and invited", () => {
+    const removed = [
+      { player_id: "a", name: "Mia", avatar: "owl", reason: "banned" as const, invited: false },
+      { player_id: "b", name: "Leo", avatar: "cat", reason: "kicked" as const, invited: false },
+      { player_id: "c", name: "Ida", avatar: "fox", reason: "kicked" as const, invited: true },
+    ];
+    const html = renderToStaticMarkup(<RemovedPlayers removed={removed} busy={false} onInvite={noop} onUnban={noop} />);
+    expect(text(html)).toBe("3 removed players");
+    expect(html).toContain('aria-expanded="false"');
+    expect(renderToStaticMarkup(<RemovedPlayers removed={[]} busy={false} onInvite={noop} onUnban={noop} />)).toBe("");
   });
 
   it("away too long: join again, ask, or nothing, depending on who can join", () => {
@@ -106,10 +138,12 @@ describe("who can join", () => {
   });
 
   it("the join screen follows the setting", () => {
-    const closed = renderToStaticMarkup(<JoinScreen players={[]} policy="closed" busy={false} onJoin={noop} onWatch={noop} />);
+    expect(renderToStaticMarkup(<JoinScreen players={[]} policy="open" busy={false} onJoin={noop} onWatch={noop} />)).toContain(">Just watch<");
+    expect(renderToStaticMarkup(<JoinScreen players={[]} policy="ask" busy={false} onJoin={noop} />)).not.toContain("Just watch");
+    const closed = renderToStaticMarkup(<JoinScreen players={[]} policy="closed" busy={false} onJoin={noop} />);
     expect(closed).toContain('data-testid="game-closed"');
     expect(closed).not.toContain('aria-label="Your name"');
-    const ask = renderToStaticMarkup(<JoinScreen players={[]} policy="ask" busy={false} onJoin={noop} onWatch={noop} />);
+    const ask = renderToStaticMarkup(<JoinScreen players={[]} policy="ask" busy={false} onJoin={noop} />);
     expect(text(ask)).toContain("The host lets you in.");
     expect(ask).toMatch(/type="submit"[^>]*>Ask to join</);
   });
