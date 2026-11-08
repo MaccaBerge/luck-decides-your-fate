@@ -81,3 +81,4 @@ class JoinRequestRow:
     avatar: str
     state: Literal["pending", "accepted", "declined"]
     created_at: str
+    invited: bool = False

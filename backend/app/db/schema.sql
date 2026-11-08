@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS join_requests (
     name       TEXT NOT NULL,
     avatar     TEXT NOT NULL,
     state      TEXT NOT NULL CHECK (state IN ('pending','accepted','declined')),
+    invited    INTEGER NOT NULL DEFAULT 0,  -- the host invited a removed player back (no asking)
     created_at TEXT NOT NULL,
     PRIMARY KEY (game_id, token_hash)
 );

@@ -424,8 +424,9 @@ def test_join_lookup_counts_players(client):
 
 
 # ---------------------------------------------------------------- kick, ban, requests, join policy
-def me(client, gid, token):
-    return client.get(f"/api/games/{gid}/players/me", headers=tok(token)).json()
+def me(client, gid, token, with_invited=False):
+    body = client.get(f"/api/games/{gid}/players/me", headers=tok(token)).json()
+    return body if with_invited else {k: v for k, v in body.items() if k != "invited"}
 
 
 def kick(client, gid, h, p, ban=False):
@@ -610,7 +611,7 @@ def test_join_policy_validation(client):
 
 def test_status_without_a_key_or_in_a_closed_link(client, admin):
     gid, h, _ = lobby(client, ())
-    assert client.get(f"/api/games/{gid}/players/me").json() == {"status": "none", "request": None}
+    assert client.get(f"/api/games/{gid}/players/me").json() == {"status": "none", "request": None, "invited": False}
     assert me(client, gid, h["player_token"])["status"] == "player"
     link = new_link(admin, client, ["A", "B"])
     hl = host(client, link)
@@ -631,3 +632,69 @@ def test_removals_and_requests_store_no_key(client, app):
         assert key not in repr(rows)
     assert "token" not in keys_deep(state(client, gid))
     assert_no_leak(state(client, gid))
+
+
+# ---------------------------------------------------------------- the host's removed players
+def removed_action(client, gid, h, player_id, action):
+    return client.post(f"/api/games/{gid}/removed/{player_id}/{action}", headers=tok(h["player_token"]))
+
+
+def test_host_sees_kicked_and_banned_players(client, app):
+    gid, h, (anna, jonas) = lobby(client)
+    kick(client, gid, h, anna)
+    s = kick(client, gid, h, jonas, ban=True)
+    assert s["removed_players"] == [
+        {"player_id": jonas["player_id"], "name": "Jonas", "avatar": "cat", "reason": "banned", "invited": False},
+        {"player_id": anna["player_id"], "name": "Anna", "avatar": "cat", "reason": "kicked", "invited": False},
+    ]
+    # Players removed for being away aren't listed.
+    later = datetime.now(timezone.utc) + timedelta(minutes=11)
+    client.portal.call(players_service.sweep_once, app.state.ctx, later)
+    assert len(state(client, gid)["removed_players"]) == 2
+
+
+def test_inviting_back_a_banned_player(client):
+    gid, h, (anna, _) = lobby(client)
+    kick(client, gid, h, anna, ban=True)
+    r = removed_action(client, gid, anna, anna["player_id"], "invite")
+    assert r.status_code == 403  # host only
+    s = removed_action(client, gid, h, anna["player_id"], "invite").json()
+    assert s["removed_players"][0]["invited"] is True and s["removed_players"][0]["reason"] == "kicked"
+    assert s["join_requests"] == []  # an invitation isn't a request to answer
+    assert me(client, gid, anna["player_token"], with_invited=True) == {"status": "kicked", "request": "accepted", "invited": True}
+    r = client.post(f"/api/games/{gid}/join-requests/me/confirm", headers=tok(anna["player_token"]))
+    back = next(p for p in r.json()["players"] if p["name"] == "Anna")
+    assert back["id"] == anna["player_id"]
+    assert r.json()["removed_players"] == []
+
+
+def test_declining_an_invitation(client):
+    gid, h, (anna, _) = lobby(client)
+    kick(client, gid, h, anna, ban=True)
+    removed_action(client, gid, h, anna["player_id"], "invite")
+    client.delete(f"/api/games/{gid}/join-requests/me", headers=tok(anna["player_token"]))  # "No thanks"
+    assert me(client, gid, anna["player_token"]) == {"status": "kicked", "request": None}  # the ban stays lifted
+    assert state(client, gid)["removed_players"][0]["invited"] is False
+
+
+def test_unban(client):
+    gid, h, (anna, jonas) = lobby(client)
+    kick(client, gid, h, anna, ban=True)
+    kick(client, gid, h, jonas)
+    r = removed_action(client, gid, h, jonas["player_id"], "unban")
+    assert r.status_code == 404  # only banned players can be unbanned
+    s = removed_action(client, gid, h, anna["player_id"], "unban").json()
+    assert [p["name"] for p in s["removed_players"]] == ["Jonas"]
+    assert me(client, gid, anna["player_token"]) == {"status": "none", "request": None}
+    # A stranger again: joins normally.
+    r = client.post(f"/api/games/{gid}/players", json={"name": "Anna", "avatar": "cat"}, headers=tok(anna["player_token"]))
+    assert r.status_code == 201
+
+
+def test_removed_actions_validation(client):
+    gid, h, _ = lobby(client, ())
+    assert removed_action(client, gid, h, "pl_nobody", "invite").status_code == 404
+    assert removed_action(client, gid, h, "pl_nobody", "pardon").status_code == 422
+    solo = new_game(client)
+    r = client.post(f"/api/games/{solo}/removed/x/invite")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "not_multiplayer"

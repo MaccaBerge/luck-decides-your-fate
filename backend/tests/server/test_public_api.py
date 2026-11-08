@@ -23,7 +23,7 @@ def test_create_game(client):
     body = r.json()
     assert set(body) == {
         "id", "game_type", "kind", "join_code", "entries", "settings", "current_spin",
-        "last_result", "recent_spins", "players", "join_policy", "join_requests",
+        "last_result", "recent_spins", "players", "join_policy", "join_requests", "removed_players",
     }
     assert body["kind"] == "solo" and body["join_code"] is None and body["players"] == []
     assert body["game_type"] == "wheel"

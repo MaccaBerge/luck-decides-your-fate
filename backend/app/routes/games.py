@@ -302,8 +302,8 @@ async def remove_player(
 @router.get("/games/{game_id}/players/me", response_model=MyStatus)
 async def my_status(game_id: str, token: str | None = PlayerToken) -> MyStatus:
     """Is this browser's key a player here, or was it removed (and why)?"""
-    status, request = await players.my_status(await load_game(game_id), token)
-    return MyStatus(status=status, request=request)  # type: ignore[arg-type]
+    status, request, invited = await players.my_status(await load_game(game_id), token)
+    return MyStatus(status=status, request=request, invited=invited)  # type: ignore[arg-type]
 
 
 @router.post("/games/{game_id}/rejoin", response_model=RejoinResponse)
@@ -317,6 +317,26 @@ async def rejoin(
         back = await players.rejoin(ctx, game, token)
         state = await _after_mutation(ctx, game_id)
     return RejoinResponse(rejoined=back, request=None if back else "pending", state=state)
+
+
+@router.post("/games/{game_id}/removed/{player_id}/{action}", response_model=PublicGameState)
+async def removed_player_action(
+    game_id: str, player_id: str, action: str, ctx: AppContext = Depends(ctx_dep),
+    token: str | None = PlayerToken,
+) -> PublicGameState:
+    """The host invites a kicked or banned player back ("invite"), or lifts a ban ("unban")."""
+    if action not in ("invite", "unban"):
+        raise validation_error("action: invite or unban")
+    game = await load_game(game_id)
+    if game.kind != "multiplayer":
+        raise not_multiplayer()
+    await players.require_control(game, token)
+    async with ctx.runtime.mutation(game_id):
+        if action == "invite":
+            await players.invite_back(game_id, player_id)
+        else:
+            await players.unban(game_id, player_id)
+        return await _after_mutation(ctx, game_id)
 
 
 @router.post("/games/{game_id}/join-requests/me/confirm", response_model=PublicGameState)

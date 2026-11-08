@@ -18,6 +18,7 @@ from app.errors import (
     game_closed,
     not_a_player,
     not_host,
+    player_not_found,
     removed,
     request_declined,
     request_not_accepted,
@@ -99,17 +100,18 @@ async def remove(ctx: AppContext, game_id: str, player_id: str, reason: str | No
 
 
 # ---------------------------------------------------------------- joining, removals and requests
-async def my_status(game: GameRow, token: str | None) -> tuple[str, str | None]:
-    """(status, request) for this browser's key. status: player, kicked, banned, timed_out or
-    none; request: the state of its request to join (pending, accepted, declined) or None."""
+async def my_status(game: GameRow, token: str | None) -> tuple[str, str | None, bool]:
+    """(status, request, invited) for this browser's key. status: player, kicked, banned,
+    timed_out or none; request: the state of its request to join (pending, accepted, declined) or
+    None; invited: the accepted request is the host's invitation."""
     if not token:
-        return "none", None
+        return "none", None, False
     h = hash_token(token)
     if await repo.player_by_token_hash(game.id, h) is not None:
-        return "player", None
+        return "player", None, False
     r = await repo.removal_by_token_hash(game.id, h)
     q = await repo.request_by_token_hash(game.id, h)
-    return (r.reason if r else "none"), (q.state if q else None)
+    return (r.reason if r else "none"), (q.state if q else None), bool(q and q.invited)
 
 
 async def effective_policy(game: GameRow) -> str:
@@ -123,7 +125,7 @@ async def effective_policy(game: GameRow) -> str:
 async def check_join(game: GameRow, token: str | None) -> str:
     """Before someone joins: "open" (join now) or "ask" (send the host a request). A kicked browser
     must use rejoin, a banned one can't come back, and nobody joins a closed game."""
-    status, _ = await my_status(game, token)
+    status, _, _ = await my_status(game, token)
     if status in ("kicked", "banned"):
         raise removed(status)
     policy = await effective_policy(game)
@@ -163,6 +165,27 @@ async def answer_request(game_id: str, player_id: str, accept: bool) -> None:
     if q is None or q.state != "pending":
         raise request_not_found()
     await repo.set_request_state(game_id, player_id, "accepted" if accept else "declined")
+
+
+async def invite_back(game_id: str, player_id: str) -> None:
+    """The host invites a kicked or banned player back (lifting a ban): they get an accepted
+    request, and join by confirming it."""
+    r = await repo.removal_by_player(game_id, player_id)
+    token_hash = await repo.removal_token_hash(game_id, player_id)
+    if r is None or token_hash is None or r.reason not in ("kicked", "banned"):
+        raise player_not_found()
+    if r.reason == "banned":
+        await repo.set_removal_reason(game_id, player_id, "kicked")
+    await repo.add_request(game_id, token_hash=token_hash, player_id=player_id, name=r.name,
+                           avatar=r.avatar, invited=True)
+
+
+async def unban(game_id: str, player_id: str) -> None:
+    """The host lifts a ban: that browser is a stranger again and can join (or ask) normally."""
+    r = await repo.removal_by_player(game_id, player_id)
+    if r is None or r.reason != "banned":
+        raise player_not_found()
+    await repo.forget_removal(game_id, player_id)
 
 
 async def confirm(ctx: AppContext, game: GameRow, token: str | None) -> None:

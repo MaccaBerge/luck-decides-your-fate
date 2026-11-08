@@ -68,6 +68,15 @@ class JoinRequestOut(BaseModel):
     state: Literal["pending", "accepted"]
 
 
+class RemovedPlayerOut(BaseModel):
+    """A kicked or banned player, for the host's "Removed players" list."""
+    player_id: str
+    name: str
+    avatar: str
+    reason: Literal["kicked", "banned"]
+    invited: bool                  # the host has invited them back; waiting for their answer
+
+
 class PublicGameState(BaseModel):
     id: str
     game_type: Literal["wheel"]
@@ -75,6 +84,7 @@ class PublicGameState(BaseModel):
     join_code: str | None          # multiplayer only
     join_policy: JoinPolicy        # multiplayer: anyone ("open"), host accepts ("ask"), nobody ("closed")
     join_requests: list[JoinRequestOut]  # multiplayer only
+    removed_players: list[RemovedPlayerOut]  # multiplayer only: kicked and banned, newest first
     entries: list[EntryOut]        # ordered by position, includes inactive
     settings: GameSettingsOut
     current_spin: SpinStarted | None
@@ -126,9 +136,11 @@ class LeaveResponse(BaseModel):
 
 
 class MyStatus(BaseModel):
-    """What this browser's key is in a game: a player, removed (and why), or nothing."""
+    """What this browser's key is in a game: a player, removed (and why), or nothing; and its
+    request to join. `invited`: the accepted request is the host's invitation."""
     status: Literal["player", "kicked", "banned", "timed_out", "none"]
     request: Literal["pending", "accepted", "declined"] | None = None
+    invited: bool = False
 
 
 class RejoinResponse(BaseModel):

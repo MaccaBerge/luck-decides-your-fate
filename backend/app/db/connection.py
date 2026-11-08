@@ -49,10 +49,19 @@ async def init_db(db_path: str) -> None:
             await db.execute("PRAGMA journal_mode = WAL")
         await _add_missing_game_columns(db)
         await db.executescript(schema)
+        await _add_missing_request_columns(db)
         await db.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_games_join_code ON games(join_code)"
             " WHERE join_code IS NOT NULL"
         )
+
+
+async def _add_missing_request_columns(db: aiosqlite.Connection) -> None:
+    """join_requests made before invitations lack the invited column."""
+    async with db.execute("PRAGMA table_info(join_requests)") as cur:
+        columns = {r[1] for r in await cur.fetchall()}
+    if "invited" not in columns:
+        await db.execute("ALTER TABLE join_requests ADD COLUMN invited INTEGER NOT NULL DEFAULT 0")
 
 
 async def _add_missing_game_columns(db: aiosqlite.Connection) -> None:

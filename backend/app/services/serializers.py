@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from app.db.rows import EntryRow, GameRow, JoinRequestRow, PlayerRow, SpinRow
+from app.db.rows import EntryRow, GameRow, JoinRequestRow, PlayerRow, RemovalRow, SpinRow
 from app.engine.rigging import RuleStatus
 from app.services.backup import BackupStatus
 from app.models import (
@@ -25,6 +25,7 @@ from app.models import (
     LinkSummary,
     PlayerOut,
     PublicGameState,
+    RemovedPlayerOut,
     RecentSpin,
     RuleStatusOut,
     RuleTarget,
@@ -46,6 +47,7 @@ def public_game_state(
     players: Sequence[PlayerRow] = (),
     here: set[str] | frozenset[str] = frozenset(),
     requests: Sequence[JoinRequestRow] = (),
+    removed: Sequence[tuple[RemovalRow, bool]] = (),
 ) -> PublicGameState:
     # Only id, remove_winner, kind, join_code and join_policy are read from the game row. Nothing else
     # of `game` may be used here (never origin, label, mode or target_names).
@@ -59,7 +61,13 @@ def public_game_state(
         join_requests=[
             JoinRequestOut(player_id=r.player_id, name=r.name, avatar=r.avatar, state=r.state)  # type: ignore[arg-type]
             for r in requests
-            if r.state in ("pending", "accepted")
+            if r.state in ("pending", "accepted") and not r.invited  # invitations are listed as removed players
+        ]
+        if multiplayer
+        else [],
+        removed_players=[
+            RemovedPlayerOut(player_id=r.player_id, name=r.name, avatar=r.avatar, reason=r.reason, invited=inv)  # type: ignore[arg-type]
+            for r, inv in removed
         ]
         if multiplayer
         else [],
