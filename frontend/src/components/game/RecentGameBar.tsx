@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Users, X } from "lucide-react";
-import { ApiError, findGameByCode } from "../../lib/api";
+import { ApiError, findGameByCode, myStatus } from "../../lib/api";
 import { getMe } from "../../lib/players";
 import { clearRecentGame, getRecentGame, type RecentGame } from "../../lib/recentGame";
 
@@ -12,6 +12,7 @@ import { clearRecentGame, getRecentGame, type RecentGame } from "../../lib/recen
  */
 export function RecentGameBar({ currentGameId }: { currentGameId: string }) {
   const [game, setGame] = useState<RecentGame | null>(null);
+  const [stillIn, setStillIn] = useState(false);
 
   useEffect(() => {
     const recent = getRecentGame();
@@ -19,10 +20,21 @@ export function RecentGameBar({ currentGameId }: { currentGameId: string }) {
     if (!recent || recent.gameId === currentGameId) return;
     let alive = true;
     findGameByCode(recent.code)
-      .then((r) => {
+      .then(async (r) => {
         if (!alive) return;
-        if (r.game_id === recent.gameId && r.players > 0) setGame(recent);
-        else if (r.game_id !== recent.gameId || r.players === 0) clearRecentGame();
+        if (r.game_id !== recent.gameId || r.players === 0) {
+          clearRecentGame();
+          return;
+        }
+        // Still a player? Removed (kicked, away too long) means "Join again"; banned, nothing.
+        const status = getMe(recent.gameId) ? (await myStatus(recent.gameId)).status : "none";
+        if (!alive) return;
+        if (status === "banned") {
+          clearRecentGame();
+          return;
+        }
+        setStillIn(status === "player");
+        setGame(recent);
       })
       .catch((e) => {
         if (alive && e instanceof ApiError && e.status === 404) clearRecentGame(); // the game has ended
@@ -33,7 +45,6 @@ export function RecentGameBar({ currentGameId }: { currentGameId: string }) {
   }, [currentGameId]);
 
   if (!game) return null;
-  const stillIn = getMe(game.gameId) !== null;
   return (
     <div
       data-testid="recent-game-bar"

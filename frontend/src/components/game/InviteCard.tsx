@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { QrZoom } from "./QrZoom";
+import { Switch } from "./Switch";
 import { card } from "./buttons";
 
 interface Props {
@@ -8,6 +9,11 @@ interface Props {
   url: string;
   /** "floating": a corner card for big-screen mode. "panel": a card in the host's side column. */
   variant?: "floating" | "panel";
+  /** Nobody new can join. */
+  locked?: boolean;
+  /** The host's lock switch (panel only). */
+  onLockedChange?: (locked: boolean) => void;
+  lockBusy?: boolean;
 }
 
 /** Copy text: the Clipboard API where allowed, else the older copy command. True if it worked. */
@@ -38,7 +44,7 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 /** The code and a QR code, so people can join from their own devices. */
-export function InviteCard({ code, url, variant = "floating" }: Props) {
+export function InviteCard({ code, url, variant = "floating", locked = false, onLockedChange, lockBusy = false }: Props) {
   const [src, setSrc] = useState<string | null>(null);
 
   useEffect(() => {
@@ -107,7 +113,9 @@ export function InviteCard({ code, url, variant = "floating" }: Props) {
       )}
       {zoomed && src && <QrZoom src={src} code={code} from={qrRef} onClose={() => setZoomed(false)} />}
       <div className="flex min-w-0 flex-col">
-        <span className="text-xs font-medium text-ink-muted">Join with the code</span>
+        <span className="text-xs font-medium text-ink-muted">
+          {locked && !panel ? "Locked: no new players" : "Join with the code"}
+        </span>
         <span className="flex items-center gap-1">
           <span
             ref={codeRef}
@@ -133,6 +141,12 @@ export function InviteCard({ code, url, variant = "floating" }: Props) {
             </button>
           )}
         </span>
+        {panel && onLockedChange && (
+          <span className="mt-2 flex items-center gap-2.5 text-sm text-ink-muted">
+            <Switch checked={locked} onChange={onLockedChange} label="Lock game" disabled={lockBusy} />
+            {locked ? "Locked: nobody new can join" : "Lock game"}
+          </span>
+        )}
       </div>
     </div>
   );

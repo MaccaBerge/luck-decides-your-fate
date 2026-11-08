@@ -5,13 +5,15 @@ import { card, textBtn } from "./buttons";
 
 interface Props {
   players: Player[];
+  /** Nobody new can join: no form, just the reason. */
+  locked?: boolean;
   busy: boolean;
   onJoin: (name: string, avatar: string) => void;
   onWatch: () => void;
 }
 
 /** What someone who hasn't joined a multiplayer game sees first. */
-export function JoinScreen({ players, busy, onJoin, onWatch }: Props) {
+export function JoinScreen({ players, locked = false, busy, onJoin, onWatch }: Props) {
   const host = players.find((p) => p.is_host);
   return (
     <main className="mx-auto flex w-full max-w-md flex-col gap-4">
@@ -32,7 +34,13 @@ export function JoinScreen({ players, busy, onJoin, onWatch }: Props) {
             </span>
           </p>
         )}
-        <PlayerSetup submitLabel="Join" busy={busy} onSubmit={onJoin} />
+        {locked ? (
+          <p data-testid="game-locked" className="rounded-2xl bg-surface-tint px-4 py-3 text-sm text-ink">
+            This game is locked, so nobody new can join right now. Ask the host to unlock it.
+          </p>
+        ) : (
+          <PlayerSetup submitLabel="Join" busy={busy} onSubmit={onJoin} />
+        )}
       </section>
       <button type="button" onClick={onWatch} className={`${textBtn} self-center`}>
         Just watch

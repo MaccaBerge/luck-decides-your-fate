@@ -44,6 +44,16 @@ export interface Player {
   status: "here" | "away";
   is_host: boolean;
 }
+export interface JoinRequest {
+  player_id: string;
+  name: string;
+  avatar: string;
+}
+/** What this browser is in a game: a player, removed (and why), or nothing. */
+export interface MyStatus {
+  status: "player" | "kicked" | "banned" | "timed_out" | "none";
+  request: "pending" | "declined" | null;
+}
 export interface PublicGameState {
   id: string;
   game_type: "wheel";
@@ -52,6 +62,10 @@ export interface PublicGameState {
   join_code: string | null;
   /** Multiplayer only (empty for solo), in joining order. */
   players: Player[];
+  /** Multiplayer: nobody new can join. */
+  locked: boolean;
+  /** Multiplayer: kicked players asking to join again (the host answers). */
+  join_requests: JoinRequest[];
   entries: Entry[];
   settings: GameSettings;
   current_spin: SpinStarted | null;
