@@ -94,6 +94,8 @@ export default function GamePage() {
   // Not (or no longer) a player here: kicked, banned, away too long, or asking to join. This
   // browser keeps its key, so the server can tell.
   const [standing, setStanding] = useState<Standing | null>(null);
+  const standingRef = useRef<Standing | null>(null);
+  standingRef.current = standing;
   // The player ID whose standing the server has told us (until then, show "loading", not the wheel).
   const [statusCheckedFor, setStatusCheckedFor] = useState<string | null>(null);
   // Just became host (the old host left or was away too long).
@@ -250,8 +252,11 @@ export default function GamePage() {
         if (st.status === "none" && st.request === null) {
           clearMe(multiplayerId);
           setMeState(null);
-          if (sawMyself.current) showToast("You're no longer in this game", "info");
+          // Banned until now: the host lifted the ban, so this browser can join (or ask) again.
+          if (standingRef.current?.status === "banned") showToast("You're unbanned from this game.", "info");
+          else if (sawMyself.current) showToast("You're no longer in this game", "info");
           sawMyself.current = false;
+          setStanding(null);
           return;
         }
         setStanding({ status: st.status, request: st.request, invited: st.invited });
@@ -668,7 +673,7 @@ export default function GamePage() {
   if (multiplayer && !myPlayer && (!watching || policyNow !== "open")) {
     return (
       <div className="mx-auto flex min-h-screen w-full max-w-[1180px] flex-col gap-7 px-4 pt-7 pb-12 text-ink sm:px-6">
-        <RecentGameBar currentGameId={game.id} />
+        <RecentGameBar currentGameId={game.id} onNotice={(text) => showToast(text, "info")} />
         {toolbar}
         <JoinScreen players={game.players} policy={policyNow} busy={playerBusy} onJoin={(n, a) => void joinThis(n, a)} onWatch={policyNow === "open" ? () => setWatching(true) : undefined} />
         <footer className="flex justify-center">
@@ -690,7 +695,7 @@ export default function GamePage() {
       }
     >
       <div className={bigScreen ? "hidden" : "contents"}>
-        <RecentGameBar currentGameId={game.id} />
+        <RecentGameBar currentGameId={game.id} onNotice={(text) => showToast(text, "info")} />
         {toolbar}
       </div>
 

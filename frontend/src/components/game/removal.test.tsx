@@ -8,6 +8,7 @@ import { InviteCard } from "./InviteCard";
 import { JoinScreen } from "./JoinScreen";
 import { NoticeDialog } from "./NoticeDialog";
 import { RemovedPlayers } from "./RemovedPlayers";
+import { noticeFor, shouldWatch } from "./RecentGameBar";
 
 const noop = () => {};
 const text = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/\s+/g, " ").trim();
@@ -146,5 +147,30 @@ describe("who can join", () => {
     const ask = renderToStaticMarkup(<JoinScreen players={[]} policy="ask" busy={false} onJoin={noop} />);
     expect(text(ask)).toContain("The host lets you in.");
     expect(ask).toMatch(/type="submit"[^>]*>Ask to join</);
+  });
+});
+
+describe("the recent-game bar keeps checking", () => {
+  const st = (status: string, request: string | null = null) =>
+    ({ status, request, invited: false }) as Parameters<typeof shouldWatch>[0];
+
+  it("while the host can still change something", () => {
+    expect(shouldWatch(st("kicked"))).toBe(true); // asked in another tab, or invited back
+    expect(shouldWatch(st("banned"))).toBe(true); // invited back, or unbanned
+    expect(shouldWatch(st("kicked", "pending"))).toBe(true);
+    expect(shouldWatch(st("none", "pending"))).toBe(true); // a newcomer asking
+  });
+
+  it("not once there's an answer, or nothing can change", () => {
+    for (const s of [st("kicked", "accepted"), st("kicked", "declined"), st("player"), st("none"), st("timed_out"), null]) {
+      expect(shouldWatch(s)).toBe(false);
+    }
+  });
+
+  it("says so when you're unbanned", () => {
+    expect(noticeFor(st("banned"), st("none")!, "ABC123")).toBe("You're unbanned from game ABC123.");
+    expect(noticeFor(st("kicked"), st("none")!, "ABC123")).toBeNull();
+    expect(noticeFor(st("banned"), st("kicked", "accepted")!, "ABC123")).toBeNull(); // invited: a card says it
+    expect(noticeFor(null, st("none")!, "ABC123")).toBeNull();
   });
 });

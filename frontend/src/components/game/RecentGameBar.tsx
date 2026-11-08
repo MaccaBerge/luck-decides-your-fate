@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Users, X } from "lucide-react";
 import { ApiError, cancelJoinRequest, confirmJoin, findGameByCode, myStatus, rejoin } from "../../lib/api";
@@ -7,8 +7,26 @@ import { clearRecentGame, getRecentGame, type RecentGame } from "../../lib/recen
 import type { MyStatus } from "../../lib/types";
 import { StatusDialog } from "./StatusDialog";
 
-/** How often to check while a request to join is waiting for the host. */
+/** How often to check while the host could still change something for you (see `shouldWatch`). */
 const POLL_MS = 5000;
+
+/**
+ * Keep checking while the host can still change your standing: a request waiting for an answer,
+ * or kicked or banned (the host can invite you back, or unban you). Not once there's an answer.
+ */
+export function shouldWatch(st: MyStatus | null): boolean {
+  if (!st) return false;
+  if (st.request === "pending") return true;
+  return (st.status === "kicked" || st.status === "banned") && st.request === null;
+}
+
+/** A short notice when a check finds a change that has no card of its own (being unbanned). */
+export function noticeFor(prev: MyStatus | null, next: MyStatus, code: string): string | null {
+  if (prev?.status === "banned" && next.status === "none" && next.request === null) {
+    return `You're unbanned from game ${code}.`;
+  }
+  return null;
+}
 
 /**
  * A bar at the top of the wheel page about the last multiplayer game you were in (not shown on
@@ -16,15 +34,28 @@ const POLL_MS = 5000;
  * - still a player: "You're still in game ABC123. Back to game"
  * - left it: "Game ABC123 is still going. Join again"
  * - kicked or away too long: "You were removed from game ABC123. Ask to join again"
- * - asked: "You asked to join game ABC123. Waiting for the host…", checked every few seconds.
- *   Accepted: a card asks if you still want to join. Declined: the bar goes and a card says so.
+ * - asked: "You asked to join game ABC123. Waiting for the host…"
+ * - banned: no bar.
+ * Kicked, banned or waiting, it's checked every few seconds: accepted or invited back, a card asks
+ * if you still want to join; declined, the bar goes and a card says so; unbanned, a notice.
  */
-export function RecentGameBar({ currentGameId }: { currentGameId: string }) {
+export function RecentGameBar({
+  currentGameId,
+  onNotice,
+}: {
+  currentGameId: string;
+  /** Shows a short notice (a toast) on the page. */
+  onNotice?: (text: string) => void;
+}) {
   const navigate = useNavigate();
   const [game, setGame] = useState<RecentGame | null>(null);
   const [status, setStatus] = useState<MyStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const statusRef = useRef<MyStatus | null>(null);
+  statusRef.current = status;
+  const noticeRef = useRef(onNotice);
+  noticeRef.current = onNotice;
 
   const forget = useCallback(() => {
     clearRecentGame();
@@ -51,8 +82,8 @@ export function RecentGameBar({ currentGameId }: { currentGameId: string }) {
           ? await myStatus(recent.gameId)
           : { status: "none", request: null, invited: false };
         if (!alive) return;
-        // Banned: no bar. The game stays remembered, so an invitation back can still reach them.
-        if (st.status === "banned" && st.request !== "accepted") return;
+        // Banned: no bar (see below), but still remembered and checked, so an invitation back or
+        // an unban reaches them.
         setStatus(st);
         setGame(recent);
       })
@@ -64,17 +95,35 @@ export function RecentGameBar({ currentGameId }: { currentGameId: string }) {
     };
   }, [currentGameId]);
 
-  // While waiting for the host, check now and then.
+  // While the host can still change something, check now and then, and as soon as the tab is
+  // back on screen. (Checks are skipped while it's hidden.)
   const waiting = status?.request === "pending";
+  const watch = shouldWatch(status);
   useEffect(() => {
-    if (!game || !waiting) return;
-    const t = setInterval(() => {
-      myStatus(game.gameId).then(setStatus, () => {});
-    }, POLL_MS);
-    return () => clearInterval(t);
-  }, [game, waiting]);
+    if (!game || !watch) return;
+    const check = () => {
+      if (document.visibilityState === "hidden") return;
+      myStatus(game.gameId).then(
+        (st) => {
+          const notice = noticeFor(statusRef.current, st, game.code);
+          if (notice) noticeRef.current?.(notice);
+          setStatus(st);
+        },
+        (e) => {
+          if (e instanceof ApiError && e.status === 404) forget(); // the game has ended
+        },
+      );
+    };
+    const t = setInterval(check, POLL_MS);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [game, watch, forget]);
 
-  if (!game || !status) return null;
+  // Banned with nothing to answer: no bar (the checks above still run).
+  if (!game || !status || (status.status === "banned" && status.request === null)) return null;
 
   const ask = async () => {
     setBusy(true);
