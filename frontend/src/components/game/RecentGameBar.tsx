@@ -8,13 +8,13 @@ import type { MyStatus } from "../../lib/types";
 import { StatusDialog } from "./StatusDialog";
 
 /** How often to check while the host could still change something for you (see `shouldWatch`). */
-const POLL_MS = 5000;
+export const POLL_MS = 5000;
 
 /**
  * Keep checking while the host can still change your standing: a request waiting for an answer,
  * or kicked or banned (the host can invite you back, or unban you). Not once there's an answer.
  */
-export function shouldWatch(st: MyStatus | null): boolean {
+export function shouldWatch(st: Pick<MyStatus, "status" | "request"> | null): boolean {
   if (!st) return false;
   if (st.request === "pending") return true;
   return (st.status === "kicked" || st.status === "banned") && st.request === null;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { JoinPolicy } from "../../lib/types";
+import type { JoinPolicy, MyStatus } from "../../lib/types";
 import { KickDialog } from "./KickDialog";
 import { StatusDialog, type Standing } from "./StatusDialog";
 import { JoinRequests } from "./JoinRequests";
@@ -152,7 +152,7 @@ describe("who can join", () => {
 
 describe("the recent-game bar keeps checking", () => {
   const st = (status: string, request: string | null = null) =>
-    ({ status, request, invited: false }) as Parameters<typeof shouldWatch>[0];
+    ({ status, request, invited: false }) as MyStatus | null;
 
   it("while the host can still change something", () => {
     expect(shouldWatch(st("kicked"))).toBe(true); // asked in another tab, or invited back
