@@ -29,7 +29,7 @@ import { PlayerRow } from "../components/game/PlayerRow";
 import { GuestPanel } from "../components/game/GuestPanel";
 import { InviteCard } from "../components/game/InviteCard";
 import { ConfirmDialog } from "../components/game/ConfirmDialog";
-import { RecentGameBar } from "../components/game/RecentGameBar";
+import { POLL_MS, RecentGameBar, shouldWatch } from "../components/game/RecentGameBar";
 import { KickDialog } from "../components/game/KickDialog";
 import { StatusDialog, type Standing } from "../components/game/StatusDialog";
 import { NoticeDialog } from "../components/game/NoticeDialog";
@@ -236,6 +236,23 @@ export default function GamePage() {
     (game?.join_requests.map((r) => `${r.player_id}:${r.state}`).join(",") ?? "") +
     "|" +
     (game?.removed_players.map((r) => `${r.player_id}:${r.invited}`).join(",") ?? "");
+  // The socket can miss an answer (a phone can drop it silently while locked or in the
+  // background), so while the host could still change your standing, also check every few
+  // seconds and whenever the tab comes back on screen, like the recent-game bar does.
+  const [statusTick, setStatusTick] = useState(0);
+  const watchStanding = !listed && shouldWatch(standing);
+  useEffect(() => {
+    if (!watchStanding) return;
+    const tick = () => {
+      if (document.visibilityState !== "hidden") setStatusTick((n) => n + 1);
+    };
+    const t = setInterval(tick, POLL_MS);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [watchStanding]);
   useEffect(() => {
     if (listed) {
       sawMyself.current = true;
@@ -265,7 +282,7 @@ export default function GamePage() {
     return () => {
       alive = false;
     };
-  }, [listed, multiplayerId, myPlayerId, showToast, requestsKey]);
+  }, [listed, multiplayerId, myPlayerId, showToast, requestsKey, statusTick]);
 
   // Became host while playing (not by hosting): say so.
   const myIsHost = !!game?.players.find((p) => p.id === myPlayerId)?.is_host;
