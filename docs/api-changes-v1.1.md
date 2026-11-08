@@ -105,5 +105,5 @@ The server remembers why a player was removed (`kicked`, `banned` or `timed_out`
 
 `POST /api/games/{id}/players` takes the browser's old key in `X-Player-Token`: a kicked key gets 403 `kicked` (ask instead), a banned one 403 `banned`, and anyone gets 409 `game_locked` while the game is locked and has players. (An empty locked game lets the next person in, who becomes host.) A ban is per browser: a private window or another device isn't recognised.
 
-New error codes: `kicked` (403), `banned` (403), `timed_out` (403, reserved), `game_locked` (409), `request_declined` (409), `request_not_found` (404).
+New error codes: `kicked` (403), `banned` (403), `game_locked` (409), `request_declined` (409), `request_not_found` (404).
 
