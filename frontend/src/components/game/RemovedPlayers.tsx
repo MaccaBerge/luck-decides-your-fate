@@ -49,7 +49,7 @@ export function RemovedPlayers({ removed, busy, onInvite, onUnban }: Props) {
                       : "bg-surface-tint text-ink-muted"
                 }`}
               >
-                {p.invited ? "Invited" : p.reason === "banned" ? "Banned" : "Kicked"}
+                {p.invited ? "Invited back" : p.reason === "banned" ? "Banned" : "Kicked"}
               </span>
               {p.reason === "banned" && !p.invited && (
                 <button type="button" onClick={() => onUnban(p)} disabled={busy} className={`${pillBtn} h-9`}>
