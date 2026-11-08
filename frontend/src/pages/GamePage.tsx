@@ -31,7 +31,8 @@ import { InviteCard } from "../components/game/InviteCard";
 import { ConfirmDialog } from "../components/game/ConfirmDialog";
 import { RecentGameBar } from "../components/game/RecentGameBar";
 import { KickDialog } from "../components/game/KickDialog";
-import { RemovedDialog, type Removal } from "../components/game/RemovedDialog";
+import { StatusDialog, type Standing } from "../components/game/StatusDialog";
+import { NoticeDialog } from "../components/game/NoticeDialog";
 import { JoinRequests } from "../components/game/JoinRequests";
 import { ResultDialog } from "../components/game/ResultDialog";
 import { SavedListsDialog } from "../components/game/SavedListsDialog";
@@ -88,8 +89,12 @@ export default function GamePage() {
   const [playerBusy, setPlayerBusy] = useState(false);
   // "Are you sure?" before leaving the game, or before a host starts a new wheel.
   const [confirming, setConfirming] = useState<null | "leave" | "newWheel">(null);
-  // Removed from the game: kicked, banned or away too long (this browser keeps its key).
-  const [removal, setRemoval] = useState<Removal | null>(null);
+  // Not (or no longer) a player here: kicked, banned, away too long, or asking to join. This
+  // browser keeps its key, so the server can tell.
+  const [standing, setStanding] = useState<Standing | null>(null);
+  // Just became host (the old host left or was away too long).
+  const [promoted, setPromoted] = useState(false);
+  const wasHost = useRef<boolean | null>(null);
   // The host choosing between kicking and banning a player.
   const [kickTarget, setKickTarget] = useState<Player | null>(null);
   const sawMyself = useRef(false);
@@ -129,7 +134,9 @@ export default function GamePage() {
     seenSpinIds.current = new Set();
     setMeState(getMe(gameId));
     setWatching(false);
-    setRemoval(null);
+    setStanding(null);
+    setPromoted(false);
+    wasHost.current = null;
     sawMyself.current = false;
   }, [gameId]);
 
@@ -209,11 +216,11 @@ export default function GamePage() {
   const myPlayerId = me?.playerId ?? null;
   const listed = !!game && game.players.some((p) => p.id === myPlayerId);
   const multiplayerId = game?.kind === "multiplayer" ? game.id : null;
-  const requestsKey = game?.join_requests.map((r) => r.player_id).join(",") ?? "";
+  const requestsKey = game?.join_requests.map((r) => `${r.player_id}:${r.state}`).join(",") ?? "";
   useEffect(() => {
     if (listed) {
       sawMyself.current = true;
-      setRemoval(null);
+      setStanding(null);
       return;
     }
     if (!multiplayerId || !myPlayerId) return;
@@ -222,14 +229,14 @@ export default function GamePage() {
       .myStatus(multiplayerId)
       .then((st) => {
         if (!alive || st.status === "player") return;
-        if (st.status === "none") {
+        if (st.status === "none" && st.request === null) {
           clearMe(multiplayerId);
           setMeState(null);
           if (sawMyself.current) showToast("You're no longer in this game", "info");
           sawMyself.current = false;
           return;
         }
-        setRemoval({ status: st.status, request: st.request });
+        setStanding({ status: st.status, request: st.request });
         setWatching(true); // the wheel stays behind the dialog
       })
       .catch(() => {});
@@ -237,6 +244,17 @@ export default function GamePage() {
       alive = false;
     };
   }, [listed, multiplayerId, myPlayerId, showToast, requestsKey]);
+
+  // Became host while playing (not by hosting): say so.
+  const myIsHost = !!game?.players.find((p) => p.id === myPlayerId)?.is_host;
+  useEffect(() => {
+    if (!listed) {
+      wasHost.current = null;
+      return;
+    }
+    if (wasHost.current === false && myIsHost) setPromoted(true);
+    wasHost.current = myIsHost;
+  }, [listed, myIsHost]);
 
   const handleSpinComplete = useCallback((s: SpinStarted) => {
     setAnimating(false);
@@ -327,8 +345,14 @@ export default function GamePage() {
   const joinThis = async (name: string, avatar: string) => {
     setPlayerBusy(true);
     try {
-      becomePlayer(game.id, await api.joinGame(game.id, name, avatar));
-      setWatching(false);
+      const r = await api.joinGame(game.id, name, avatar);
+      becomePlayer(game.id, r);
+      if (r.requested) {
+        // The game needs the host's OK: wait for it, watching the wheel.
+        setStanding({ status: "none", request: "pending" });
+        setWatching(true);
+        if (r.state.join_code) setRecentGame({ gameId: game.id, code: r.state.join_code });
+      } else setWatching(false);
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Could not join");
     } finally {
@@ -372,16 +396,16 @@ export default function GamePage() {
     setPlayerBusy(false);
   };
 
-  // Kicked: ask the host. Away too long: straight back in.
-  const comeBack = async () => {
+  // Kicked or away too long: ask the host, or come straight back into an open game.
+  const askOrRejoin = async () => {
     setPlayerBusy(true);
     try {
       const r = await api.rejoin(game.id);
       setGame(r.state);
       if (r.rejoined) {
-        setRemoval(null);
+        setStanding(null);
         setWatching(false);
-      } else if (removal) setRemoval({ ...removal, request: "pending" });
+      } else setStanding((st) => (st ? { ...st, request: "pending" } : st));
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Could not join again");
     } finally {
@@ -389,10 +413,33 @@ export default function GamePage() {
     }
   };
 
-  // OK on the removed dialog: home, like leaving. A game you can't come back to is forgotten.
-  const removalOk = () => {
-    if (removal?.status === "banned" || removal?.request === "declined") clearRecentGame();
-    setRemoval(null);
+  // Accepted by the host, and still want in.
+  const confirmJoin = async () => {
+    setPlayerBusy(true);
+    try {
+      setGame(await api.confirmJoin(game.id));
+      setStanding(null);
+      setWatching(false);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Could not join");
+    } finally {
+      setPlayerBusy(false);
+    }
+  };
+
+  // Accepted, but changed your mind: withdraw and go home.
+  const noThanks = async () => {
+    await api.cancelJoinRequest(game.id).catch(() => {});
+    clearRecentGame();
+    setStanding(null);
+    navigate("/");
+  };
+
+  // OK: home, like leaving. A game you can't come back to is forgotten; a "no" is acknowledged.
+  const standingOk = () => {
+    if (standing?.request === "declined") void api.cancelJoinRequest(game.id).catch(() => {});
+    if (standing?.status === "banned" || standing?.request === "declined") clearRecentGame();
+    setStanding(null);
     navigate("/");
   };
 
@@ -571,7 +618,7 @@ export default function GamePage() {
       <div className="mx-auto flex min-h-screen w-full max-w-[1180px] flex-col gap-7 px-4 pt-7 pb-12 text-ink sm:px-6">
         <RecentGameBar currentGameId={game.id} />
         {toolbar}
-        <JoinScreen players={game.players} locked={game.locked && game.players.length > 0} busy={playerBusy} onJoin={(n, a) => void joinThis(n, a)} onWatch={() => setWatching(true)} />
+        <JoinScreen players={game.players} policy={game.players.length > 0 ? game.join_policy : "open"} busy={playerBusy} onJoin={(n, a) => void joinThis(n, a)} onWatch={() => setWatching(true)} />
         <footer className="flex justify-center">
           <PrivacyLink />
         </footer>
@@ -621,7 +668,7 @@ export default function GamePage() {
             >
               <Users className="size-4" aria-hidden="true" />
               Multiplayer
-              {!canControl && (
+              {!canControl && game.join_policy !== "closed" && (
                 // The host has the code on their invite card.
                 <>
                   <span aria-hidden="true">·</span>
@@ -699,9 +746,9 @@ export default function GamePage() {
               variant="panel"
               code={game.join_code}
               url={wheelUrl}
-              locked={game.locked}
-              lockBusy={spinning}
-              onLockedChange={(v) => void mutate(() => api.updateSettings(game.id, { locked: v }))}
+              policy={game.join_policy}
+              policyBusy={spinning}
+              onPolicyChange={(v) => void mutate(() => api.updateSettings(game.id, { join_policy: v }))}
             />
           )}
           <EntryPanel
@@ -743,7 +790,7 @@ export default function GamePage() {
       </footer>
 
       {bigScreen && multiplayer && game.join_code && (
-        <InviteCard code={game.join_code} url={wheelUrl} locked={game.locked} />
+        <InviteCard code={game.join_code} url={wheelUrl} policy={game.join_policy} />
       )}
       {bigScreen && (
         <button
@@ -790,13 +837,21 @@ export default function GamePage() {
         onBan={() => void kick(true)}
         onClose={() => setKickTarget(null)}
       />
-      <RemovedDialog
-        removal={removal}
-        locked={game.locked}
+      <StatusDialog
+        standing={standing}
+        code={game.join_code}
+        policy={game.players.length > 0 ? game.join_policy : "open"}
         busy={playerBusy}
-        onAsk={() => void comeBack()}
-        onRejoin={() => void comeBack()}
-        onOk={removalOk}
+        onAsk={() => void askOrRejoin()}
+        onConfirm={() => void confirmJoin()}
+        onNoThanks={() => void noThanks()}
+        onOk={standingOk}
+      />
+      <NoticeDialog
+        open={promoted}
+        title="You're the host now"
+        text="You spin the wheel and decide who can join."
+        onClose={() => setPromoted(false)}
       />
       <ConfirmDialog
         open={confirming !== null}

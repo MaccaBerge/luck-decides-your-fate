@@ -44,15 +44,17 @@ export interface Player {
   status: "here" | "away";
   is_host: boolean;
 }
+export type JoinPolicy = "open" | "ask" | "closed";
 export interface JoinRequest {
   player_id: string;
   name: string;
   avatar: string;
+  state: "pending" | "accepted";
 }
-/** What this browser is in a game: a player, removed (and why), or nothing. */
+/** What this browser is in a game: a player, removed (and why), or nothing; and its request to join. */
 export interface MyStatus {
   status: "player" | "kicked" | "banned" | "timed_out" | "none";
-  request: "pending" | "declined" | null;
+  request: "pending" | "accepted" | "declined" | null;
 }
 export interface PublicGameState {
   id: string;
@@ -62,9 +64,9 @@ export interface PublicGameState {
   join_code: string | null;
   /** Multiplayer only (empty for solo), in joining order. */
   players: Player[];
-  /** Multiplayer: nobody new can join. */
-  locked: boolean;
-  /** Multiplayer: kicked players asking to join again (the host answers). */
+  /** Multiplayer: who can join. Anyone ("open"), the host accepts each one ("ask"), or nobody ("closed"). */
+  join_policy: JoinPolicy;
+  /** Multiplayer: people asking to join ("accepted": waiting for them to confirm). */
   join_requests: JoinRequest[];
   entries: Entry[];
   settings: GameSettings;
@@ -83,6 +85,8 @@ export type PlayerEvent =
   | { type: "game_deleted" };
 
 export interface JoinResponse {
+  /** The game needs the host's OK: this is a request (keep the key, confirm once accepted). */
+  requested: boolean;
   player_id: string;
   /** The key this browser keeps to be recognised as this player. */
   player_token: string;

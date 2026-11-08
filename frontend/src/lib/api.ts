@@ -1,4 +1,4 @@
-import type { ApiErrorBody, JoinResponse, MyStatus, PublicGameState, SpinStarted } from "./types";
+import type { ApiErrorBody, JoinPolicy, JoinResponse, MyStatus, PublicGameState, SpinStarted } from "./types";
 import { getMe } from "./players";
 
 export class ApiError extends Error {
@@ -79,7 +79,7 @@ export const deleteEntry = (id: string, entryId: string) =>
   request<PublicGameState>("DELETE", `${g(id)}/entries/${encodeURIComponent(entryId)}`, undefined, as(id));
 export const shuffleEntries = (id: string) => request<PublicGameState>("POST", `${g(id)}/shuffle`, undefined, as(id));
 export const restoreEntries = (id: string) => request<PublicGameState>("POST", `${g(id)}/restore`, undefined, as(id));
-export const updateSettings = (id: string, s: { remove_winner?: boolean; locked?: boolean }) =>
+export const updateSettings = (id: string, s: { remove_winner?: boolean; join_policy?: JoinPolicy }) =>
   request<PublicGameState>("PATCH", `${g(id)}/settings`, s, as(id));
 export const spin = (id: string) => request<SpinStarted>("POST", `${g(id)}/spin`, undefined, as(id));
 
@@ -101,9 +101,15 @@ export const removePlayer = (id: string, playerId: string, ban = false) =>
     as(id),
   );
 export const myStatus = (id: string) => request<MyStatus>("GET", `${g(id)}/players/me`, undefined, as(id));
-/** Come back after being removed: straight in after timing out; a kicked player asks the host. */
+/** Come back after being removed: straight back into an open game after timing out; otherwise ask. */
 export const rejoin = (id: string) =>
   request<{ rejoined: boolean; request: "pending" | null; state: PublicGameState }>("POST", `${g(id)}/rejoin`, undefined, as(id));
+/** Accepted by the host, and still want in. */
+export const confirmJoin = (id: string) =>
+  request<PublicGameState>("POST", `${g(id)}/join-requests/me/confirm`, undefined, as(id));
+/** Withdraw a request ("No thanks"), or acknowledge a "no". */
+export const cancelJoinRequest = (id: string) =>
+  request<PublicGameState>("DELETE", `${g(id)}/join-requests/me`, undefined, as(id));
 export const answerJoinRequest = (id: string, playerId: string, accept: boolean) =>
   request<PublicGameState>(
     "POST",

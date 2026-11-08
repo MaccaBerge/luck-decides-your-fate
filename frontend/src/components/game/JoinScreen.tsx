@@ -1,19 +1,19 @@
 import { avatarEmoji } from "../../lib/avatars";
-import type { Player } from "../../lib/types";
+import type { JoinPolicy, Player } from "../../lib/types";
 import { PlayerSetup } from "./PlayerSetup";
 import { card, textBtn } from "./buttons";
 
 interface Props {
   players: Player[];
-  /** Nobody new can join: no form, just the reason. */
-  locked?: boolean;
+  /** "closed": no form, just the reason. "ask": the form sends the host a request. */
+  policy?: JoinPolicy;
   busy: boolean;
   onJoin: (name: string, avatar: string) => void;
   onWatch: () => void;
 }
 
 /** What someone who hasn't joined a multiplayer game sees first. */
-export function JoinScreen({ players, locked = false, busy, onJoin, onWatch }: Props) {
+export function JoinScreen({ players, policy = "open", busy, onJoin, onWatch }: Props) {
   const host = players.find((p) => p.is_host);
   return (
     <main className="mx-auto flex w-full max-w-md flex-col gap-4">
@@ -22,6 +22,7 @@ export function JoinScreen({ players, locked = false, busy, onJoin, onWatch }: P
           <p className="font-display text-[26px] leading-tight font-semibold">Join the game</p>
           <p className="text-sm leading-relaxed text-ink-muted">
             {host ? `${host.name} is hosting. ` : ""}Pick a name and an avatar, and you'll get a slice on the wheel.
+            {policy === "ask" && " The host lets you in."}
           </p>
         </div>
         {players.length > 0 && (
@@ -34,12 +35,12 @@ export function JoinScreen({ players, locked = false, busy, onJoin, onWatch }: P
             </span>
           </p>
         )}
-        {locked ? (
-          <p data-testid="game-locked" className="rounded-2xl bg-surface-tint px-4 py-3 text-sm text-ink">
-            This game is locked, so nobody new can join right now. Ask the host to unlock it.
+        {policy === "closed" ? (
+          <p data-testid="game-closed" className="rounded-2xl bg-surface-tint px-4 py-3 text-sm text-ink">
+            This game is closed to new players right now.
           </p>
         ) : (
-          <PlayerSetup submitLabel="Join" busy={busy} onSubmit={onJoin} />
+          <PlayerSetup submitLabel={policy === "ask" ? "Ask to join" : "Join"} busy={busy} onSubmit={onJoin} />
         )}
       </section>
       <button type="button" onClick={onWatch} className={`${textBtn} self-center`}>
