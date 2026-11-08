@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from app.db.rows import EntryRow, GameRow, PlayerRow, SpinRow
+from app.db.rows import EntryRow, GameRow, PlayerRow, RemovalRow, SpinRow
 from app.engine.rigging import RuleStatus
 from app.services.backup import BackupStatus
 from app.models import (
@@ -21,6 +21,7 @@ from app.models import (
     EntryOut,
     GameSettingsOut,
     LastResult,
+    JoinRequestOut,
     LinkSummary,
     PlayerOut,
     PublicGameState,
@@ -44,15 +45,20 @@ def public_game_state(
     recent_spins: Sequence[SpinRow],
     players: Sequence[PlayerRow] = (),
     here: set[str] | frozenset[str] = frozenset(),
+    requests: Sequence[RemovalRow] = (),
 ) -> PublicGameState:
-    # Only id, remove_winner, kind and join_code are read from the game row. Nothing else of
-    # `game` may be used here (never origin, label, mode or target_names).
+    # Only id, remove_winner, kind, join_code and locked are read from the game row. Nothing else
+    # of `game` may be used here (never origin, label, mode or target_names).
     multiplayer = game.kind == "multiplayer"
     return PublicGameState(
         id=game.id,
         game_type="wheel",
         kind=game.kind,
         join_code=game.join_code if multiplayer else None,
+        locked=game.locked if multiplayer else False,
+        join_requests=[JoinRequestOut(player_id=r.player_id, name=r.name, avatar=r.avatar) for r in requests]
+        if multiplayer
+        else [],
         players=[player_out(p, p.id in here) for p in players] if multiplayer else [],
         entries=[entry_out(e) for e in sorted(entries, key=lambda e: e.position)],
         settings=GameSettingsOut(remove_winner=game.remove_winner),

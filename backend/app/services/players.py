@@ -13,7 +13,16 @@ from datetime import datetime, timedelta, timezone
 from app.context import AppContext
 from app.db import repository as repo
 from app.db.rows import GameRow, PlayerRow
-from app.errors import not_a_player, not_host, validation_error
+from app.errors import (
+    entries_limit,
+    game_locked,
+    not_a_player,
+    not_host,
+    removed,
+    request_declined,
+    request_not_found,
+    validation_error,
+)
 from app.services import serializers as ser
 from app.services import views
 from app.timeutil import utc_iso
@@ -75,13 +84,77 @@ async def ensure_host(ctx: AppContext, game_id: str) -> None:
     await repo.set_host(game_id, nxt.id)
 
 
-async def remove(ctx: AppContext, game_id: str, player_id: str) -> bool:
+MAX_ENTRIES = 100
+
+
+async def remove(ctx: AppContext, game_id: str, player_id: str, reason: str | None = None) -> bool:
     """Remove a player and their name from the wheel. Call with the game's lock held and no spin
-    running. The caller broadcasts the change."""
-    if not await repo.remove_player(game_id, player_id):
+    running. The caller broadcasts the change. `reason` (kicked, banned, timed_out) is remembered
+    so their page can say what happened; leaving on your own has none."""
+    if not await repo.remove_player(game_id, player_id, reason):
         return False
     await ensure_host(ctx, game_id)
     return True
+
+
+# ---------------------------------------------------------------- removed players
+async def my_status(game: GameRow, token: str | None) -> tuple[str, str | None]:
+    """(status, request) for this browser's key: player, kicked, banned, timed_out or none."""
+    if not token:
+        return "none", None
+    h = hash_token(token)
+    if await repo.player_by_token_hash(game.id, h) is not None:
+        return "player", None
+    r = await repo.removal_by_token_hash(game.id, h)
+    return (r.reason, r.request) if r else ("none", None)
+
+
+async def check_can_join(game: GameRow, token: str | None) -> None:
+    """A banned browser can't join again; a kicked one must ask the host (POST .../rejoin)."""
+    status, _ = await my_status(game, token)
+    if status in ("kicked", "banned"):
+        raise removed(status)
+    # An empty locked game would be shut for ever: the next person in becomes host as usual.
+    if game.locked and await repo.count_players(game.id) > 0:
+        raise game_locked()
+
+
+async def rejoin(ctx: AppContext, game: GameRow, token: str | None) -> bool:
+    """Come back after being removed. Timed out: straight back in (unless locked). Kicked: asks the
+    host. Banned: refused. Returns True if back in, False if the host has been asked. Call with the
+    game's lock held and no spin running."""
+    r = await repo.removal_by_token_hash(game.id, hash_token(token)) if token else None
+    if r is None:
+        raise not_a_player()
+    if r.reason == "banned":
+        raise removed("banned")
+    if r.reason == "kicked":
+        if r.request == "declined":
+            raise request_declined()
+        await repo.set_request(game.id, r.player_id, "pending")
+        return False
+    if game.locked:
+        raise game_locked()
+    await _readd(ctx, game.id, r.player_id)
+    return True
+
+
+async def answer_request(ctx: AppContext, game_id: str, player_id: str, accept: bool) -> None:
+    """The host accepts (back in, even if locked) or declines a kicked player's request."""
+    r = await repo.removal_by_player(game_id, player_id)
+    if r is None or r.request != "pending":
+        raise request_not_found()
+    if accept:
+        await _readd(ctx, game_id, player_id)
+    else:
+        await repo.set_request(game_id, player_id, "declined")
+
+
+async def _readd(ctx: AppContext, game_id: str, player_id: str) -> None:
+    if len(await repo.list_entries(game_id)) + 1 > MAX_ENTRIES:
+        raise entries_limit()
+    await repo.readd_player(game_id, player_id)
+    await ensure_host(ctx, game_id)
 
 
 async def end_game(ctx: AppContext, game: GameRow) -> None:
@@ -119,7 +192,7 @@ async def sweep_once(ctx: AppContext, now: datetime | None = None) -> list[str]:
             fresh = await repo.get_player(p.game_id, p.id)
             if fresh is None or fresh.last_seen_at >= cutoff or p.id in ctx.manager.players_here(p.game_id):
                 continue
-            if await remove(ctx, p.game_id, p.id):
+            if await remove(ctx, p.game_id, p.id, "timed_out"):
                 removed.append(p.id)
                 changed.add(p.game_id)
     for game_id in changed:

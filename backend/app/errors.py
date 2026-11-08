@@ -64,6 +64,28 @@ def player_not_found() -> ApiError:
     return ApiError(404, "player_not_found", "Player not found")
 
 
+def removed(reason: str) -> ApiError:
+    """This browser's key was removed from the game: kicked, banned or timed_out."""
+    messages = {
+        "kicked": "The host removed you from this game. Ask the host to let you back in.",
+        "banned": "The host removed you from this game, and you can't join it again.",
+        "timed_out": "You were away for too long, so you left the game.",
+    }
+    return ApiError(403, reason, messages[reason])
+
+
+def game_locked() -> ApiError:
+    return ApiError(409, "game_locked", "This game is locked: nobody new can join")
+
+
+def request_declined() -> ApiError:
+    return ApiError(409, "request_declined", "The host said no")
+
+
+def request_not_found() -> ApiError:
+    return ApiError(404, "request_not_found", "Nobody is asking to join with that ID")
+
+
 def unauthorized() -> ApiError:
     return ApiError(401, "unauthorized", "Not logged in")
 

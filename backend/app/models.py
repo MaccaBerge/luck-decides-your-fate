@@ -58,11 +58,20 @@ class PlayerOut(BaseModel):
     is_host: bool
 
 
+class JoinRequestOut(BaseModel):
+    """A kicked player asking to join again (the host accepts or declines)."""
+    player_id: str
+    name: str
+    avatar: str
+
+
 class PublicGameState(BaseModel):
     id: str
     game_type: Literal["wheel"]
     kind: Kind
     join_code: str | None          # multiplayer only
+    locked: bool                   # multiplayer: nobody new can join
+    join_requests: list[JoinRequestOut]  # multiplayer only
     entries: list[EntryOut]        # ordered by position, includes inactive
     settings: GameSettingsOut
     current_spin: SpinStarted | None
@@ -84,7 +93,8 @@ class UpdateEntryRequest(BaseModel):
 
 
 class UpdateSettingsRequest(BaseModel):
-    remove_winner: bool
+    remove_winner: bool | None = None
+    locked: bool | None = None     # multiplayer: nobody new can join (host only)
 
 
 class JoinRequest(BaseModel):
@@ -108,6 +118,19 @@ class LeaveResponse(BaseModel):
     """Leaving as the last player ends the game; `state` is then null (whatever happened to it)."""
     ended: bool
     state: PublicGameState | None
+
+
+class MyStatus(BaseModel):
+    """What this browser's key is in a game: a player, removed (and why), or nothing."""
+    status: Literal["player", "kicked", "banned", "timed_out", "none"]
+    request: Literal["pending", "declined"] | None = None
+
+
+class RejoinResponse(BaseModel):
+    """`rejoined`: back in the game. Otherwise `request` says the host has been asked."""
+    rejoined: bool
+    request: Literal["pending"] | None
+    state: PublicGameState
 
 
 class SocketTicket(BaseModel):

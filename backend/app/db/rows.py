@@ -20,6 +20,7 @@ class GameRow:
     last_activity_at: str
     kind: Kind = "solo"
     join_code: str | None = None
+    locked: bool = False
 
 
 @dataclass(frozen=True)
@@ -55,3 +56,17 @@ class PlayerRow:
     is_host: bool
     joined_at: str
     last_seen_at: str
+
+
+RemovalReason = Literal["kicked", "banned", "timed_out"]
+
+
+@dataclass(frozen=True)
+class RemovalRow:
+    game_id: str
+    player_id: str
+    name: str
+    avatar: str
+    reason: RemovalReason
+    request: Literal["pending", "declined"] | None
+    removed_at: str

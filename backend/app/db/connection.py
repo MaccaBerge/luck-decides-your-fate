@@ -69,3 +69,5 @@ async def _add_missing_game_columns(db: aiosqlite.Connection) -> None:
         )
     if "join_code" not in columns:
         await db.execute("ALTER TABLE games ADD COLUMN join_code TEXT")
+    if "locked" not in columns:
+        await db.execute("ALTER TABLE games ADD COLUMN locked INTEGER NOT NULL DEFAULT 0")

@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS games (
     last_activity_at TEXT NOT NULL,
     -- 'solo' (one screen) or 'multiplayer' (a hosted game people join). Public, unlike origin.
     kind             TEXT NOT NULL DEFAULT 'solo' CHECK (kind IN ('solo','multiplayer')),
-    join_code        TEXT              -- multiplayer only; unique index created in connection.py
+    join_code        TEXT,             -- multiplayer only; unique index created in connection.py
+    locked           INTEGER NOT NULL DEFAULT 0   -- multiplayer: nobody new can join
 );
 CREATE INDEX IF NOT EXISTS idx_games_origin_activity ON games(origin, last_activity_at);
 
@@ -60,3 +61,18 @@ CREATE TABLE IF NOT EXISTS players (
     last_seen_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_players_game ON players(game_id, joined_at);
+
+-- Why a player was removed from a multiplayer game, so their page can say so (and a banned
+-- browser can't rejoin). Keyed by the hash of the key the browser still holds.
+-- request: a kicked player's "ask to join again" ('pending', then 'declined' if refused).
+CREATE TABLE IF NOT EXISTS player_removals (
+    game_id    TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL,
+    player_id  TEXT NOT NULL,
+    name       TEXT NOT NULL,
+    avatar     TEXT NOT NULL,
+    reason     TEXT NOT NULL CHECK (reason IN ('kicked','banned','timed_out')),
+    request    TEXT CHECK (request IN ('pending','declined')),
+    removed_at TEXT NOT NULL,
+    PRIMARY KEY (game_id, token_hash)
+);
