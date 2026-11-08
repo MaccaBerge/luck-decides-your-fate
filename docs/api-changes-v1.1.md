@@ -89,3 +89,21 @@ Controller links are solo games until the controller part of multiplayer (2b); a
 
 **Ending a game.** When the last player leaves, the game ends. An ordinary wheel is deleted (its watchers get `game_deleted`); a controller link is only closed: it goes back to a solo wheel with no code, its names, rule and label kept, so a friend can never delete the controller's link (the owner's decision). The leave response is the same either way; only revisiting the old URL shows the difference. A player removed by the 10-minute sweep doesn't end the game.
 
+## v1.4: kicking, banning and locking
+
+`PublicGameState` has two more multiplayer fields: `locked` (nobody new can join) and `join_requests`: kicked players asking to join again, as `{ "player_id", "name", "avatar" }`. Both are `false` / `[]` for solo wheels.
+
+The server remembers why a player was removed (`kicked`, `banned` or `timed_out`, after 10 minutes away), keyed by the hash of the key their browser still holds, with their name and avatar for a request to join again. Leaving on your own records nothing. A closed controller link forgets its removals.
+
+| Method | Path | Body | Success | Errors |
+|---|---|---|---|---|
+| DELETE | `/api/games/{id}/players/{player_id}?ban=true` | none | As before; without `ban` the player is **kicked** (they can ask to join again), with it **banned** (that browser can't come back). Deleting a player's name kicks them. | as before |
+| GET | `/api/games/{id}/players/me` | none | 200 `{ "status", "request" }`: `status` is `player`, `kicked`, `banned`, `timed_out` or `none`; `request` is `pending`, `declined` or null | 404 |
+| POST | `/api/games/{id}/rejoin` | none | 200 `{ "rejoined", "request", "state" }`: timed out goes straight back in (`rejoined: true`); kicked asks the host (`request: "pending"`) | 403 `banned`, 403 `not_a_player`, 409 `request_declined`, 409 `game_locked`, 409 `entries_limit`, 409 `spin_in_progress` |
+| POST | `/api/games/{id}/join-requests/{player_id}/accept` or `/decline` | none | 200 `PublicGameState` (host only). Accepting puts the player back with the same ID, key, name and avatar, even into a locked game. | 403 `not_host`, 404 `request_not_found`, 422 |
+| PATCH | `/api/games/{id}/settings` | `{ "remove_winner"?, "locked"? }` | Both fields are optional now (at least one); `locked` is multiplayer only and host only | 409 `not_multiplayer`, 422 |
+
+`POST /api/games/{id}/players` takes the browser's old key in `X-Player-Token`: a kicked key gets 403 `kicked` (ask instead), a banned one 403 `banned`, and anyone gets 409 `game_locked` while the game is locked and has players. (An empty locked game lets the next person in, who becomes host.) A ban is per browser: a private window or another device isn't recognised.
+
+New error codes: `kicked` (403), `banned` (403), `timed_out` (403, reserved), `game_locked` (409), `request_declined` (409), `request_not_found` (404).
+
