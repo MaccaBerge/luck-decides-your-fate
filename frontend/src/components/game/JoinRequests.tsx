@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { avatarEmoji, avatarLabel } from "../../lib/avatars";
 import type { JoinRequest } from "../../lib/types";
@@ -13,6 +13,10 @@ interface Props {
 /** For the host: one compact line ("2 players want to join") that expands into the list. */
 export function JoinRequests({ requests, busy, onAnswer }: Props) {
   const [open, setOpen] = useState(false);
+  // Start compact again once everyone has been answered.
+  useEffect(() => {
+    if (requests.length === 0) setOpen(false);
+  }, [requests.length]);
   if (requests.length === 0) return null;
   const pending = requests.filter((r) => r.state === "pending").length;
   const summary =

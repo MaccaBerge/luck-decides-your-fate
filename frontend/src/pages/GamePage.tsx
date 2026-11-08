@@ -140,6 +140,11 @@ export default function GamePage() {
     sawMyself.current = false;
   }, [gameId]);
 
+  // Whether this browser is a player right now. The socket reconnects when this changes, so it
+  // connects with a ticket (counted as "here") once an accepted request turns into a player.
+  // Games this page load has already opened a socket for (see connectGameSocket's alreadyVisited).
+  const socketsOpened = useRef(new Set<string>());
+  const isPlayerHere = !!game && !!me && game.players.some((p) => p.id === me.playerId);
   useEffect(() => {
     if (!gameId) return;
     let alive = true;
@@ -182,14 +187,17 @@ export default function GamePage() {
       (code) => {
         if (alive && code === 4404) setNotFound(true);
       },
+      // Reconnecting on the same page (after joining, or being removed) isn't a new visit.
+      socketsOpened.current.has(gameId),
     );
+    socketsOpened.current.add(gameId);
 
     return () => {
       alive = false;
       dispose();
     };
-    // A new player ID reconnects the socket, now with (or without) a ticket.
-  }, [gameId, me?.playerId, beginSpin, showToast]);
+    // Becoming (or no longer being) a player reconnects the socket, with (or without) a ticket.
+  }, [gameId, me?.playerId, isPlayerHere, beginSpin, showToast]);
 
   useEffect(
     () => () => {

@@ -89,21 +89,30 @@ Controller links are solo games until the controller part of multiplayer (2b); a
 
 **Ending a game.** When the last player leaves, the game ends. An ordinary wheel is deleted (its watchers get `game_deleted`); a controller link is only closed: it goes back to a solo wheel with no code, its names, rule and label kept, so a friend can never delete the controller's link (the owner's decision). The leave response is the same either way; only revisiting the old URL shows the difference. A player removed by the 10-minute sweep doesn't end the game.
 
-## v1.4: kicking, banning and locking
+## v1.4: kicking, banning, requests and who can join
 
-`PublicGameState` has two more multiplayer fields: `locked` (nobody new can join) and `join_requests`: kicked players asking to join again, as `{ "player_id", "name", "avatar" }`. Both are `false` / `[]` for solo wheels.
+`PublicGameState` has two more multiplayer fields:
 
-The server remembers why a player was removed (`kicked`, `banned` or `timed_out`, after 10 minutes away), keyed by the hash of the key their browser still holds, with their name and avatar for a request to join again. Leaving on your own records nothing. A closed controller link forgets its removals.
+| Field | Value |
+|---|---|
+| `join_policy` | who can join: `"open"` (anyone with the code), `"ask"` (the host accepts each one), `"closed"` (nobody new). `"open"` for solo wheels and by default. |
+| `join_requests` | people asking to join, oldest first: `{ "player_id", "name", "avatar", "state" }`, where `state` is `"pending"` (waiting for the host) or `"accepted"` (the host said yes; waiting for the player to confirm). Declined requests aren't listed. `[]` for solo wheels. |
+
+The server remembers why a player was removed (`kicked`, `banned`, or `timed_out` after 10 minutes away), and each request to join, keyed by the hash of the key the browser holds. Leaving on your own records nothing. A closed controller link forgets its removals and requests.
+
+**Requests.** A request is made by a kicked player asking to come back, a timed-out player when the game needs the host's OK, or a newcomer to an `"ask"` game. The host accepts or declines; an accepted player then confirms (they may have changed their mind) and joins with the ID, name and avatar of the request, whatever the game's setting. An empty game lets the next person in (they become host), whatever its setting.
 
 | Method | Path | Body | Success | Errors |
 |---|---|---|---|---|
-| DELETE | `/api/games/{id}/players/{player_id}?ban=true` | none | As before; without `ban` the player is **kicked** (they can ask to join again), with it **banned** (that browser can't come back). Deleting a player's name kicks them. | as before |
-| GET | `/api/games/{id}/players/me` | none | 200 `{ "status", "request" }`: `status` is `player`, `kicked`, `banned`, `timed_out` or `none`; `request` is `pending`, `declined` or null | 404 |
-| POST | `/api/games/{id}/rejoin` | none | 200 `{ "rejoined", "request", "state" }`: timed out goes straight back in (`rejoined: true`); kicked asks the host (`request: "pending"`) | 403 `banned`, 403 `not_a_player`, 409 `request_declined`, 409 `game_locked`, 409 `entries_limit`, 409 `spin_in_progress` |
-| POST | `/api/games/{id}/join-requests/{player_id}/accept` or `/decline` | none | 200 `PublicGameState` (host only). Accepting puts the player back with the same ID, key, name and avatar, even into a locked game. | 403 `not_host`, 404 `request_not_found`, 422 |
-| PATCH | `/api/games/{id}/settings` | `{ "remove_winner"?, "locked"? }` | Both fields are optional now (at least one); `locked` is multiplayer only and host only | 409 `not_multiplayer`, 422 |
+| POST | `/api/games/{id}/players` | `{ "name", "avatar" }` | 201 `{ "requested", "player_id", "player_token", "state" }`. `requested: true` in an `"ask"` game: keep the key and confirm once accepted. Sends the browser's old key: a kicked key gets 403 `kicked` (use rejoin), a banned one 403 `banned`. | 409 `game_closed`, as before |
+| DELETE | `/api/games/{id}/players/{player_id}?ban=true` | none | As before; without `ban` the player is **kicked**, with it **banned** (that browser can't come back). Deleting a player's name kicks them. | as before |
+| GET | `/api/games/{id}/players/me` | none | 200 `{ "status", "request" }`: `status` is `player`, `kicked`, `banned`, `timed_out` or `none`; `request` is `pending`, `accepted`, `declined` or null | 404 |
+| POST | `/api/games/{id}/rejoin` | none | 200 `{ "rejoined", "request", "state" }`: timed out from an `"open"` game goes straight back in; otherwise a request is made (`request: "pending"`; asking twice is fine) | 403 `banned`, 403 `not_a_player`, 409 `request_declined`, 409 `game_closed`, 409 `entries_limit`, 409 `spin_in_progress` |
+| POST | `/api/games/{id}/join-requests/{player_id}/accept` or `/decline` | none | 200 `PublicGameState` (host only) | 403 `not_host`, 404 `request_not_found`, 422 |
+| POST | `/api/games/{id}/join-requests/me/confirm` | none | 200 `PublicGameState`: an accepted request joins | 404 `request_not_found`, 409 `request_not_accepted`, 409 `entries_limit` |
+| DELETE | `/api/games/{id}/join-requests/me` | none | 200 `PublicGameState`: withdraw a request ("No thanks"), or acknowledge a "no" | 404 `request_not_found` |
+| PATCH | `/api/games/{id}/settings` | `{ "remove_winner"?, "join_policy"? }` | Both optional now (at least one); `join_policy` is multiplayer only and host only | 409 `not_multiplayer`, 422 |
 
-`POST /api/games/{id}/players` takes the browser's old key in `X-Player-Token`: a kicked key gets 403 `kicked` (ask instead), a banned one 403 `banned`, and anyone gets 409 `game_locked` while the game is locked and has players. (An empty locked game lets the next person in, who becomes host.) A ban is per browser: a private window or another device isn't recognised.
+A ban is per browser: a private window or another device isn't recognised.
 
-New error codes: `kicked` (403), `banned` (403), `game_locked` (409), `request_declined` (409), `request_not_found` (404).
-
+New error codes: `kicked` (403), `banned` (403), `game_closed` (409), `request_declined` (409), `request_not_accepted` (409), `request_not_found` (404).

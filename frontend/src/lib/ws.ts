@@ -21,6 +21,9 @@ export interface SocketOptions {
    * one visit per page load. It's a flag, not an identifier.
    */
   markResumes?: boolean;
+  /** This page already had a connection (e.g. it reconnects after joining): every connection, the
+   * first included, is a resume, so it doesn't count as a new visit. */
+  alreadyVisited?: boolean;
 }
 
 const isHidden = () => typeof document !== "undefined" && document.visibilityState === "hidden";
@@ -42,7 +45,7 @@ export function openSocket<T>(
   let disposed = false;
   let stop = false;
   let paused = false;
-  let opened = false;
+  let opened = !!options.alreadyVisited;
   let attempt = 0;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let hideTimer: ReturnType<typeof setTimeout> | null = null;
@@ -163,6 +166,7 @@ export const connectGameSocket = (
   gameId: string,
   onEvent: (e: PlayerEvent) => void,
   onClose?: (code: number) => void,
+  alreadyVisited = false,
 ) => {
   const base = `/ws/games/${encodeURIComponent(gameId)}`;
   const path = () =>
@@ -172,5 +176,5 @@ export const connectGameSocket = (
           () => base,
         )
       : base;
-  return openSocket<PlayerEvent>(path, onEvent, onClose, { pauseWhenHidden: true, markResumes: true });
+  return openSocket<PlayerEvent>(path, onEvent, onClose, { pauseWhenHidden: true, markResumes: true, alreadyVisited });
 };
