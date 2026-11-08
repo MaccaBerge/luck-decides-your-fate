@@ -91,11 +91,22 @@ CODE=$(echo "$HOSTED" | jq -r '.state.join_code')
 echo "$HOSTED" | jq -e '.state.kind=="multiplayer" and (.state.players|length)==1 and .state.players[0].is_host' >/dev/null \
   && ok "host a wheel" || fail "host a wheel"
 expect_jq   "find the game by its code"  ".game_id==\"$MP\""  $BASE/api/join/$CODE
-GUEST_KEY=$(curl -sf -X POST $BASE/api/games/$MP/players -H "$H" -d '{"name":"Mia","avatar":"robot"}' | jq -r '.player_token')
+GUEST=$(curl -sf -X POST $BASE/api/games/$MP/players -H "$H" -d '{"name":"Mia","avatar":"robot"}')
+GUEST_KEY=$(echo "$GUEST" | jq -r '.player_token')
+GUEST_ID=$(echo "$GUEST" | jq -r '.player_id')
 expect_jq   "a guest can't spin"  '.error.code=="not_host"'  -X POST $BASE/api/games/$MP/spin -H "X-Player-Token: $GUEST_KEY"
 expect_code 202 "the host spins"  -X POST $BASE/api/games/$MP/spin -H "X-Player-Token: $HOST_KEY"
 sleep 0.8
 expect_jq   "the key is never in public state"  "(tostring|contains(\"$HOST_KEY\")|not) and (.players|length)==2"  $BASE/api/games/$MP
+expect_jq   "the host kicks the guest"  '(.players|length)==1'  -X DELETE $BASE/api/games/$MP/players/$GUEST_ID -H "X-Player-Token: $HOST_KEY"
+expect_jq   "the guest knows it was kicked"  '.status=="kicked"'  $BASE/api/games/$MP/players/me -H "X-Player-Token: $GUEST_KEY"
+expect_jq   "the guest asks to join again"  '.request=="pending" and (.state.join_requests|length)==1'  -X POST $BASE/api/games/$MP/rejoin -H "X-Player-Token: $GUEST_KEY"
+expect_jq   "the host accepts"  '.join_requests[0].state=="accepted" and (.players|length)==1' \
+            -X POST $BASE/api/games/$MP/join-requests/$GUEST_ID/accept -H "X-Player-Token: $HOST_KEY"
+expect_jq   "the guest confirms and is back"  '(.players|length)==2 and (.join_requests|length)==0' \
+            -X POST $BASE/api/games/$MP/join-requests/me/confirm -H "X-Player-Token: $GUEST_KEY"
+expect_jq   "the host closes the game"  '.join_policy=="closed"'  -X PATCH $BASE/api/games/$MP/settings -H "$H" -H "X-Player-Token: $HOST_KEY" -d '{"join_policy":"closed"}'
+expect_jq   "nobody new joins a closed game"  '.error.code=="game_closed"'  -X POST $BASE/api/games/$MP/players -H "$H" -d '{"name":"Late","avatar":"cat"}'
 expect_jq   "a guest leaves"  '.ended==false and (.state.players|length)==1'  -X DELETE $BASE/api/games/$MP/players/me -H "X-Player-Token: $GUEST_KEY"
 expect_jq   "the last player leaving ends the game"  '.ended==true and .state==null'  -X DELETE $BASE/api/games/$MP/players/me -H "X-Player-Token: $HOST_KEY"
 expect_code 404 "an ended wheel is gone"  $BASE/api/games/$MP

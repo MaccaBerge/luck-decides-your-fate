@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 Mode = Literal["fair", "always", "never"]
 LinkStatus = Literal["created", "connected", "disconnected"]
 RuleState = Literal["fair_mode", "active", "no_match", "all_excluded"]
+JoinPolicy = Literal["open", "ask", "closed"]
 
 
 # ---------- public ----------
@@ -58,11 +59,32 @@ class PlayerOut(BaseModel):
     is_host: bool
 
 
+class JoinRequestOut(BaseModel):
+    """Someone asking to join (a newcomer, or a removed player asking to come back). 'accepted':
+    the host said yes and the player hasn't confirmed yet."""
+    player_id: str
+    name: str
+    avatar: str
+    state: Literal["pending", "accepted"]
+
+
+class RemovedPlayerOut(BaseModel):
+    """A kicked or banned player, for the host's "Removed players" list."""
+    player_id: str
+    name: str
+    avatar: str
+    reason: Literal["kicked", "banned"]
+    invited: bool                  # the host has invited them back; waiting for their answer
+
+
 class PublicGameState(BaseModel):
     id: str
     game_type: Literal["wheel"]
     kind: Kind
     join_code: str | None          # multiplayer only
+    join_policy: JoinPolicy        # multiplayer: anyone ("open"), host accepts ("ask"), nobody ("closed")
+    join_requests: list[JoinRequestOut]  # multiplayer only
+    removed_players: list[RemovedPlayerOut]  # multiplayer only: kicked and banned, newest first
     entries: list[EntryOut]        # ordered by position, includes inactive
     settings: GameSettingsOut
     current_spin: SpinStarted | None
@@ -84,7 +106,8 @@ class UpdateEntryRequest(BaseModel):
 
 
 class UpdateSettingsRequest(BaseModel):
-    remove_winner: bool
+    remove_winner: bool | None = None
+    join_policy: JoinPolicy | None = None   # multiplayer, host only
 
 
 class JoinRequest(BaseModel):
@@ -94,6 +117,8 @@ class JoinRequest(BaseModel):
 
 
 class JoinResponse(BaseModel):
+    # True: the game needs the host's OK, so this is a request (keep the key; confirm once accepted).
+    requested: bool = False
     player_id: str
     player_token: str              # shown once; the browser keeps it, the server stores a hash
     state: PublicGameState
@@ -108,6 +133,21 @@ class LeaveResponse(BaseModel):
     """Leaving as the last player ends the game; `state` is then null (whatever happened to it)."""
     ended: bool
     state: PublicGameState | None
+
+
+class MyStatus(BaseModel):
+    """What this browser's key is in a game: a player, removed (and why), or nothing; and its
+    request to join. `invited`: the accepted request is the host's invitation."""
+    status: Literal["player", "kicked", "banned", "timed_out", "none"]
+    request: Literal["pending", "accepted", "declined"] | None = None
+    invited: bool = False
+
+
+class RejoinResponse(BaseModel):
+    """`rejoined`: back in the game. Otherwise `request` says the host has been asked."""
+    rejoined: bool
+    request: Literal["pending"] | None
+    state: PublicGameState
 
 
 class SocketTicket(BaseModel):

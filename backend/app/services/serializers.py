@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from app.db.rows import EntryRow, GameRow, PlayerRow, SpinRow
+from app.db.rows import EntryRow, GameRow, JoinRequestRow, PlayerRow, RemovalRow, SpinRow
 from app.engine.rigging import RuleStatus
 from app.services.backup import BackupStatus
 from app.models import (
@@ -21,9 +21,11 @@ from app.models import (
     EntryOut,
     GameSettingsOut,
     LastResult,
+    JoinRequestOut,
     LinkSummary,
     PlayerOut,
     PublicGameState,
+    RemovedPlayerOut,
     RecentSpin,
     RuleStatusOut,
     RuleTarget,
@@ -44,15 +46,31 @@ def public_game_state(
     recent_spins: Sequence[SpinRow],
     players: Sequence[PlayerRow] = (),
     here: set[str] | frozenset[str] = frozenset(),
+    requests: Sequence[JoinRequestRow] = (),
+    removed: Sequence[tuple[RemovalRow, bool]] = (),
 ) -> PublicGameState:
-    # Only id, remove_winner, kind and join_code are read from the game row. Nothing else of
-    # `game` may be used here (never origin, label, mode or target_names).
+    # Only id, remove_winner, kind, join_code and join_policy are read from the game row. Nothing else
+    # of `game` may be used here (never origin, label, mode or target_names).
     multiplayer = game.kind == "multiplayer"
     return PublicGameState(
         id=game.id,
         game_type="wheel",
         kind=game.kind,
         join_code=game.join_code if multiplayer else None,
+        join_policy=game.join_policy if multiplayer else "open",
+        join_requests=[
+            JoinRequestOut(player_id=r.player_id, name=r.name, avatar=r.avatar, state=r.state)  # type: ignore[arg-type]
+            for r in requests
+            if r.state in ("pending", "accepted") and not r.invited  # invitations are listed as removed players
+        ]
+        if multiplayer
+        else [],
+        removed_players=[
+            RemovedPlayerOut(player_id=r.player_id, name=r.name, avatar=r.avatar, reason=r.reason, invited=inv)  # type: ignore[arg-type]
+            for r, inv in removed
+        ]
+        if multiplayer
+        else [],
         players=[player_out(p, p.id in here) for p in players] if multiplayer else [],
         entries=[entry_out(e) for e in sorted(entries, key=lambda e: e.position)],
         settings=GameSettingsOut(remove_winner=game.remove_winner),

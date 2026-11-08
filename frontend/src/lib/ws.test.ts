@@ -128,6 +128,12 @@ describe("the wheel socket pauses while the tab is hidden", () => {
     dispose();
   });
 
+  it("marks even the first connection as a resume when the page reconnects", () => {
+    const dispose = connectGameSocket("abc", () => {}, undefined, true);
+    expect(urls()).toEqual(["/ws/games/abc?resume=1"]);
+    dispose();
+  });
+
   it("retries without the flag while no connection has opened yet", () => {
     const dispose = connectGameSocket("abc", () => {});
     FakeSocket.instances[0].onclose?.({ code: 1006 });

@@ -11,7 +11,10 @@ CREATE TABLE IF NOT EXISTS games (
     last_activity_at TEXT NOT NULL,
     -- 'solo' (one screen) or 'multiplayer' (a hosted game people join). Public, unlike origin.
     kind             TEXT NOT NULL DEFAULT 'solo' CHECK (kind IN ('solo','multiplayer')),
-    join_code        TEXT              -- multiplayer only; unique index created in connection.py
+    join_code        TEXT,             -- multiplayer only; unique index created in connection.py
+    -- multiplayer: who can join. 'open': anyone with the code; 'ask': the host accepts each one;
+    -- 'closed': nobody new.
+    join_policy      TEXT NOT NULL DEFAULT 'open' CHECK (join_policy IN ('open','ask','closed'))
 );
 CREATE INDEX IF NOT EXISTS idx_games_origin_activity ON games(origin, last_activity_at);
 
@@ -60,3 +63,31 @@ CREATE TABLE IF NOT EXISTS players (
     last_seen_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_players_game ON players(game_id, joined_at);
+
+-- Why a player was removed from a multiplayer game, so their page can say so (and a banned
+-- browser can't rejoin). Keyed by the hash of the key the browser still holds.
+CREATE TABLE IF NOT EXISTS player_removals (
+    game_id    TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL,
+    player_id  TEXT NOT NULL,
+    name       TEXT NOT NULL,
+    avatar     TEXT NOT NULL,
+    reason     TEXT NOT NULL CHECK (reason IN ('kicked','banned','timed_out')),
+    removed_at TEXT NOT NULL,
+    PRIMARY KEY (game_id, token_hash)
+);
+
+-- Asking to join: a kicked or timed-out player asking to come back, or a newcomer to a game that
+-- needs the host's OK. Keyed by the hash of the key the asking browser holds. 'accepted' waits for
+-- the player to confirm they still want to join.
+CREATE TABLE IF NOT EXISTS join_requests (
+    game_id    TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL,
+    player_id  TEXT NOT NULL,     -- a returning player keeps theirs; a newcomer gets one now
+    name       TEXT NOT NULL,
+    avatar     TEXT NOT NULL,
+    state      TEXT NOT NULL CHECK (state IN ('pending','accepted','declined')),
+    invited    INTEGER NOT NULL DEFAULT 0,  -- the host invited a removed player back (no asking)
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (game_id, token_hash)
+);

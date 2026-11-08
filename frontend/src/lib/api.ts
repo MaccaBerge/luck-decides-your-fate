@@ -1,4 +1,4 @@
-import type { ApiErrorBody, JoinResponse, PublicGameState, SpinStarted } from "./types";
+import type { ApiErrorBody, JoinPolicy, JoinResponse, MyStatus, PublicGameState, SpinStarted } from "./types";
 import { getMe } from "./players";
 
 export class ApiError extends Error {
@@ -79,20 +79,47 @@ export const deleteEntry = (id: string, entryId: string) =>
   request<PublicGameState>("DELETE", `${g(id)}/entries/${encodeURIComponent(entryId)}`, undefined, as(id));
 export const shuffleEntries = (id: string) => request<PublicGameState>("POST", `${g(id)}/shuffle`, undefined, as(id));
 export const restoreEntries = (id: string) => request<PublicGameState>("POST", `${g(id)}/restore`, undefined, as(id));
-export const updateSettings = (id: string, s: { remove_winner: boolean }) =>
+export const updateSettings = (id: string, s: { remove_winner?: boolean; join_policy?: JoinPolicy }) =>
   request<PublicGameState>("PATCH", `${g(id)}/settings`, s, as(id));
 export const spin = (id: string) => request<SpinStarted>("POST", `${g(id)}/spin`, undefined, as(id));
 
 // Multiplayer
 export const hostGame = (id: string, name: string, avatar: string) =>
   request<JoinResponse>("POST", `${g(id)}/host`, { name, avatar }, as(id));
+/** Sends this browser's old key, if any: a kicked or banned browser can't simply join again. */
 export const joinGame = (id: string, name: string, avatar: string) =>
-  request<JoinResponse>("POST", `${g(id)}/players`, { name, avatar });
+  request<JoinResponse>("POST", `${g(id)}/players`, { name, avatar }, as(id));
 /** Leaving as the last player ends the game (`ended`, and no state). */
 export const leaveGame = (id: string) =>
   request<{ ended: boolean; state: PublicGameState | null }>("DELETE", `${g(id)}/players/me`, undefined, as(id));
-export const removePlayer = (id: string, playerId: string) =>
-  request<PublicGameState>("DELETE", `${g(id)}/players/${encodeURIComponent(playerId)}`, undefined, as(id));
+/** The host kicks a player (they can ask to join again) or bans them. */
+export const removePlayer = (id: string, playerId: string, ban = false) =>
+  request<PublicGameState>(
+    "DELETE",
+    `${g(id)}/players/${encodeURIComponent(playerId)}${ban ? "?ban=true" : ""}`,
+    undefined,
+    as(id),
+  );
+export const myStatus = (id: string) => request<MyStatus>("GET", `${g(id)}/players/me`, undefined, as(id));
+/** Come back after being removed: straight back into an open game after timing out; otherwise ask. */
+export const rejoin = (id: string) =>
+  request<{ rejoined: boolean; request: "pending" | null; state: PublicGameState }>("POST", `${g(id)}/rejoin`, undefined, as(id));
+/** Accepted by the host, and still want in. */
+export const confirmJoin = (id: string) =>
+  request<PublicGameState>("POST", `${g(id)}/join-requests/me/confirm`, undefined, as(id));
+/** Withdraw a request ("No thanks"), or acknowledge a "no". */
+export const cancelJoinRequest = (id: string) =>
+  request<PublicGameState>("DELETE", `${g(id)}/join-requests/me`, undefined, as(id));
+/** The host invites a kicked or banned player back, or lifts a ban. */
+export const removedPlayerAction = (id: string, playerId: string, action: "invite" | "unban") =>
+  request<PublicGameState>("POST", `${g(id)}/removed/${encodeURIComponent(playerId)}/${action}`, undefined, as(id));
+export const answerJoinRequest = (id: string, playerId: string, accept: boolean) =>
+  request<PublicGameState>(
+    "POST",
+    `${g(id)}/join-requests/${encodeURIComponent(playerId)}/${accept ? "accept" : "decline"}`,
+    undefined,
+    as(id),
+  );
 export const socketTicket = (id: string) =>
   request<{ ticket: string }>("POST", `${g(id)}/socket-ticket`, undefined, as(id));
 export const findGameByCode = (code: string) =>

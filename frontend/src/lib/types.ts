@@ -44,6 +44,29 @@ export interface Player {
   status: "here" | "away";
   is_host: boolean;
 }
+export type JoinPolicy = "open" | "ask" | "closed";
+export interface JoinRequest {
+  player_id: string;
+  name: string;
+  avatar: string;
+  state: "pending" | "accepted";
+}
+/** What this browser is in a game: a player, removed (and why), or nothing; and its request to join. */
+export interface MyStatus {
+  status: "player" | "kicked" | "banned" | "timed_out" | "none";
+  request: "pending" | "accepted" | "declined" | null;
+  /** The accepted request is the host's invitation (after being kicked or banned). */
+  invited: boolean;
+}
+/** A kicked or banned player, for the host's list. */
+export interface RemovedPlayer {
+  player_id: string;
+  name: string;
+  avatar: string;
+  reason: "kicked" | "banned";
+  /** Invited back; waiting for their answer. */
+  invited: boolean;
+}
 export interface PublicGameState {
   id: string;
   game_type: "wheel";
@@ -52,6 +75,12 @@ export interface PublicGameState {
   join_code: string | null;
   /** Multiplayer only (empty for solo), in joining order. */
   players: Player[];
+  /** Multiplayer: who can join. Anyone ("open"), the host accepts each one ("ask"), or nobody ("closed"). */
+  join_policy: JoinPolicy;
+  /** Multiplayer: people asking to join ("accepted": waiting for them to confirm). */
+  join_requests: JoinRequest[];
+  /** Multiplayer: kicked and banned players, newest first (the host's list). */
+  removed_players: RemovedPlayer[];
   entries: Entry[];
   settings: GameSettings;
   current_spin: SpinStarted | null;
@@ -69,6 +98,8 @@ export type PlayerEvent =
   | { type: "game_deleted" };
 
 export interface JoinResponse {
+  /** The game needs the host's OK: this is a request (keep the key, confirm once accepted). */
+  requested: boolean;
   player_id: string;
   /** The key this browser keeps to be recognised as this player. */
   player_token: string;

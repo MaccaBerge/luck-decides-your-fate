@@ -7,7 +7,7 @@ import aiosqlite
 
 from app.db.connection import connect
 from app.db.ids import new_entry_id, new_game_id, new_join_code, new_player_id, next_color
-from app.db.rows import EntryRow, GameRow, Mode, Origin, PlayerRow, SpinRow
+from app.db.rows import EntryRow, GameRow, JoinRequestRow, Mode, Origin, PlayerRow, RemovalRow, SpinRow
 from app.timeutil import utc_iso_days_ago, utc_now_iso
 
 
@@ -41,6 +41,7 @@ def _game(r: aiosqlite.Row) -> GameRow:
         last_activity_at=r["last_activity_at"],
         kind=r["kind"],
         join_code=r["join_code"],
+        join_policy=r["join_policy"],
     )
 
 
@@ -390,7 +391,11 @@ async def make_multiplayer(game_id: str) -> GameRow | None:
 async def close_multiplayer(game_id: str) -> None:
     """Turn a multiplayer game back into a solo wheel: no code. (Its players are already gone.)"""
     async with connect() as db:
-        await db.execute("UPDATE games SET kind = 'solo', join_code = NULL WHERE id = ?", (game_id,))
+        await db.execute(
+            "UPDATE games SET kind = 'solo', join_code = NULL, join_policy = 'open' WHERE id = ?", (game_id,)
+        )
+        await db.execute("DELETE FROM player_removals WHERE game_id = ?", (game_id,))
+        await db.execute("DELETE FROM join_requests WHERE game_id = ?", (game_id,))
 
 
 async def count_players(game_id: str) -> int:
@@ -460,9 +465,18 @@ async def player_for_entry(game_id: str, entry_id: str) -> PlayerRow | None:
     return _player(r) if r else None
 
 
-async def remove_player(game_id: str, player_id: str) -> bool:
-    """Delete the player's entry; the player row goes with it (ON DELETE CASCADE)."""
+async def remove_player(game_id: str, player_id: str, reason: str | None = None) -> bool:
+    """Delete the player's entry; the player row goes with it (ON DELETE CASCADE). With a `reason`
+    (kicked, banned, timed_out), remember it for the key their browser still holds."""
     async with connect() as db:
+        if reason is not None:
+            await db.execute(
+                "INSERT OR REPLACE INTO player_removals (game_id, token_hash, player_id, name, avatar,"
+                " reason, removed_at)"
+                " SELECT p.game_id, p.token_hash, p.id, e.name, p.avatar, ?, ?"
+                " FROM players p JOIN entries e ON e.id = p.entry_id WHERE p.game_id = ? AND p.id = ?",
+                (reason, utc_now_iso(), game_id, player_id),
+            )
         cur = await db.execute(
             "DELETE FROM entries WHERE id = (SELECT entry_id FROM players WHERE game_id = ? AND id = ?)",
             (game_id, player_id),
@@ -490,3 +504,153 @@ async def players_last_seen_before(cutoff: str) -> list[PlayerRow]:
             _PLAYER_SELECT + " WHERE p.last_seen_at < ? ORDER BY p.game_id, p.joined_at", (cutoff,)
         ) as cur:
             return [_player(r) for r in await cur.fetchall()]
+
+
+# ---------- removals, requests to join and the join policy ----------
+def _removal(r: aiosqlite.Row) -> RemovalRow:
+    return RemovalRow(
+        game_id=r["game_id"], player_id=r["player_id"], name=r["name"], avatar=r["avatar"],
+        reason=r["reason"], removed_at=r["removed_at"],
+    )
+
+
+def _request(r: aiosqlite.Row) -> JoinRequestRow:
+    return JoinRequestRow(
+        game_id=r["game_id"], token_hash=r["token_hash"], player_id=r["player_id"], name=r["name"],
+        avatar=r["avatar"], state=r["state"], created_at=r["created_at"], invited=bool(r["invited"]),
+    )
+
+
+async def removal_by_token_hash(game_id: str, token_hash: str) -> RemovalRow | None:
+    async with connect() as db:
+        async with db.execute(
+            "SELECT * FROM player_removals WHERE game_id = ? AND token_hash = ?", (game_id, token_hash)
+        ) as cur:
+            r = await cur.fetchone()
+    return _removal(r) if r else None
+
+
+async def request_by_token_hash(game_id: str, token_hash: str) -> JoinRequestRow | None:
+    async with connect() as db:
+        async with db.execute(
+            "SELECT * FROM join_requests WHERE game_id = ? AND token_hash = ?", (game_id, token_hash)
+        ) as cur:
+            r = await cur.fetchone()
+    return _request(r) if r else None
+
+
+async def request_by_player(game_id: str, player_id: str) -> JoinRequestRow | None:
+    async with connect() as db:
+        async with db.execute(
+            "SELECT * FROM join_requests WHERE game_id = ? AND player_id = ?", (game_id, player_id)
+        ) as cur:
+            r = await cur.fetchone()
+    return _request(r) if r else None
+
+
+async def open_requests(game_id: str) -> list[JoinRequestRow]:
+    """Pending and accepted (waiting for the player) requests, oldest first."""
+    async with connect() as db:
+        async with db.execute(
+            "SELECT * FROM join_requests WHERE game_id = ? AND state IN ('pending','accepted')"
+            " ORDER BY created_at, rowid",
+            (game_id,),
+        ) as cur:
+            return [_request(r) for r in await cur.fetchall()]
+
+
+async def add_request(game_id: str, *, token_hash: str, player_id: str, name: str, avatar: str,
+                      invited: bool = False) -> None:
+    """A request to join: 'pending' (asked), or straight to 'accepted' when the host invites."""
+    async with connect() as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO join_requests (game_id, token_hash, player_id, name, avatar, state,"
+            " invited, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (game_id, token_hash, player_id, name, avatar, "accepted" if invited else "pending",
+             1 if invited else 0, utc_now_iso()),
+        )
+
+
+async def set_request_state(game_id: str, player_id: str, state: str) -> None:
+    async with connect() as db:
+        await db.execute(
+            "UPDATE join_requests SET state = ? WHERE game_id = ? AND player_id = ?", (state, game_id, player_id)
+        )
+
+
+async def delete_request(game_id: str, token_hash: str) -> None:
+    async with connect() as db:
+        await db.execute("DELETE FROM join_requests WHERE game_id = ? AND token_hash = ?", (game_id, token_hash))
+
+
+async def add_known_player(game_id: str, *, token_hash: str, player_id: str, name: str,
+                           avatar: str) -> PlayerRow:
+    """Add a player whose ID and key already exist (a returning player, or an accepted request).
+    Their removal and request, if any, are forgotten."""
+    now = utc_now_iso()
+    async with connect() as db:
+        (entry_id,) = await _insert_entries(db, game_id, [name])
+        await db.execute(
+            "INSERT INTO players (id, game_id, entry_id, avatar, is_host, token_hash, joined_at,"
+            " last_seen_at) VALUES (?, ?, ?, ?, 0, ?, ?, ?)",
+            (player_id, game_id, entry_id, avatar, token_hash, now, now),
+        )
+        await db.execute("DELETE FROM player_removals WHERE game_id = ? AND token_hash = ?", (game_id, token_hash))
+        await db.execute("DELETE FROM join_requests WHERE game_id = ? AND token_hash = ?", (game_id, token_hash))
+        async with db.execute(_PLAYER_SELECT + " WHERE p.id = ?", (player_id,)) as cur:
+            return _player(await cur.fetchone())
+
+
+async def set_join_policy(game_id: str, policy: str) -> None:
+    async with connect() as db:
+        await db.execute("UPDATE games SET join_policy = ? WHERE id = ?", (policy, game_id))
+
+
+async def removal_by_player(game_id: str, player_id: str) -> RemovalRow | None:
+    async with connect() as db:
+        async with db.execute(
+            "SELECT * FROM player_removals WHERE game_id = ? AND player_id = ?", (game_id, player_id)
+        ) as cur:
+            r = await cur.fetchone()
+    return _removal(r) if r else None
+
+
+async def removal_token_hash(game_id: str, player_id: str) -> str | None:
+    async with connect() as db:
+        async with db.execute(
+            "SELECT token_hash FROM player_removals WHERE game_id = ? AND player_id = ?", (game_id, player_id)
+        ) as cur:
+            r = await cur.fetchone()
+    return r["token_hash"] if r else None
+
+
+async def list_removed(game_id: str) -> list[tuple[RemovalRow, bool]]:
+    """Kicked and banned players (not those who were away too long), each with whether the host
+    has invited them back."""
+    async with connect() as db:
+        async with db.execute(
+            "SELECT r.*, EXISTS (SELECT 1 FROM join_requests q WHERE q.game_id = r.game_id"
+            " AND q.token_hash = r.token_hash AND q.invited = 1) AS invited"
+            " FROM player_removals r WHERE r.game_id = ? AND r.reason IN ('kicked','banned')"
+            " ORDER BY r.removed_at DESC",
+            (game_id,),
+        ) as cur:
+            return [(_removal(r), bool(r["invited"])) for r in await cur.fetchall()]
+
+
+async def set_removal_reason(game_id: str, player_id: str, reason: str) -> None:
+    async with connect() as db:
+        await db.execute(
+            "UPDATE player_removals SET reason = ? WHERE game_id = ? AND player_id = ?", (reason, game_id, player_id)
+        )
+
+
+async def forget_removal(game_id: str, player_id: str) -> None:
+    """Forget that a player was removed (and any request of theirs): they're a stranger again."""
+    async with connect() as db:
+        await db.execute(
+            "DELETE FROM join_requests WHERE game_id = ? AND token_hash ="
+            " (SELECT token_hash FROM player_removals WHERE game_id = ? AND player_id = ?)",
+            (game_id, game_id, player_id),
+        )
+        await db.execute("DELETE FROM player_removals WHERE game_id = ? AND player_id = ?", (game_id, player_id))
