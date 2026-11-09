@@ -91,3 +91,13 @@ CREATE TABLE IF NOT EXISTS join_requests (
     created_at TEXT NOT NULL,
     PRIMARY KEY (game_id, token_hash)
 );
+
+-- The controller's login sessions (app.auth). token_hash is an HMAC of the cookie's token keyed
+-- with ADMIN_PASSWORD, so a copy of the database logs nobody in.
+CREATE TABLE IF NOT EXISTS admin_sessions (
+    id           TEXT PRIMARY KEY,
+    token_hash   TEXT NOT NULL UNIQUE,
+    device       TEXT NOT NULL,
+    created_at   TEXT NOT NULL,
+    last_used_at TEXT NOT NULL
+);

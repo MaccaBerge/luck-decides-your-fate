@@ -83,6 +83,7 @@ def create_app(
                 MIN_RECOMMENDED_PASSWORD_LENGTH,
             )
         await init_db(settings.database_path)
+        await ctx.sessions.load()  # the controller stays logged in across restarts
         finished = await repo.finish_dangling_spins()
         if finished:
             log.info("marked %d interrupted spin(s) as finished", finished)

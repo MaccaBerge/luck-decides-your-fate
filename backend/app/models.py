@@ -159,6 +159,20 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class AdminSessionOut(BaseModel):
+    """A device logged in to the controller (GET /api/admin/sessions)."""
+    id: str
+    device: str
+    created_at: str
+    last_used_at: str
+    expires_at: str
+    current: bool  # the session making this request
+
+
+class AdminSessions(BaseModel):
+    sessions: list[AdminSessionOut]
+
+
 class LinkSummary(BaseModel):
     id: str
     path: str                      # "/g/{id}"

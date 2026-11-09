@@ -82,3 +82,12 @@ class JoinRequestRow:
     state: Literal["pending", "accepted", "declined"]
     created_at: str
     invited: bool = False
+
+
+@dataclass(frozen=True)
+class AdminSessionRow:
+    id: str
+    token_hash: str  # HMAC of the cookie's token, keyed with ADMIN_PASSWORD (app.auth)
+    device: str
+    created_at: str
+    last_used_at: str
