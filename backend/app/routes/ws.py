@@ -119,7 +119,8 @@ async def admin_game_socket(ws: WebSocket, game_id: str) -> None:
         await _reject(ws, CLOSE_UNAUTHORIZED)
         return
     game = await repo.get_game(game_id)
-    if game is None or game.origin != "admin_link":
+    # A controller link, or an ordinary solo wheel the controller has taken over.
+    if game is None or not (game.origin == "admin_link" or game.kind == "solo"):
         await _reject(ws, CLOSE_NOT_FOUND)
         return
     await ws.accept()

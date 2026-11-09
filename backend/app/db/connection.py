@@ -85,6 +85,8 @@ async def _add_missing_game_columns(db: aiosqlite.Connection) -> None:
         await db.execute("ALTER TABLE games ADD COLUMN max_streak INTEGER")
     if "script" not in columns:
         await db.execute("ALTER TABLE games ADD COLUMN script TEXT NOT NULL DEFAULT '[]'")
+    if "own_rule" not in columns:
+        await db.execute("ALTER TABLE games ADD COLUMN own_rule INTEGER NOT NULL DEFAULT 0")
     if "join_policy" not in columns:
         await db.execute(
             "ALTER TABLE games ADD COLUMN join_policy TEXT NOT NULL DEFAULT 'open'"

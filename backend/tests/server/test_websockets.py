@@ -33,10 +33,19 @@ def test_admin_sockets_require_cookie_4401(client, admin):
     expect_close(client.websocket_connect(f"/ws/admin/games/{gid}", **bad), 4401)
 
 
-def test_admin_game_socket_404_for_public_or_unknown(client, admin):
+def test_admin_game_socket_404_for_multiplayer_or_unknown(client, admin):
     pub = new_game(client)
-    expect_close(admin.websocket_connect(f"/ws/admin/games/{pub}"), 4404)
+    r = client.post(f"/api/games/{pub}/host", json={"name": "Hosty", "avatar": "fox"})
+    assert r.status_code in (200, 201), r.text
+    expect_close(admin.websocket_connect(f"/ws/admin/games/{pub}"), 4404)  # multiplayer: not yet
     expect_close(admin.websocket_connect("/ws/admin/games/zzzzzzzz"), 4404)
+
+
+def test_admin_game_socket_for_an_ordinary_wheel(client, admin):
+    pub = new_game(client, ["Anna", "Jonas"])
+    with admin.websocket_connect(f"/ws/admin/games/{pub}") as ws:
+        m = ws.receive_json()
+        assert m["type"] == "admin_state" and m["state"]["control"]["source"] == "none"
 
 
 def test_player_connect_sends_state_and_marks_opened(client, admin):

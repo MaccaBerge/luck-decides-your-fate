@@ -25,6 +25,7 @@ class GameRow:
     chance: int | None = None    # "always": X wins this % of spins (None: every spin)
     max_streak: int | None = None  # streak breaker for "always" (None: off)
     script: list[str] = field(default_factory=list)  # upcoming winners, first one next
+    own_rule: bool = False       # an ordinary wheel with its own rule (not the standing rule)
 
 
 @dataclass(frozen=True)

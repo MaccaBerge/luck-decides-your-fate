@@ -45,6 +45,7 @@ def _game(r: aiosqlite.Row) -> GameRow:
         chance=r["chance"],
         max_streak=r["max_streak"],
         script=list(json.loads(r["script"] or "[]")),
+        own_rule=bool(r["own_rule"]),
     )
 
 
@@ -155,7 +156,7 @@ async def list_admin_links() -> list[GameRow]:
 
 
 async def update_rules(game_id: str, *, label=UNSET, mode=UNSET, target_names=UNSET,
-                       chance=UNSET, max_streak=UNSET, script=UNSET) -> GameRow | None:
+                       chance=UNSET, max_streak=UNSET, script=UNSET, own_rule=UNSET) -> GameRow | None:
     sets: list[str] = []
     params: list[Any] = []
     if label is not UNSET:
@@ -176,6 +177,9 @@ async def update_rules(game_id: str, *, label=UNSET, mode=UNSET, target_names=UN
     if script is not UNSET:
         sets.append("script = ?")
         params.append(json.dumps(list(script or [])))
+    if own_rule is not UNSET:
+        sets.append("own_rule = ?")
+        params.append(1 if own_rule else 0)
     async with connect() as db:
         if sets:
             await db.execute(f"UPDATE games SET {', '.join(sets)} WHERE id = ?",
@@ -183,19 +187,44 @@ async def update_rules(game_id: str, *, label=UNSET, mode=UNSET, target_names=UN
         return await _fetch_game(db, game_id)
 
 
-async def all_links_fair() -> list[str]:
-    """The panic button: every controller link back to fair, scripts cleared (targets, chance and
-    streak breaker are kept for later). Returns the IDs of the links that changed."""
+async def all_games_fair() -> list[str]:
+    """The panic button: every game with a rule or a script back to fair, scripts cleared
+    (targets, chance and streak breaker are kept for later). Ordinary wheels with their own rule
+    keep it as fair, so the standing rule (made fair separately) doesn't take over. Returns the
+    IDs of the games that changed."""
+    where = "(mode != 'fair' OR script != '[]')"
+    async with connect() as db:
+        async with db.execute(f"SELECT id FROM games WHERE {where}") as cur:
+            ids = [r[0] for r in await cur.fetchall()]
+        await db.execute(f"UPDATE games SET mode = 'fair', script = '[]' WHERE {where}")
+    return ids
+
+
+async def list_solo_wheels(limit: int = 300) -> list[GameRow]:
+    """Ordinary solo wheels (not controller links, not multiplayer), most recently used first."""
     async with connect() as db:
         async with db.execute(
-            "SELECT id FROM games WHERE origin = 'admin_link' AND (mode != 'fair' OR script != '[]')"
+            "SELECT * FROM games WHERE origin = 'public' AND kind = 'solo'"
+            " ORDER BY last_activity_at DESC, rowid DESC LIMIT ?",
+            (limit,),
         ) as cur:
-            ids = [r[0] for r in await cur.fetchall()]
+            return [_game(r) for r in await cur.fetchall()]
+
+
+async def get_setting(key: str) -> Any:
+    async with connect() as db:
+        async with db.execute("SELECT value FROM admin_settings WHERE key = ?", (key,)) as cur:
+            row = await cur.fetchone()
+    return json.loads(row[0]) if row else None
+
+
+async def set_setting(key: str, value: Any) -> None:
+    async with connect() as db:
         await db.execute(
-            "UPDATE games SET mode = 'fair', script = '[]' WHERE origin = 'admin_link'"
-            " AND (mode != 'fair' OR script != '[]')"
+            "INSERT INTO admin_settings (key, value) VALUES (?, ?)"
+            " ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, json.dumps(value)),
         )
-    return ids
 
 
 async def update_settings(game_id: str, *, remove_winner: bool) -> GameRow | None:

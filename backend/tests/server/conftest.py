@@ -53,6 +53,9 @@ class AdminClient:
     def delete(self, url, **kw):
         return self.client.delete(url, **self._h(kw))
 
+    def put(self, url, **kw):
+        return self.client.put(url, **self._h(kw))
+
     def websocket_connect(self, url, **kw):
         return self.client.websocket_connect(url, **self._h(kw))
 
