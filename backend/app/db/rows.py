@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 Mode = Literal["fair", "always", "never"]
@@ -22,6 +22,9 @@ class GameRow:
     kind: Kind = "solo"
     join_code: str | None = None
     join_policy: JoinPolicy = "open"
+    chance: int | None = None    # "always": X wins this % of spins (None: every spin)
+    max_streak: int | None = None  # streak breaker for "always" (None: off)
+    script: list[str] = field(default_factory=list)  # upcoming winners, first one next
 
 
 @dataclass(frozen=True)

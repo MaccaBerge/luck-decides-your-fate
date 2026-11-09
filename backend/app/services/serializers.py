@@ -171,6 +171,9 @@ def link_summary(game: GameRow, *, player_count: int, entry_count: int) -> LinkS
         label=game.label,
         mode=game.mode,
         target_names=list(game.target_names),
+        chance=game.chance,
+        max_streak=game.max_streak,
+        script=list(game.script),
         status=link_status(game, player_count),  # type: ignore[arg-type]
         player_count=player_count,
         entry_count=entry_count,
@@ -186,6 +189,13 @@ def rule_status_out(status: RuleStatus) -> RuleStatusOut:
         matched_target=status.matched_target,
         matched_entry_ids=list(status.matched_entry_ids),
         targets=[RuleTarget(name=name, entry_ids=list(ids)) for name, ids in status.targets],
+        script_step=(
+            RuleTarget(name=status.script_step[0], entry_ids=list(status.script_step[1]))
+            if status.script_step
+            else None
+        ),
+        streak=status.streak,
+        decider=status.decider,
     )
 
 

@@ -14,7 +14,13 @@ CREATE TABLE IF NOT EXISTS games (
     join_code        TEXT,             -- multiplayer only; unique index created in connection.py
     -- multiplayer: who can join. 'open': anyone with the code; 'ask': the host accepts each one;
     -- 'closed': nobody new.
-    join_policy      TEXT NOT NULL DEFAULT 'open' CHECK (join_policy IN ('open','ask','closed'))
+    join_policy      TEXT NOT NULL DEFAULT 'open' CHECK (join_policy IN ('open','ask','closed')),
+    -- More rule settings (app.engine.rigging): "always" X wins chance% of spins (NULL: every
+    -- spin); the streak breaker pauses "always" after X has won max_streak in a row (NULL: off);
+    -- script is a JSON list of upcoming winners, used up one step per spin.
+    chance           INTEGER,
+    max_streak       INTEGER,
+    script           TEXT NOT NULL DEFAULT '[]'
 );
 CREATE INDEX IF NOT EXISTS idx_games_origin_activity ON games(origin, last_activity_at);
 

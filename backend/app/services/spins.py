@@ -34,7 +34,14 @@ async def start_spin(ctx: AppContext, game_id: str) -> SpinStarted:
         if len(active) < 2:
             raise not_enough_entries()
 
-        pick = pick_winner(active, game.mode, game.target_names, ctx.rng)
+        recent = await repo.list_finished_spins(game_id, game.max_streak) if game.max_streak else []
+        pick = pick_winner(
+            active, game.mode, game.target_names, ctx.rng, chance=game.chance,
+            max_streak=game.max_streak, script=game.script,
+            recent_winners=[s.winner_name for s in recent],
+        )
+        if pick.used_script_step:
+            await repo.update_rules(game_id, script=game.script[1:])  # that step is used up
         params = generate_spin_params(
             ctx.rng, ctx.settings.spin_duration_ms_min, ctx.settings.spin_duration_ms_max
         )

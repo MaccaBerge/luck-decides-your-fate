@@ -4,7 +4,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 Mode = Literal["fair", "always", "never"]
 LinkStatus = Literal["created", "connected", "disconnected"]
-RuleState = Literal["fair_mode", "active", "no_match", "all_excluded"]
+RuleState = Literal["fair_mode", "active", "no_match", "all_excluded", "streak_paused"]
+Decider = Literal["script", "rule", "fair"]
 JoinPolicy = Literal["open", "ask", "closed"]
 
 
@@ -179,6 +180,9 @@ class LinkSummary(BaseModel):
     label: str | None
     mode: Mode
     target_names: list[str]
+    chance: int | None             # "always": X wins this % of spins (null: every spin)
+    max_streak: int | None         # streak breaker (null: off)
+    script: list[str]              # upcoming winners, first one next
     status: LinkStatus
     player_count: int
     entry_count: int               # active entries
@@ -197,6 +201,10 @@ class RuleStatusOut(BaseModel):
     matched_target: str | None
     matched_entry_ids: list[str]
     targets: list[RuleTarget]   # every target in priority order
+    # The script's next step and the active entries it matches (none: it waits for that name).
+    script_step: RuleTarget | None
+    streak: int                 # spins in a row the "always" target has won
+    decider: Decider            # what decides the next spin
 
 
 class AdminSpinRecord(BaseModel):
@@ -228,6 +236,10 @@ class Dashboard(BaseModel):
     backup: BackupStatusOut
 
 
+class AllFairResult(BaseModel):
+    changed: int                   # links that were rigged (or had a script) and are fair now
+
+
 class CreateLinkRequest(BaseModel):
     label: str | None = Field(default=None, max_length=60)
     mode: Mode = "fair"
@@ -239,6 +251,9 @@ class UpdateLinkRequest(BaseModel):
     label: str | None = None
     mode: Mode | None = None
     target_names: list[str] | None = None
+    chance: int | None = Field(default=None, ge=1, le=100)      # null: every spin
+    max_streak: int | None = Field(default=None, ge=1, le=20)   # null: off
+    script: list[str] | None = None
     # at least one field must be present, else 422
 
 
