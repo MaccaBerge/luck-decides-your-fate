@@ -133,3 +133,26 @@ A controller login now lasts until it has gone **60 days unused**, and at most *
 New error code: `session_not_found` (404).
 
 **Home Screen web app.** `/admin/manifest.webmanifest` and the icons in `/admin/` let the controller be added to a phone's Home Screen as "LDYF Controller". Only the admin code links to them.
+
+## v1.6: the rule engine
+
+Controller links have three more rule settings. All are admin only: public state and player sockets never contain them, and changing them sends nothing to players.
+
+| Field | Value |
+|---|---|
+| `chance` | `"always"` only: the target wins this % of spins (1–100) and someone else wins the rest. `null` (the default): every spin. Below a fair share makes the target win less often than chance would. |
+| `max_streak` | The streak breaker, `"always"` only (1–20): once the target has won this many spins in a row, spins are fair until someone else wins. `null` (the default): off. |
+| `script` | Upcoming winners, first one next (up to 20 names, each up to 40 characters). Its first step decides the next spin if that name is on the wheel (matched like targets), and is then used up. If the name isn't on the wheel, the step waits and the rule decides meanwhile. The script ignores the streak breaker. |
+
+`PATCH /api/admin/links/{id}` accepts `chance`, `max_streak` and `script` (`null` clears `chance` and `max_streak`). `LinkSummary` includes all three.
+
+`rule_status` has three more fields:
+- `script_step`: `{ "name", "entry_ids" }` for the script's first step (empty `entry_ids`: it waits for that name), or `null`.
+- `streak`: how many spins in a row the `"always"` target has won.
+- `decider`: what decides the next spin, `"script"`, `"rule"` or `"fair"`.
+
+`state` can also be `"streak_paused"`. `rule_applied` in the spin history is true when the script or the rule decided the spin.
+
+| Method | Path | Body | Success | Errors |
+|---|---|---|---|---|
+| POST | `/api/admin/links/all-fair` | none | 200 `{ "changed" }`: the panic button. Every link goes back to `"fair"` and its script is cleared; targets, `chance` and `max_streak` are kept. | 401 |
