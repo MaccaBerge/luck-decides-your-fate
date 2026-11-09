@@ -80,7 +80,7 @@ export default function GamePage() {
   const [spinRequested, setSpinRequested] = useState(false);
   const [bigScreen, setBigScreen] = useState(false);
   // Leaving big-screen mode animates: the wheel, the invite card and the size button glide back
-  // to their places. (Entering is instant.)
+  // to their places. Entering animates only on a phone (see enterBigScreen).
   const switchBigScreen = useCallback((next: boolean) => withViewTransition(() => setBigScreen(next)), []);
   // Multiplayer: which player this browser is (from local storage), and the dialogs around it.
   const [me, setMeState] = useState<Me | null>(() => getMe(gameId));
@@ -583,10 +583,17 @@ export default function GamePage() {
   };
 
   const enterBigScreen = () => {
-    // Opening is instant (an animation here added friction); closing animates back.
-    setBigScreen(true);
     // The root element keeps dialogs and confetti visible. iPhone Safari has no fullscreen; the layout works without it.
-    void document.documentElement.requestFullscreen?.().catch(() => {});
+    const goFullscreen = () => void document.documentElement.requestFullscreen?.().catch(() => {});
+    // On a phone, the wheel, invite card and size button glide into the big-screen layout first,
+    // then it goes fullscreen (a resize during the transition would cancel it). Elsewhere opening
+    // is instant (an animation there added friction). Closing animates back everywhere.
+    if (isTouchScreen()) {
+      void switchBigScreen(true).then(goFullscreen);
+      return;
+    }
+    setBigScreen(true);
+    goFullscreen();
   };
 
   // Leave fullscreen first; its fullscreenchange handler then animates back to the normal layout.
@@ -952,4 +959,9 @@ export default function GamePage() {
       <Toast toast={toast} />
     </div>
   );
+}
+
+/** A phone or tablet: the main pointer is a finger. */
+function isTouchScreen(): boolean {
+  return typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches;
 }
