@@ -42,6 +42,9 @@ def _game(r: aiosqlite.Row) -> GameRow:
         kind=r["kind"],
         join_code=r["join_code"],
         join_policy=r["join_policy"],
+        chance=r["chance"],
+        max_streak=r["max_streak"],
+        script=list(json.loads(r["script"] or "[]")),
     )
 
 
@@ -151,8 +154,8 @@ async def list_admin_links() -> list[GameRow]:
             return [_game(r) for r in await cur.fetchall()]
 
 
-async def update_rules(game_id: str, *, label=UNSET, mode=UNSET,
-                       target_names=UNSET) -> GameRow | None:
+async def update_rules(game_id: str, *, label=UNSET, mode=UNSET, target_names=UNSET,
+                       chance=UNSET, max_streak=UNSET, script=UNSET) -> GameRow | None:
     sets: list[str] = []
     params: list[Any] = []
     if label is not UNSET:
@@ -164,11 +167,35 @@ async def update_rules(game_id: str, *, label=UNSET, mode=UNSET,
     if target_names is not UNSET:
         sets.append("target_names = ?")
         params.append(json.dumps(list(target_names or [])))
+    if chance is not UNSET:
+        sets.append("chance = ?")
+        params.append(chance)         # None: every spin
+    if max_streak is not UNSET:
+        sets.append("max_streak = ?")
+        params.append(max_streak)     # None: off
+    if script is not UNSET:
+        sets.append("script = ?")
+        params.append(json.dumps(list(script or [])))
     async with connect() as db:
         if sets:
             await db.execute(f"UPDATE games SET {', '.join(sets)} WHERE id = ?",
                              (*params, game_id))
         return await _fetch_game(db, game_id)
+
+
+async def all_links_fair() -> list[str]:
+    """The panic button: every controller link back to fair, scripts cleared (targets, chance and
+    streak breaker are kept for later). Returns the IDs of the links that changed."""
+    async with connect() as db:
+        async with db.execute(
+            "SELECT id FROM games WHERE origin = 'admin_link' AND (mode != 'fair' OR script != '[]')"
+        ) as cur:
+            ids = [r[0] for r in await cur.fetchall()]
+        await db.execute(
+            "UPDATE games SET mode = 'fair', script = '[]' WHERE origin = 'admin_link'"
+            " AND (mode != 'fair' OR script != '[]')"
+        )
+    return ids
 
 
 async def update_settings(game_id: str, *, remove_winner: bool) -> GameRow | None:

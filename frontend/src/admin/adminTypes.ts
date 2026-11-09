@@ -1,7 +1,11 @@
 import type { Mode, PublicGameState, SpinStarted } from "../lib/types";
 
 export type LinkStatus = "created" | "connected" | "disconnected";
-export type RuleState = "fair_mode" | "active" | "no_match" | "all_excluded";
+/** streak_paused: the "always" target has won `max_streak` spins in a row, so spins are fair
+ * until someone else wins. */
+export type RuleState = "fair_mode" | "active" | "no_match" | "all_excluded" | "streak_paused";
+/** What decides the next spin. */
+export type Decider = "script" | "rule" | "fair";
 
 export interface LinkSummary {
   id: string;
@@ -9,6 +13,12 @@ export interface LinkSummary {
   label: string | null;
   mode: Mode;
   target_names: string[];
+  /** "always": the target wins this % of spins (null: every spin). */
+  chance: number | null;
+  /** Streak breaker: pause "always" after this many wins in a row (null: off). */
+  max_streak: number | null;
+  /** Upcoming winners, first one next. */
+  script: string[];
   status: LinkStatus;
   player_count: number;
   entry_count: number;
@@ -29,6 +39,11 @@ export interface RuleStatus {
   matched_entry_ids: string[];
   /** Every target in priority order. */
   targets: RuleTarget[];
+  /** The script's next step, and the active entries it matches (none: it waits for that name). */
+  script_step: RuleTarget | null;
+  /** Spins in a row the "always" target has won. */
+  streak: number;
+  decider: Decider;
 }
 
 export interface AdminSpinRecord {

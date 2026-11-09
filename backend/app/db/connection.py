@@ -78,6 +78,13 @@ async def _add_missing_game_columns(db: aiosqlite.Connection) -> None:
         )
     if "join_code" not in columns:
         await db.execute("ALTER TABLE games ADD COLUMN join_code TEXT")
+    # Databases made before the rule engine's chance, streak breaker and script.
+    if "chance" not in columns:
+        await db.execute("ALTER TABLE games ADD COLUMN chance INTEGER")
+    if "max_streak" not in columns:
+        await db.execute("ALTER TABLE games ADD COLUMN max_streak INTEGER")
+    if "script" not in columns:
+        await db.execute("ALTER TABLE games ADD COLUMN script TEXT NOT NULL DEFAULT '[]'")
     if "join_policy" not in columns:
         await db.execute(
             "ALTER TABLE games ADD COLUMN join_policy TEXT NOT NULL DEFAULT 'open'"

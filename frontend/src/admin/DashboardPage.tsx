@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { BarChart3, Download, Loader2, Plus, SlidersHorizontal, Users } from "lucide-react";
+import { BarChart3, Download, Loader2, Plus, ShieldOff, SlidersHorizontal, Users } from "lucide-react";
 import type { Mode } from "../lib/types";
 import * as adminApi from "./adminApi";
 import { errorMessage, errorStatus, parseNames } from "./adminApi";
@@ -9,6 +9,7 @@ import { useAdminAuth } from "./auth";
 import { useDashboardSocket } from "./useAdminSocket";
 import { DevicesCard } from "./components/DevicesCard";
 import {
+  btnDanger,
   btnPrimary,
   btnSecondary,
   card,
@@ -50,6 +51,7 @@ export default function DashboardPage() {
   const [dash, setDash] = useState<Dashboard | null>(null);
   const [error, setError] = useState("");
   const [backingUp, setBackingUp] = useState(false);
+  const [notice, setNotice] = useState("");
 
   const handleError = useCallback(
     (err: unknown) => {
@@ -112,6 +114,15 @@ export default function DashboardPage() {
           <LogoutButton onClick={logout} />
         </div>
       </header>
+
+      {dash && dash.links.some((l) => l.mode !== "fair" || l.script.length > 0) && (
+        <AllFairButton onDone={(changed) => setNotice(changed === 1 ? "1 link is fair now." : `${changed} links are fair now.`)} onError={handleError} />
+      )}
+      {notice && (
+        <p role="status" className="text-sm text-ink-muted">
+          {notice}
+        </p>
+      )}
 
       <p className="flex items-center gap-2 text-sm text-ink-muted">
         <span aria-hidden className="size-2 rounded-full bg-success-dot" />
@@ -214,6 +225,51 @@ function CreateLinkForm({ onError }: { onError: (err: unknown) => void }) {
   );
 }
 
+/**
+ * The panic button: every link back to fair at once (scripts cleared; targets, chance and the
+ * streak breaker are kept). Asks once before doing it. Players get nothing.
+ */
+function AllFairButton({ onDone, onError }: { onDone: (changed: number) => void; onError: (err: unknown) => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  if (!confirming) {
+    return (
+      <button type="button" className={`${btnSecondary} self-start`} onClick={() => setConfirming(true)}>
+        <ShieldOff className="size-4" aria-hidden />
+        Make every link fair
+      </button>
+    );
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-sm">Every link goes fair now, and scripts are cleared.</span>
+      <button
+        type="button"
+        className={btnDanger}
+        disabled={busy}
+        autoFocus
+        onClick={async () => {
+          setBusy(true);
+          try {
+            onDone((await adminApi.allLinksFair()).changed);
+          } catch (err) {
+            onError(err);
+          } finally {
+            setBusy(false);
+            setConfirming(false);
+          }
+        }}
+      >
+        {busy && <Loader2 className="size-4 animate-spin" aria-hidden />}
+        Make all fair
+      </button>
+      <button type="button" className={btnSecondary} onClick={() => setConfirming(false)}>
+        Cancel
+      </button>
+    </div>
+  );
+}
+
 function LinkRow({ link, onDelete }: { link: LinkSummary; onDelete: () => Promise<void> }) {
   const now = useNow();
   const title = linkTitle(link.label);
@@ -230,8 +286,15 @@ function LinkRow({ link, onDelete }: { link: LinkSummary; onDelete: () => Promis
         <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[13px] text-ink-muted">
           <span className="truncate">
             {MODE_LABEL[link.mode]}
+            {link.mode === "always" && link.chance !== null && ` ${link.chance}%`}
             {targetsText}
           </span>
+          {link.script.length > 0 && (
+            <span>
+              Next: {link.script[0]}
+              {link.script.length > 1 && ` +${link.script.length - 1}`}
+            </span>
+          )}
           <span className="inline-flex items-center gap-1">
             <Users className="size-3.5" aria-hidden />
             {link.player_count} {link.player_count === 1 ? "player" : "players"}

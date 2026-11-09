@@ -57,8 +57,11 @@ async def admin_state(ctx: AppContext, game: GameRow) -> AdminGameState:
     entries = await repo.list_entries(game.id)
     active = [e for e in entries if e.is_active]
     public = await public_state(ctx, game, entries)
-    rule = evaluate_rule(active, game.mode, game.target_names)
     spins = await repo.list_spins(game.id, SPIN_HISTORY_LIMIT)
+    rule = evaluate_rule(
+        active, game.mode, game.target_names, max_streak=game.max_streak, script=game.script,
+        recent_winners=[s.winner_name for s in spins if s.finished_at is not None],
+    )
     return ser.admin_game_state(public, link_summary(ctx, game, entries), rule, spins)
 
 

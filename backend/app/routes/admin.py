@@ -20,6 +20,7 @@ from app.models import (
     AdminGameState,
     AdminSessionOut,
     AdminSessions,
+    AllFairResult,
     ANALYTICS_DAYS,
     AnalyticsReport,
     CreateLinkRequest,
@@ -49,13 +50,14 @@ def clean_label(label: str | None) -> str | None:
     return cleaned or None
 
 
-def clean_targets(targets: list[str]) -> list[str]:
+def clean_targets(targets: list[str], field: str = "target_names") -> list[str]:
+    """Target names, or script steps: stripped, empty ones dropped, at most MAX_TARGETS."""
     if len(targets) > MAX_TARGETS:
-        raise validation_error(f"target_names: At most {MAX_TARGETS} target names")
+        raise validation_error(f"{field}: At most {MAX_TARGETS} names")
     cleaned = [t.strip() for t in targets]
     cleaned = [t for t in cleaned if t]
     if any(len(t) > MAX_TARGET_LEN for t in cleaned):
-        raise validation_error(f"target_names: Names can be at most {MAX_TARGET_LEN} characters")
+        raise validation_error(f"{field}: Names can be at most {MAX_TARGET_LEN} characters")
     return cleaned
 
 
@@ -187,8 +189,8 @@ async def update_link(
     game_id: str, body: UpdateLinkRequest, ctx: AppContext = Depends(ctx_dep)
 ) -> AdminGameState:
     fields = body.model_fields_set
-    if not fields & {"label", "mode", "target_names"}:
-        raise validation_error("Provide at least one of label, mode or target_names")
+    if not fields & {"label", "mode", "target_names", "chance", "max_streak", "script"}:
+        raise validation_error("Provide at least one of label, mode, target_names, chance, max_streak or script")
     changes: dict = {}
     if "label" in fields:
         changes["label"] = clean_label(body.label)
@@ -200,6 +202,15 @@ async def update_link(
         if body.target_names is None:
             raise validation_error("target_names: Input should be a valid list")
         changes["target_names"] = clean_targets(body.target_names)
+    # null clears these two: chance (every spin) and max_streak (off).
+    if "chance" in fields:
+        changes["chance"] = body.chance
+    if "max_streak" in fields:
+        changes["max_streak"] = body.max_streak
+    if "script" in fields:
+        if body.script is None:
+            raise validation_error("script: Input should be a valid list")
+        changes["script"] = clean_targets(body.script, field="script")
     await load_link(game_id)
     async with ctx.runtime.locked(game_id):
         game = await repo.update_rules(game_id, **changes)
@@ -208,6 +219,16 @@ async def update_link(
         # Admin sockets + dashboard only. NOTHING goes to player sockets (§10.3).
         await views.notify_admin_change(ctx, game_id)
         return await views.admin_state(ctx, game)
+
+
+@protected.post("/links/all-fair", response_model=AllFairResult)
+async def all_links_fair(ctx: AppContext = Depends(ctx_dep)) -> AllFairResult:
+    """The panic button: every link back to fair at once, scripts cleared. Targets, chance and
+    the streak breaker are kept, so a link can be rigged again with one change."""
+    changed = await repo.all_links_fair()
+    for game_id in changed:
+        await views.notify_admin_change(ctx, game_id)  # admins + dashboard only, never players
+    return AllFairResult(changed=len(changed))
 
 
 @protected.delete("/links/{game_id}", status_code=204)

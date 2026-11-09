@@ -187,3 +187,67 @@ def test_targets_present_in_every_state(mode):
     st = evaluate_rule(entries, mode, ["Anna", "Erik"])
     assert st.targets == (("Anna", (entries[0].id,)), ("Erik", ()))
     assert evaluate_rule(entries, mode, []).targets == ()
+
+
+# ---------- chance, streak breaker and script ----------
+def wins(entries, n=4000, seed=7, **kw):
+    rng = random.Random(seed)
+    return Counter(pick_winner(entries, kw.pop("mode", "always"), kw.pop("targets", ["Jonas"]), rng, **kw).winner.name
+                   for _ in range(n))
+
+
+def test_chance_sets_how_often_x_wins():
+    c = wins(make("Anna", "Jonas", "Per", "Kari"), chance=60)
+    assert 0.56 < c["Jonas"] / 4000 < 0.64
+    c = wins(make("Anna", "Jonas", "Per", "Kari"), chance=5)  # below a fair share: rarely
+    assert 0.03 < c["Jonas"] / 4000 < 0.07
+
+
+def test_chance_100_or_none_is_every_spin():
+    assert wins(make("Anna", "Jonas"), n=200, chance=100) == Counter({"Jonas": 200})
+    assert wins(make("Anna", "Jonas"), n=200) == Counter({"Jonas": 200})
+
+
+def test_chance_with_only_x_left():
+    assert wins(make("Jonas"), n=20, chance=10) == Counter({"Jonas": 20})
+
+
+def test_streak_breaker_pauses_always():
+    entries = make("Anna", "Jonas")
+    st = evaluate_rule(entries, "always", ["Jonas"], max_streak=3, recent_winners=["Jonas", "jonas ", "Jonas", "Anna"])
+    assert st.state == "streak_paused" and st.streak == 3 and st.decider == "fair"
+    st = evaluate_rule(entries, "always", ["Jonas"], max_streak=3, recent_winners=["Jonas", "Jonas", "Anna", "Jonas"])
+    assert st.state == "active" and st.streak == 2 and st.decider == "rule"
+    rng = random.Random(1)
+    paused = [pick_winner(entries, "always", ["Jonas"], rng, max_streak=1, recent_winners=["Jonas"]) for _ in range(200)]
+    assert not any(p.rule_applied for p in paused)
+    assert {p.winner.name for p in paused} == {"Anna", "Jonas"}  # fair while paused
+
+
+def test_streak_breaker_only_for_always():
+    st = evaluate_rule(make("Anna", "Jonas"), "never", ["Jonas"], max_streak=1, recent_winners=["Anna", "Anna"])
+    assert st.state == "active" and st.streak == 0
+
+
+def test_script_step_decides_before_the_rule():
+    entries = make("Anna", "Jonas", "Mia")
+    rng = random.Random(3)
+    p = pick_winner(entries, "never", ["Mia"], rng, script=["mia", "Anna"])
+    assert p.winner.name == "Mia" and p.rule_applied and p.used_script_step
+    st = evaluate_rule(entries, "fair", [], script=["Mia"])
+    assert st.decider == "script" and st.script_step == ("Mia", (entries[2].id,))
+
+
+def test_script_step_waits_for_its_name():
+    entries = make("Anna", "Jonas")
+    st = evaluate_rule(entries, "always", ["Jonas"], script=["Mia"])
+    assert st.script_step == ("Mia", ()) and st.decider == "rule"
+    p = pick_winner(entries, "always", ["Jonas"], random.Random(1), script=["Mia"])
+    assert p.winner.name == "Jonas" and not p.used_script_step
+
+
+def test_script_ignores_the_streak_breaker():
+    entries = make("Anna", "Jonas")
+    p = pick_winner(entries, "always", ["Jonas"], random.Random(1), max_streak=1, script=["Jonas"],
+                    recent_winners=["Jonas"])
+    assert p.winner.name == "Jonas" and p.used_script_step

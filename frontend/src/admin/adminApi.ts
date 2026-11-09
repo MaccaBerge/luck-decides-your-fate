@@ -12,6 +12,11 @@ export interface UpdateLinkBody {
   label?: string | null;
   mode?: Mode;
   target_names?: string[];
+  /** null: every spin. */
+  chance?: number | null;
+  /** null: off. */
+  max_streak?: number | null;
+  script?: string[];
 }
 
 export const login = (password: string) =>
@@ -41,6 +46,9 @@ export const getLink = (gameId: string) =>
 
 export const updateLink = (gameId: string, patch: UpdateLinkBody) =>
   request<AdminGameState>("PATCH", `/api/admin/links/${encodeURIComponent(gameId)}`, patch);
+
+/** The panic button: every link back to fair, scripts cleared. */
+export const allLinksFair = () => request<{ changed: number }>("POST", "/api/admin/links/all-fair");
 
 export const deleteLink = (gameId: string) =>
   request<void>("DELETE", `/api/admin/links/${encodeURIComponent(gameId)}`);

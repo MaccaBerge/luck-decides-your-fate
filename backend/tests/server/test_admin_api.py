@@ -79,7 +79,11 @@ def test_create_link(admin):
         "matched_target": None,
         "matched_entry_ids": [],
         "targets": [{"name": "Erik", "entry_ids": []}, {"name": "Jonas", "entry_ids": []}],
+        "script_step": None,
+        "streak": 0,
+        "decider": "fair",
     }
+    assert link["chance"] is None and link["max_streak"] is None and link["script"] == []
     assert body["spin_history"] == []
 
 
