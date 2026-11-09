@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 import os
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -21,6 +22,11 @@ from app.models import (
     AdminSessionOut,
     AdminSessions,
     AllFairResult,
+    FriendsIn,
+    FriendsOut,
+    StandingRule,
+    UpdateStandingRequest,
+    UpdateWheelRequest,
     ANALYTICS_DAYS,
     AnalyticsReport,
     CreateLinkRequest,
@@ -30,7 +36,8 @@ from app.models import (
 )
 from app.services import serializers as ser
 from app.services.backup import backup_filename, create_snapshot
-from app.services import views
+from app.services import control, views
+from app.engine.friends import MAX_ALIASES, MAX_FRIENDS, MAX_NAME_LEN
 from app.timeutil import utc_iso
 
 router = APIRouter(prefix="/api/admin")
@@ -191,9 +198,26 @@ async def update_link(
     fields = body.model_fields_set
     if not fields & {"label", "mode", "target_names", "chance", "max_streak", "script"}:
         raise validation_error("Provide at least one of label, mode, target_names, chance, max_streak or script")
-    changes: dict = {}
+    changes = rule_changes(body)
     if "label" in fields:
         changes["label"] = clean_label(body.label)
+    await load_link(game_id)
+    async with ctx.runtime.locked(game_id):
+        game = await repo.update_rules(game_id, **changes)
+        if game is None:
+            raise game_not_found()
+        # Admin sockets + dashboard only. NOTHING goes to player sockets (§10.3).
+        await views.notify_admin_change(ctx, game_id)
+        return await views.admin_state(ctx, game)
+
+
+RULE_FIELDS = {"mode", "target_names", "chance", "max_streak"}
+
+
+def rule_changes(body) -> dict:
+    """The rule fields (and script) present in an update body, validated and cleaned."""
+    fields = body.model_fields_set
+    changes: dict = {}
     if "mode" in fields:
         if body.mode is None:
             raise validation_error("mode: Input should be 'fair', 'always' or 'never'")
@@ -211,24 +235,112 @@ async def update_link(
         if body.script is None:
             raise validation_error("script: Input should be a valid list")
         changes["script"] = clean_targets(body.script, field="script")
-    await load_link(game_id)
+    return changes
+
+
+@protected.post("/all-fair", response_model=AllFairResult)
+async def all_fair(ctx: AppContext = Depends(ctx_dep)) -> AllFairResult:
+    """The panic button: every link and wheel back to fair at once, scripts cleared, and the
+    standing rule set to fair. Targets, chance and the streak breaker are kept, so anything can
+    be rigged again with one change."""
+    changed = await repo.all_games_fair()
+    standing = await control.get_standing()
+    if standing.mode != "fair":
+        await control.set_standing(replace(standing, mode="fair"))
+        await _standing_changed(ctx)
+    for game_id in changed:
+        await views.notify_admin_change(ctx, game_id)  # admins + dashboard only, never players
+    return AllFairResult(changed=len(changed) + (standing.mode != "fair"))
+
+
+# ---------------------------------------------------------------- ordinary wheels
+async def load_wheel(game_id: str) -> GameRow:
+    """An ordinary solo wheel (not a link; multiplayer games aren't controlled here yet)."""
+    game = await repo.get_game(game_id)
+    if game is None or game.origin != "public" or game.kind != "solo":
+        raise game_not_found()
+    return game
+
+
+@protected.get("/wheels/{game_id}", response_model=AdminGameState)
+async def get_wheel(game_id: str, ctx: AppContext = Depends(ctx_dep)) -> AdminGameState:
+    return await views.admin_state(ctx, await load_wheel(game_id))
+
+
+@protected.patch("/wheels/{game_id}", response_model=AdminGameState)
+async def update_wheel(
+    game_id: str, body: UpdateWheelRequest, ctx: AppContext = Depends(ctx_dep)
+) -> AdminGameState:
+    """Take control of an ordinary wheel. Changing its rule gives it its own rule, starting from
+    the one in effect (the standing rule, or fair); `own_rule: false` hands it back to the
+    standing rule. The script (next winners) is the wheel's own either way."""
+    fields = body.model_fields_set
+    if not fields & (RULE_FIELDS | {"script", "own_rule"}):
+        raise validation_error("Provide at least one of mode, target_names, chance, max_streak, script or own_rule")
+    if "own_rule" in fields and body.own_rule is not False:
+        raise validation_error("own_rule: Only false (back to the standing rule) can be set")
+    changes = rule_changes(body)
+    await load_wheel(game_id)
     async with ctx.runtime.locked(game_id):
+        game = await load_wheel(game_id)
+        if body.own_rule is False:
+            changes.update(own_rule=False, mode="fair", target_names=[], chance=None, max_streak=None)
+        elif fields & RULE_FIELDS and not game.own_rule:
+            active = [e for e in await repo.list_entries(game_id) if e.is_active]
+            start = (await control.effective_rule(game, active)).settings
+            changes = {"mode": start.mode, "target_names": start.target_names, "chance": start.chance,
+                       "max_streak": start.max_streak, **changes, "own_rule": True}
         game = await repo.update_rules(game_id, **changes)
         if game is None:
             raise game_not_found()
-        # Admin sockets + dashboard only. NOTHING goes to player sockets (§10.3).
-        await views.notify_admin_change(ctx, game_id)
+        await views.notify_admin_change(ctx, game_id)  # admins + dashboard only, never players
         return await views.admin_state(ctx, game)
 
 
-@protected.post("/links/all-fair", response_model=AllFairResult)
-async def all_links_fair(ctx: AppContext = Depends(ctx_dep)) -> AllFairResult:
-    """The panic button: every link back to fair at once, scripts cleared. Targets, chance and
-    the streak breaker are kept, so a link can be rigged again with one change."""
-    changed = await repo.all_links_fair()
-    for game_id in changed:
-        await views.notify_admin_change(ctx, game_id)  # admins + dashboard only, never players
-    return AllFairResult(changed=len(changed))
+# ---------------------------------------------------------------- friends and the standing rule
+async def _standing_changed(ctx: AppContext) -> None:
+    """The friends list or standing rule changed: refresh the dashboard and any open wheel pages."""
+    for game in await repo.list_solo_wheels():
+        await views.notify_admins(ctx, game)
+    ctx.manager.request_dashboard()
+
+
+async def _friends_out() -> FriendsOut:
+    s = await control.get_standing()
+    return FriendsOut(
+        friends=await control.get_friends(),
+        standing=StandingRule(mode=s.mode, target_names=s.target_names, chance=s.chance, max_streak=s.max_streak),
+    )
+
+
+@protected.get("/friends", response_model=FriendsOut)
+async def get_friends() -> FriendsOut:
+    return await _friends_out()
+
+
+@protected.put("/friends", response_model=FriendsOut)
+async def put_friends(body: FriendsIn, ctx: AppContext = Depends(ctx_dep)) -> FriendsOut:
+    """Replace the friends list: each friend is the names they go by, display name first."""
+    friends = [[n.strip() for n in f if n.strip()] for f in body.friends]
+    friends = [f for f in friends if f]
+    if len(friends) > MAX_FRIENDS or any(len(f) > MAX_ALIASES for f in friends):
+        raise validation_error(f"friends: At most {MAX_FRIENDS} friends with {MAX_ALIASES} names each")
+    if any(len(n) > MAX_NAME_LEN for f in friends for n in f):
+        raise validation_error(f"friends: Names can be at most {MAX_NAME_LEN} characters")
+    await control.set_friends(friends)
+    await _standing_changed(ctx)
+    return await _friends_out()
+
+
+@protected.patch("/standing-rule", response_model=FriendsOut)
+async def update_standing(body: UpdateStandingRequest, ctx: AppContext = Depends(ctx_dep)) -> FriendsOut:
+    """The rule for friends' wheels you haven't set yourself."""
+    if not body.model_fields_set & RULE_FIELDS:
+        raise validation_error("Provide at least one of mode, target_names, chance or max_streak")
+    changes = rule_changes(body)
+    await control.set_standing(replace(await control.get_standing(), **changes))
+    await _standing_changed(ctx)
+    return await _friends_out()
 
 
 @protected.delete("/links/{game_id}", status_code=204)

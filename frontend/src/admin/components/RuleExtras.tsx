@@ -57,7 +57,8 @@ export function AlwaysOptions({
   activeCount,
   onPatch,
 }: {
-  link: LinkSummary;
+  /** A link, a wheel, or the standing rule (id is only used to name the controls). */
+  link: Pick<LinkSummary, "id" | "chance" | "max_streak">;
   activeCount: number;
   onPatch: (body: { chance?: number | null; max_streak?: number | null }) => Promise<void>;
 }) {

@@ -20,7 +20,9 @@ CREATE TABLE IF NOT EXISTS games (
     -- script is a JSON list of upcoming winners, used up one step per spin.
     chance           INTEGER,
     max_streak       INTEGER,
-    script           TEXT NOT NULL DEFAULT '[]'
+    script           TEXT NOT NULL DEFAULT '[]',
+    -- An ordinary wheel the admin set a rule on itself: it no longer follows the standing rule.
+    own_rule         INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_games_origin_activity ON games(origin, last_activity_at);
 
@@ -106,4 +108,11 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
     device       TEXT NOT NULL,
     created_at   TEXT NOT NULL,
     last_used_at TEXT NOT NULL
+);
+
+-- The controller's settings that aren't per game: the friends list and the standing rule
+-- (app.services.control). Values are JSON.
+CREATE TABLE IF NOT EXISTS admin_settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
 );

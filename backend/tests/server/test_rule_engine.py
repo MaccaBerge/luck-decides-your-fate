@@ -79,14 +79,14 @@ def test_all_fair(client, admin):
     b = new_link(admin, client, ["Anna", "Jonas"], mode="fair")
     admin.patch(f"/api/admin/links/{b}", json={"script": ["Anna"]})
     c = new_link(admin, client, ["Anna", "Jonas"], mode="fair")
-    r = admin.post("/api/admin/links/all-fair")
+    r = admin.post("/api/admin/all-fair")
     assert r.status_code == 200 and r.json() == {"changed": 2}
     for gid in (a, b, c):
         link = admin.get(f"/api/admin/links/{gid}").json()["link"]
         assert link["mode"] == "fair" and link["script"] == []
     assert admin.get(f"/api/admin/links/{a}").json()["link"]["target_names"] == ["Jonas"]  # kept
-    assert admin.post("/api/admin/links/all-fair").json() == {"changed": 0}
-    assert client.post("/api/admin/links/all-fair").status_code == 401
+    assert admin.post("/api/admin/all-fair").json() == {"changed": 0}
+    assert client.post("/api/admin/all-fair").status_code == 401
 
 
 def test_rule_changes_send_nothing_to_players(client, admin):
@@ -95,7 +95,7 @@ def test_rule_changes_send_nothing_to_players(client, admin):
         p.receive_json()
         for body in ({"chance": 30}, {"max_streak": 3}, {"script": ["Anna"]}, {"script": []}):
             assert admin.patch(f"/api/admin/links/{gid}", json=body).status_code == 200
-        assert admin.post("/api/admin/links/all-fair").status_code == 200
+        assert admin.post("/api/admin/all-fair").status_code == 200
         client.post(f"/api/games/{gid}/entries", json={"names": ["Marker"]})
         m = p.receive_json()  # the very next message is the marker: nothing came before it
         assert m["type"] == "state" and m["state"]["entries"][-1]["name"] == "Marker"

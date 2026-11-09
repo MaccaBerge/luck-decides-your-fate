@@ -56,9 +56,52 @@ export interface AdminSpinRecord {
   finished_at: string | null;
 }
 
+/** Which rule decides a game: a link's own, an ordinary wheel's own, the standing rule (friends
+ * on it), or none (fair). */
+export type RuleSource = "link" | "own" | "standing" | "none";
+
+export interface Control {
+  source: RuleSource;
+  /** The friends on the wheel (display names). */
+  friends: string[];
+  /** At least two different friends: a friends' wheel. */
+  matched: boolean;
+}
+
+/** An ordinary solo wheel in the controller's lists. */
+export interface WheelSummary {
+  id: string;
+  path: string;
+  names: string[];
+  entry_count: number;
+  open_now: boolean;
+  created_at: string;
+  last_activity_at: string;
+  control: Control;
+  /** The rule in effect. */
+  mode: Mode;
+  chance: number | null;
+  script: string[];
+}
+
+export interface StandingRule {
+  mode: Mode;
+  target_names: string[];
+  chance: number | null;
+  max_streak: number | null;
+}
+
+export interface FriendsSettings {
+  /** Each friend: the names they go by, display name first. */
+  friends: string[][];
+  standing: StandingRule;
+}
+
 export interface AdminGameState {
   game: PublicGameState;
+  /** For an ordinary wheel: label null, and the rule fields are the rule in effect. */
   link: LinkSummary;
+  control: Control;
   rule_status: RuleStatus;
   spin_history: AdminSpinRecord[];
 }
@@ -73,6 +116,8 @@ export interface Dashboard {
   live_games: number;
   backup: BackupStatus;
   links: LinkSummary[];
+  /** Ordinary solo wheels, most recently used first: friends' wheels apart. */
+  wheels: { matched: WheelSummary[]; others: WheelSummary[] };
 }
 
 export type AdminLinkEvent =

@@ -66,7 +66,8 @@ def test_create_link(admin):
     )
     assert r.status_code == 201
     body = r.json()
-    assert set(body) == {"game", "link", "rule_status", "spin_history"}
+    assert set(body) == {"game", "link", "control", "rule_status", "spin_history"}
+    assert body["control"] == {"source": "link", "friends": [], "matched": False}
     link = body["link"]
     gid = body["game"]["id"]
     assert link["id"] == gid and link["path"] == f"/g/{gid}"
@@ -198,7 +199,8 @@ def test_dashboard(client, admin):
     l1 = new_link(admin, label="one")
     l2 = new_link(admin, client, ["A", "B", "C"], label="two")
     d = admin.get("/api/admin/dashboard").json()
-    assert set(d) == {"live_games", "links", "backup"}
+    assert set(d) == {"live_games", "links", "wheels", "backup"}
+    assert [w["id"] for w in d["wheels"]["others"]] == [pub] and d["wheels"]["matched"] == []
     assert d["live_games"] == 0
     ids = [link["id"] for link in d["links"]]
     assert ids == [l2, l1]  # newest first

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { BarChart3, Download, Loader2, Plus, ShieldOff, SlidersHorizontal, Users } from "lucide-react";
+import { BarChart3, Download, Heart, Loader2, Plus, ShieldOff, SlidersHorizontal, Users } from "lucide-react";
 import type { Mode } from "../lib/types";
 import * as adminApi from "./adminApi";
 import { errorMessage, errorStatus, parseNames } from "./adminApi";
-import type { BackupStatus, Dashboard, LinkSummary } from "./adminTypes";
+import type { BackupStatus, Dashboard, LinkSummary, WheelSummary } from "./adminTypes";
 import { useAdminAuth } from "./auth";
 import { useDashboardSocket } from "./useAdminSocket";
 import { DevicesCard } from "./components/DevicesCard";
@@ -97,6 +97,10 @@ export default function DashboardPage() {
           <Wordmark>Controller</Wordmark>
         </h1>
         <div className="flex flex-wrap items-center gap-2">
+          <button type="button" aria-label="Friends" className={btnSecondary} onClick={() => navigate("/admin/friends")}>
+            <Heart className="size-4" aria-hidden />
+            <span className="hidden sm:inline">Friends</span>
+          </button>
           <button type="button" aria-label="Analytics" className={btnSecondary} onClick={() => navigate("/admin/analytics")}>
             <BarChart3 className="size-4" aria-hidden />
             <span className="hidden sm:inline">Analytics</span>
@@ -115,9 +119,12 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {dash && dash.links.some((l) => l.mode !== "fair" || l.script.length > 0) && (
-        <AllFairButton onDone={(changed) => setNotice(changed === 1 ? "1 link is fair now." : `${changed} links are fair now.`)} onError={handleError} />
-      )}
+      <AllFairButton
+        onDone={(changed) =>
+          setNotice(changed === 0 ? "Everything was fair already." : changed === 1 ? "1 thing is fair now." : `${changed} things are fair now.`)
+        }
+        onError={handleError}
+      />
       {notice && (
         <p role="status" className="text-sm text-ink-muted">
           {notice}
@@ -138,6 +145,37 @@ export default function DashboardPage() {
 
       <ErrorText>{error}</ErrorText>
 
+      <section
+        aria-label="Friends' wheels"
+        className={`${card} flex min-w-0 flex-col gap-3 ${dash && dash.wheels.matched.length > 0 ? "border-primary/50 bg-primary-soft/40" : ""}`}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className={`${cardTitle} flex items-center gap-2`}>
+            <Heart className="size-5 text-primary-strong" aria-hidden />
+            Friends' wheels
+            {dash && dash.wheels.matched.length > 0 && (
+              <span data-testid="matched-count" className="rounded-full bg-primary px-2.5 py-0.5 text-sm font-semibold text-white tabular-nums">
+                {dash.wheels.matched.length}
+              </span>
+            )}
+          </h2>
+          <Link to="/admin/friends" className="text-sm font-medium text-ink-muted underline underline-offset-3 hover:text-ink">
+            Friends and standing rule
+          </Link>
+        </div>
+        {!dash ? (
+          <Loader2 className="size-5 animate-spin text-ink-muted" aria-label="Loading wheels" />
+        ) : dash.wheels.matched.length === 0 ? (
+          <p className="text-sm text-ink-muted">No wheel has two of your friends on it right now.</p>
+        ) : (
+          <ul data-testid="matched-wheels" className="flex flex-col divide-y divide-divider">
+            {dash.wheels.matched.map((w) => (
+              <WheelRow key={w.id} wheel={w} />
+            ))}
+          </ul>
+        )}
+      </section>
+
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
         <CreateLinkForm onError={handleError} />
         <section aria-label="Links" className={`${card} flex min-w-0 flex-col gap-3`}>
@@ -155,6 +193,22 @@ export default function DashboardPage() {
           )}
         </section>
       </div>
+
+      <section aria-label="All wheels" className={`${card} flex min-w-0 flex-col gap-3`}>
+        <h2 className={cardTitle}>All other wheels</h2>
+        <p className="text-sm text-ink-muted">Every other wheel made on the site, most recently used first.</p>
+        {!dash ? (
+          <Loader2 className="size-5 animate-spin text-ink-muted" aria-label="Loading wheels" />
+        ) : dash.wheels.others.length === 0 ? (
+          <p className="text-sm text-ink-muted">No other wheels right now.</p>
+        ) : (
+          <ul data-testid="other-wheels" className="flex flex-col divide-y divide-divider">
+            {dash.wheels.others.map((w) => (
+              <WheelRow key={w.id} wheel={w} />
+            ))}
+          </ul>
+        )}
+      </section>
 
       <DevicesCard onUnauthorized={onUnauthorized} />
     </div>
@@ -236,13 +290,13 @@ function AllFairButton({ onDone, onError }: { onDone: (changed: number) => void;
     return (
       <button type="button" className={`${btnSecondary} self-start`} onClick={() => setConfirming(true)}>
         <ShieldOff className="size-4" aria-hidden />
-        Make every link fair
+        Make everything fair
       </button>
     );
   }
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-sm">Every link goes fair now, and scripts are cleared.</span>
+      <span className="text-sm">Every link and wheel goes fair now, the standing rule too, and next winners are cleared.</span>
       <button
         type="button"
         className={btnDanger}
@@ -251,7 +305,7 @@ function AllFairButton({ onDone, onError }: { onDone: (changed: number) => void;
         onClick={async () => {
           setBusy(true);
           try {
-            onDone((await adminApi.allLinksFair()).changed);
+            onDone((await adminApi.allFair()).changed);
           } catch (err) {
             onError(err);
           } finally {
@@ -267,6 +321,44 @@ function AllFairButton({ onDone, onError }: { onDone: (changed: number) => void;
         Cancel
       </button>
     </div>
+  );
+}
+
+/** What decides an ordinary wheel, in a few words. */
+export function wheelRuleText(w: WheelSummary): string {
+  const rule =
+    w.mode === "fair" ? "Fair" : `${MODE_LABEL[w.mode]}${w.mode === "always" && w.chance !== null ? ` ${w.chance}%` : ""}`;
+  const source = w.control.source === "standing" ? "standing rule" : w.control.source === "own" ? "own rule" : null;
+  const next = w.script.length > 0 ? ` · Next: ${w.script[0]}${w.script.length > 1 ? ` +${w.script.length - 1}` : ""}` : "";
+  return `${rule}${source ? ` (${source})` : ""}${next}`;
+}
+
+function WheelRow({ wheel }: { wheel: WheelSummary }) {
+  const now = useNow();
+  const names = wheel.names.length > 0 ? wheel.names.join(", ") : "No names yet";
+  return (
+    <li className="flex flex-col gap-3 py-3.5 first:pt-1 last:pb-1 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <div className="flex min-w-0 items-center gap-2">
+          {wheel.open_now && <span aria-label="Open now" title="Open now" className="size-2 shrink-0 rounded-full bg-success-dot" />}
+          <span className="truncate text-[15px] font-semibold">{names}</span>
+        </div>
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[13px] text-ink-muted">
+          {wheel.control.friends.length > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <Heart className="size-3.5" aria-hidden />
+              {wheel.control.friends.join(", ")}
+            </span>
+          )}
+          <span>{wheelRuleText(wheel)}</span>
+          <span>{wheel.open_now ? "open now" : relativeTime(wheel.last_activity_at, now)}</span>
+        </p>
+      </div>
+      <Link to={`/admin/wheels/${wheel.id}`} aria-label={`Open controls for the wheel with ${names}`} className={`${btnSecondary} shrink-0 self-start sm:self-auto`}>
+        <SlidersHorizontal className="size-4" aria-hidden />
+        <span>Controls</span>
+      </Link>
+    </li>
   );
 }
 

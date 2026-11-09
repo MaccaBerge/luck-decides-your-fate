@@ -11,6 +11,7 @@ from app.engine.rigging import pick_winner
 from app.engine.spin_params import generate_spin_params
 from app.errors import game_not_found, not_enough_entries, spin_in_progress
 from app.models import SpinStarted
+from app.services import control
 from app.services import serializers as ser
 from app.services import views
 
@@ -34,10 +35,14 @@ async def start_spin(ctx: AppContext, game_id: str) -> SpinStarted:
         if len(active) < 2:
             raise not_enough_entries()
 
-        recent = await repo.list_finished_spins(game_id, game.max_streak) if game.max_streak else []
+        # The rule in effect: a link's own, or for an ordinary wheel its own, the standing rule
+        # (friends on it) or none. Same code path and payload either way.
+        eff = await control.effective_rule(game, active)
+        r = eff.settings
+        recent = await repo.list_finished_spins(game_id, r.max_streak) if r.max_streak else []
         pick = pick_winner(
-            active, game.mode, game.target_names, ctx.rng, chance=game.chance,
-            max_streak=game.max_streak, script=game.script,
+            active, r.mode, r.target_names, ctx.rng, chance=r.chance,
+            max_streak=r.max_streak, script=eff.script,
             recent_winners=[s.winner_name for s in recent],
         )
         if pick.used_script_step:
@@ -50,7 +55,7 @@ async def start_spin(ctx: AppContext, game_id: str) -> SpinStarted:
             game_id,
             winner_entry_id=pick.winner.id,
             winner_name=pick.winner.name,
-            mode=game.mode,
+            mode=r.mode,
             rule_applied=pick.rule_applied,
         )
         spin = ser.spin_started(
@@ -66,7 +71,8 @@ async def start_spin(ctx: AppContext, game_id: str) -> SpinStarted:
 
         # Player version has no rule information; admin version carries rule_applied.
         await ctx.manager.send_players(game_id, ser.player_spin_started_event(spin))
-        if game.origin == "admin_link":
+        # Admin sockets watching this game (any game the controller has open).
+        if ctx.manager.has_admin_watchers(game_id):
             await ctx.manager.send_admins(
                 game_id, ser.admin_spin_started_event(spin, pick.rule_applied)
             )
@@ -123,7 +129,7 @@ async def _finish_locked(ctx: AppContext, game_id: str, spin_id: int) -> tuple[s
         if result is not None:
             event = ser.spin_finished_event(result)
             await ctx.manager.send_players(game_id, event)
-            if game.origin == "admin_link":
+            if ctx.manager.has_admin_watchers(game_id):
                 await ctx.manager.send_admins(game_id, event)
         await views.notify_public_change(ctx, game_id)
     return game.origin, row.rule_applied

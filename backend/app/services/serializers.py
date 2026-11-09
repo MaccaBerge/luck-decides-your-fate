@@ -14,6 +14,8 @@ from app.db.rows import EntryRow, GameRow, JoinRequestRow, PlayerRow, RemovalRow
 from app.engine.rigging import RuleStatus
 from app.services.backup import BackupStatus
 from app.models import (
+    ControlOut,
+    WheelLists,
     AdminGameState,
     AdminSpinRecord,
     BackupStatusOut,
@@ -164,15 +166,17 @@ def link_status(game: GameRow, player_count: int) -> str:
     return "disconnected"
 
 
-def link_summary(game: GameRow, *, player_count: int, entry_count: int) -> LinkSummary:
+def link_summary(game: GameRow, *, player_count: int, entry_count: int, rule: Any = None) -> LinkSummary:
+    """`rule`: the RuleSettings in effect (app.services.control), when not the game's own."""
+    rule = rule or game
     return LinkSummary(
         id=game.id,
         path=f"/g/{game.id}",
         label=game.label,
-        mode=game.mode,
-        target_names=list(game.target_names),
-        chance=game.chance,
-        max_streak=game.max_streak,
+        mode=rule.mode,
+        target_names=list(rule.target_names),
+        chance=rule.chance,
+        max_streak=rule.max_streak,
         script=list(game.script),
         status=link_status(game, player_count),  # type: ignore[arg-type]
         player_count=player_count,
@@ -211,24 +215,31 @@ def admin_spin_record(spin: SpinRow) -> AdminSpinRecord:
     )
 
 
+def control_out(eff: Any) -> ControlOut:
+    return ControlOut(source=eff.source, friends=list(eff.friends), matched=eff.matched)
+
+
 def admin_game_state(
     public: PublicGameState,
     link: LinkSummary,
+    control: ControlOut,
     rule: RuleStatus,
     spins: Sequence[SpinRow],
 ) -> AdminGameState:
     return AdminGameState(
         game=public,
         link=link,
+        control=control,
         rule_status=rule_status_out(rule),
         spin_history=[admin_spin_record(s) for s in spins],
     )
 
 
-def dashboard(live_games: int, links: list[LinkSummary], backup: BackupStatus) -> Dashboard:
+def dashboard(live_games: int, links: list[LinkSummary], wheels: WheelLists, backup: BackupStatus) -> Dashboard:
     return Dashboard(
         live_games=live_games,
         links=links,
+        wheels=wheels,
         backup=BackupStatusOut(
             enabled=backup.enabled,
             last_success_at=backup.last_success_at,

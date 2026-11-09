@@ -217,9 +217,38 @@ class AdminSpinRecord(BaseModel):
     finished_at: str | None
 
 
+class ControlOut(BaseModel):
+    """Which rule decides this game (see app.services.control)."""
+    source: Literal["link", "own", "standing", "none"]
+    friends: list[str]             # the friends on the wheel; [] for links
+    matched: bool                  # at least two different friends: a friends' wheel
+
+
+class WheelSummary(BaseModel):
+    """An ordinary solo wheel in the controller's lists."""
+    id: str
+    path: str
+    names: list[str]               # active names, in wheel order
+    entry_count: int
+    open_now: bool                 # someone has it open
+    created_at: str
+    last_activity_at: str
+    control: ControlOut
+    mode: Mode                     # the rule in effect (own or standing)
+    chance: int | None
+    script: list[str]
+
+
+class WheelLists(BaseModel):
+    matched: list[WheelSummary]    # friends' wheels
+    others: list[WheelSummary]
+
+
 class AdminGameState(BaseModel):
     game: PublicGameState
+    # For an ordinary wheel: label null, and mode/targets/chance/max_streak are the rule in effect.
     link: LinkSummary
+    control: ControlOut
     rule_status: RuleStatusOut
     spin_history: list[AdminSpinRecord]   # newest first, max 50
 
@@ -233,7 +262,40 @@ class BackupStatusOut(BaseModel):
 class Dashboard(BaseModel):
     live_games: int                # games of ANY origin with >= 1 player socket
     links: list[LinkSummary]       # admin links only, newest created first
+    wheels: WheelLists             # ordinary solo wheels, most recently used first
     backup: BackupStatusOut
+
+
+class UpdateWheelRequest(BaseModel):
+    mode: Mode | None = None
+    target_names: list[str] | None = None
+    chance: int | None = Field(default=None, ge=1, le=100)
+    max_streak: int | None = Field(default=None, ge=1, le=20)
+    script: list[str] | None = None
+    own_rule: bool | None = None   # only false: back to the standing rule
+
+
+class StandingRule(BaseModel):
+    mode: Mode
+    target_names: list[str]
+    chance: int | None
+    max_streak: int | None
+
+
+class UpdateStandingRequest(BaseModel):
+    mode: Mode | None = None
+    target_names: list[str] | None = None
+    chance: int | None = Field(default=None, ge=1, le=100)
+    max_streak: int | None = Field(default=None, ge=1, le=20)
+
+
+class FriendsIn(BaseModel):
+    friends: list[list[str]] = Field(max_length=200)
+
+
+class FriendsOut(BaseModel):
+    friends: list[list[str]]       # each friend: the names they go by, display name first
+    standing: StandingRule
 
 
 class AllFairResult(BaseModel):

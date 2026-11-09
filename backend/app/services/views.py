@@ -12,7 +12,8 @@ from app.context import AppContext
 from app.db import repository as repo
 from app.db.rows import EntryRow, GameRow
 from app.engine.rigging import evaluate_rule
-from app.models import AdminGameState, Dashboard, LastResult, LinkSummary, PublicGameState
+from app.models import AdminGameState, Dashboard, LastResult, LinkSummary, PublicGameState, WheelLists, WheelSummary
+from app.services import control
 from app.services import serializers as ser
 
 SPIN_HISTORY_LIMIT = 50
@@ -45,11 +46,12 @@ async def public_state(
     )
 
 
-def link_summary(ctx: AppContext, game: GameRow, entries: list[EntryRow]) -> LinkSummary:
+def link_summary(ctx: AppContext, game: GameRow, entries: list[EntryRow], rule=None) -> LinkSummary:
     return ser.link_summary(
         game,
         player_count=ctx.manager.player_count(game.id),
         entry_count=sum(1 for e in entries if e.is_active),
+        rule=rule,
     )
 
 
@@ -58,11 +60,40 @@ async def admin_state(ctx: AppContext, game: GameRow) -> AdminGameState:
     active = [e for e in entries if e.is_active]
     public = await public_state(ctx, game, entries)
     spins = await repo.list_spins(game.id, SPIN_HISTORY_LIMIT)
+    eff = await control.effective_rule(game, active)
+    r = eff.settings
     rule = evaluate_rule(
-        active, game.mode, game.target_names, max_streak=game.max_streak, script=game.script,
+        active, r.mode, r.target_names, max_streak=r.max_streak, script=eff.script,
         recent_winners=[s.winner_name for s in spins if s.finished_at is not None],
     )
-    return ser.admin_game_state(public, link_summary(ctx, game, entries), rule, spins)
+    return ser.admin_game_state(
+        public, link_summary(ctx, game, entries, r), ser.control_out(eff), rule, spins
+    )
+
+
+async def wheel_lists(ctx: AppContext) -> WheelLists:
+    """Every ordinary solo wheel, friends' wheels first (most recently used first in each)."""
+    friends = await control.get_friends()
+    standing = await control.get_standing()
+    matched, others = [], []
+    for game in await repo.list_solo_wheels():
+        active = [e for e in await repo.list_entries(game.id) if e.is_active]
+        eff = control.resolve(game, active, friends, standing)
+        summary = WheelSummary(
+            id=game.id,
+            path=f"/g/{game.id}",
+            names=[e.name for e in active],
+            entry_count=len(active),
+            open_now=ctx.manager.player_count(game.id) > 0,
+            created_at=game.created_at,
+            last_activity_at=game.last_activity_at,
+            control=ser.control_out(eff),
+            mode=eff.settings.mode,
+            chance=eff.settings.chance,
+            script=eff.script,
+        )
+        (matched if eff.matched else others).append(summary)
+    return WheelLists(matched=matched, others=others)
 
 
 async def dashboard(ctx: AppContext) -> Dashboard:
@@ -70,7 +101,7 @@ async def dashboard(ctx: AppContext) -> Dashboard:
     for game in await repo.list_admin_links():
         entries = await repo.list_entries(game.id)
         links.append(link_summary(ctx, game, entries))
-    return ser.dashboard(ctx.manager.live_games(), links, ctx.backup_status)
+    return ser.dashboard(ctx.manager.live_games(), links, await wheel_lists(ctx), ctx.backup_status)
 
 
 async def dashboard_payload(ctx: AppContext) -> dict:
@@ -79,7 +110,7 @@ async def dashboard_payload(ctx: AppContext) -> dict:
 
 # ---------------------------------------------------------------- broadcasts
 async def notify_admins(ctx: AppContext, game: GameRow) -> None:
-    if game.origin == "admin_link" and ctx.manager.has_admin_watchers(game.id):
+    if ctx.manager.has_admin_watchers(game.id):
         await ctx.manager.send_admins(game.id, ser.admin_state_event(await admin_state(ctx, game)))
 
 
