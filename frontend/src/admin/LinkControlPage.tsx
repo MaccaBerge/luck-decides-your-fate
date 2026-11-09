@@ -11,6 +11,7 @@ import { useAdminAuth } from "./auth";
 import { useAdminLinkSocket } from "./useAdminSocket";
 import { sortByTarget, targetRanks, toggleTarget } from "./targets";
 import RuleStatusBanner from "./components/RuleStatusBanner";
+import { AlwaysOptions, ScriptCard } from "./components/RuleExtras";
 import {
   btnPill,
   btnPrimary,
@@ -264,7 +265,8 @@ export default function LinkControlPage() {
               Save target names
             </button>
           </div>
-          <RuleStatusBanner status={rule_status} mode={link.mode} />
+          {link.mode === "always" && <AlwaysOptions link={link} activeCount={active.length} onPatch={patch} />}
+          <RuleStatusBanner status={rule_status} link={link} />
           <div className="flex flex-col gap-2.5">
             <span className={fieldLabel}>Label (private)</span>
             <div className="flex gap-2">
@@ -374,6 +376,14 @@ export default function LinkControlPage() {
               )}
             </div>
           </section>
+
+          <ScriptCard
+            className={card}
+            link={link}
+            status={rule_status}
+            entries={game.entries}
+            onSave={(script) => patch({ script })}
+          />
 
           <section aria-label="Spin history" className={`${card} flex min-w-0 flex-col gap-3`}>
             <h2 className={cardTitle}>Spin history</h2>
