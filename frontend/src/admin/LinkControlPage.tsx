@@ -6,7 +6,7 @@ import { textColorFor } from "../components/wheel/wheelMath";
 import type { Mode, SpinStarted } from "../lib/types";
 import * as adminApi from "./adminApi";
 import { errorMessage, errorStatus, parseNames, type UpdateLinkBody } from "./adminApi";
-import type { AdminGameState, AdminLinkEvent } from "./adminTypes";
+import type { AdminGameState, AdminLinkEvent, Control } from "./adminTypes";
 import { useAdminAuth } from "./auth";
 import { useAdminLinkSocket } from "./useAdminSocket";
 import { sortByTarget, targetRanks, toggleTarget } from "./targets";
@@ -51,7 +51,13 @@ function useDraft(serverValue: string | undefined) {
   return [draft, setDraft, dirty] as const;
 }
 
-export default function LinkControlPage() {
+/**
+ * The control page of a controller link, or (kind "wheel") of an ordinary wheel someone made on
+ * the site: the same live wheel, rule, next winners and history. A wheel has no label and can't
+ * be deleted here, and says which rule decides it (its own, the standing rule, or none).
+ */
+export default function LinkControlPage({ kind = "link" }: { kind?: "link" | "wheel" }) {
+  const isWheel = kind === "wheel";
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
   const { onUnauthorized, logout } = useAdminAuth();
@@ -86,8 +92,8 @@ export default function LinkControlPage() {
     setSt(null);
     setSpin(null);
     setNotFound(false);
-    adminApi.getLink(gameId).then(applyState, handleError);
-  }, [gameId, applyState, handleError]);
+    (isWheel ? adminApi.getWheel : adminApi.getLink)(gameId).then(applyState, handleError);
+  }, [gameId, isWheel, applyState, handleError]);
 
   useAdminLinkSocket(
     gameId,
@@ -116,7 +122,7 @@ export default function LinkControlPage() {
     if (!gameId) return;
     setError("");
     try {
-      applyState(await adminApi.updateLink(gameId, body));
+      applyState(await (isWheel ? adminApi.updateWheel : adminApi.updateLink)(gameId, body));
     } catch (err) {
       handleError(err);
     }
@@ -176,7 +182,7 @@ export default function LinkControlPage() {
       <div className={page}>
         {header}
         <div className={card}>
-          <p className="font-medium">This link no longer exists.</p>
+          <p className="font-medium">{isWheel ? "This wheel no longer exists." : "This link no longer exists."}</p>
         </div>
       </div>
     );
@@ -192,9 +198,9 @@ export default function LinkControlPage() {
     );
   }
 
-  const { link, game, rule_status, spin_history } = st;
+  const { link, game, rule_status, spin_history, control } = st;
   const url = `${location.origin}/g/${game.id}`;
-  const title = linkTitle(link.label);
+  const title = isWheel ? (control.matched ? "Friends' wheel" : "Wheel") : linkTitle(link.label);
   const matched = new Set(rule_status.matched_entry_ids);
   const ranks = targetRanks(rule_status.targets);
   const active = game.entries.filter((e) => e.is_active);
@@ -209,7 +215,7 @@ export default function LinkControlPage() {
         <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-2">
           <h1 className="truncate font-display text-[26px] leading-tight font-semibold">{title}</h1>
           <div className="flex flex-wrap items-center gap-2.5">
-            <StatusBadge status={link.status} />
+            {!isWheel && <StatusBadge status={link.status} />}
             <span className="text-[13px] text-ink-muted">
               <span data-testid="player-count" className="tabular-nums">
                 {link.player_count}
@@ -235,6 +241,12 @@ export default function LinkControlPage() {
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
         <section aria-label="Rules" className={`${card} flex flex-col gap-[22px]`}>
           <h2 className="font-display text-xl font-semibold">Rules</h2>
+          {isWheel && (
+            <WheelControlNote
+              control={control}
+              onBackToStanding={() => patch({ own_rule: false })}
+            />
+          )}
           <div className="flex flex-col gap-2.5">
             <span className={fieldLabel}>Mode (applies immediately)</span>
             <ModeRadioGroup
@@ -267,7 +279,7 @@ export default function LinkControlPage() {
           </div>
           {link.mode === "always" && <AlwaysOptions link={link} activeCount={active.length} onPatch={patch} />}
           <RuleStatusBanner status={rule_status} link={link} />
-          <div className="flex flex-col gap-2.5">
+          {!isWheel && <div className="flex flex-col gap-2.5">
             <span className={fieldLabel}>Label (private)</span>
             <div className="flex gap-2">
               <input
@@ -290,7 +302,7 @@ export default function LinkControlPage() {
                 Save label
               </button>
             </div>
-          </div>
+          </div>}
         </section>
 
         <div className="flex min-w-0 flex-col gap-6">
@@ -426,11 +438,35 @@ export default function LinkControlPage() {
             )}
           </section>
 
-          <div className="flex justify-end">
-            <DeleteWithConfirm label={`Delete link ${title}`} onConfirm={remove} />
-          </div>
+          {!isWheel && (
+            <div className="flex justify-end">
+              <DeleteWithConfirm label={`Delete link ${title}`} onConfirm={remove} />
+            </div>
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** On an ordinary wheel: which rule decides it, and the way back to the standing rule. */
+function WheelControlNote({ control, onBackToStanding }: { control: Control; onBackToStanding: () => void }) {
+  const friends = control.friends.length > 0 ? `Friends on it: ${control.friends.join(", ")}.` : "No friends on it.";
+  const text =
+    control.source === "own"
+      ? "This wheel has its own rule. The standing rule doesn't apply to it."
+      : control.source === "standing"
+        ? "This wheel follows the standing rule. Change the rule here to give it its own."
+        : "This wheel isn't a friends' wheel, so it's fair. Change the rule here to take it over.";
+  return (
+    <div data-testid="wheel-control" className="flex flex-col gap-2 rounded-2xl bg-surface-tint px-4 py-3.5 text-sm">
+      <p>{text}</p>
+      <p className="text-[13px] text-ink-muted">{friends}</p>
+      {control.source === "own" && (
+        <button type="button" className={`${btnPill} self-start`} onClick={onBackToStanding}>
+          {control.matched ? "Back to the standing rule" : "Back to fair"}
+        </button>
+      )}
     </div>
   );
 }

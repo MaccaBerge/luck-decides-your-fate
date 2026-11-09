@@ -8,6 +8,7 @@ import LoginPage from "./LoginPage";
 import DashboardPage from "./DashboardPage";
 import LinkControlPage from "./LinkControlPage";
 import AnalyticsPage from "./analytics/AnalyticsPage";
+import FriendsPage from "./FriendsPage";
 import { addWebAppTags } from "./webApp";
 
 type AuthState = "checking" | "in" | "out";
@@ -54,6 +55,8 @@ export default function AdminApp() {
       <Routes>
         <Route index element={<DashboardPage />} />
         <Route path="links/:gameId" element={<LinkControlPage />} />
+        <Route path="wheels/:gameId" element={<LinkControlPage kind="wheel" />} />
+        <Route path="friends" element={<FriendsPage />} />
         <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="*" element={<DashboardPage />} />
       </Routes>

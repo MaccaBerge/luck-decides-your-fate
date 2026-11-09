@@ -1,6 +1,14 @@
 import { ApiError, request } from "../lib/api";
 import type { Mode } from "../lib/types";
-import type { AdminGameState, AdminSession, AnalyticsDays, AnalyticsReport, Dashboard } from "./adminTypes";
+import type {
+  AdminGameState,
+  AdminSession,
+  AnalyticsDays,
+  AnalyticsReport,
+  Dashboard,
+  FriendsSettings,
+  StandingRule,
+} from "./adminTypes";
 
 export interface CreateLinkBody {
   label: string | null;
@@ -17,6 +25,8 @@ export interface UpdateLinkBody {
   /** null: off. */
   max_streak?: number | null;
   script?: string[];
+  /** Ordinary wheels only: false hands the wheel back to the standing rule. */
+  own_rule?: false;
 }
 
 export const login = (password: string) =>
@@ -47,8 +57,19 @@ export const getLink = (gameId: string) =>
 export const updateLink = (gameId: string, patch: UpdateLinkBody) =>
   request<AdminGameState>("PATCH", `/api/admin/links/${encodeURIComponent(gameId)}`, patch);
 
-/** The panic button: every link back to fair, scripts cleared. */
-export const allLinksFair = () => request<{ changed: number }>("POST", "/api/admin/links/all-fair");
+/** The panic button: every link and wheel back to fair, scripts cleared, standing rule fair. */
+export const allFair = () => request<{ changed: number }>("POST", "/api/admin/all-fair");
+
+const w = (gameId: string) => `/api/admin/wheels/${encodeURIComponent(gameId)}`;
+export const getWheel = (gameId: string) => request<AdminGameState>("GET", w(gameId));
+/** Changing the rule gives the wheel its own; `own_rule: false` hands it back to the standing rule. */
+export const updateWheel = (gameId: string, patch: UpdateLinkBody) =>
+  request<AdminGameState>("PATCH", w(gameId), patch);
+
+export const getFriends = () => request<FriendsSettings>("GET", "/api/admin/friends");
+export const putFriends = (friends: string[][]) => request<FriendsSettings>("PUT", "/api/admin/friends", { friends });
+export const updateStanding = (patch: Partial<StandingRule>) =>
+  request<FriendsSettings>("PATCH", "/api/admin/standing-rule", patch);
 
 export const deleteLink = (gameId: string) =>
   request<void>("DELETE", `/api/admin/links/${encodeURIComponent(gameId)}`);
