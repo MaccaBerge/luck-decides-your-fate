@@ -95,7 +95,8 @@ export type PlayerEvent =
   | { type: "state"; state: PublicGameState }
   | { type: "spin_started"; spin: SpinStarted }
   | { type: "spin_finished"; spin_id: number; winner_entry_id: string; winner_name: string }
-  | { type: "game_deleted" };
+  /** reason "operator": the site's developer ended this game on purpose. */
+  | { type: "game_deleted"; reason?: "operator" };
 
 export interface JoinResponse {
   /** The game needs the host's OK: this is a request (keep the key, confirm once accepted). */

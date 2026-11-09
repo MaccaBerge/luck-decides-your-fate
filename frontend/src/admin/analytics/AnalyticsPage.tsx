@@ -5,7 +5,7 @@ import * as adminApi from "../adminApi";
 import { errorMessage, errorStatus } from "../adminApi";
 import type { AnalyticsDays, AnalyticsMetric, AnalyticsReport } from "../adminTypes";
 import { useAdminAuth } from "../auth";
-import { btnSecondary, card, clockTime, ErrorText, LogoutButton, page, Wordmark } from "../components/ui";
+import { btnSecondary, card, clockTime, ErrorText, page, SubPageHeader } from "../components/ui";
 import { MetricBody, WIDE_KINDS } from "./renderers";
 
 const RANGES: AnalyticsDays[] = [7, 30, 90];
@@ -92,15 +92,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className={page}>
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <Wordmark>Controller</Wordmark>
-        <nav className="flex items-center gap-2">
-          <button type="button" className={btnSecondary} onClick={() => navigate("/admin")}>
-            Back to dashboard
-          </button>
-          <LogoutButton onClick={logout} />
-        </nav>
-      </header>
+      <SubPageHeader onBack={() => navigate("/admin")} onLogout={logout} />
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">

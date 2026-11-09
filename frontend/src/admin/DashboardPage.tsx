@@ -81,6 +81,16 @@ export default function DashboardPage() {
     }
   }
 
+  async function removeWheel(id: string) {
+    try {
+      await adminApi.deleteWheel(id);
+      const drop = (ws: WheelSummary[]) => ws.filter((w) => w.id !== id);
+      setDash((d) => (d ? { ...d, wheels: { matched: drop(d.wheels.matched), others: drop(d.wheels.others) } } : d));
+    } catch (err) {
+      handleError(err);
+    }
+  }
+
   async function remove(id: string) {
     try {
       await adminApi.deleteLink(id);
@@ -170,7 +180,7 @@ export default function DashboardPage() {
         ) : (
           <ul data-testid="matched-wheels" className="flex flex-col divide-y divide-divider">
             {dash.wheels.matched.map((w) => (
-              <WheelRow key={w.id} wheel={w} />
+              <WheelRow key={w.id} wheel={w} onDelete={() => removeWheel(w.id)} />
             ))}
           </ul>
         )}
@@ -204,7 +214,7 @@ export default function DashboardPage() {
         ) : (
           <ul data-testid="other-wheels" className="flex flex-col divide-y divide-divider">
             {dash.wheels.others.map((w) => (
-              <WheelRow key={w.id} wheel={w} />
+              <WheelRow key={w.id} wheel={w} onDelete={() => removeWheel(w.id)} />
             ))}
           </ul>
         )}
@@ -333,9 +343,17 @@ export function wheelRuleText(w: WheelSummary): string {
   return `${rule}${source ? ` (${source})` : ""}${next}`;
 }
 
-function WheelRow({ wheel }: { wheel: WheelSummary }) {
+/** Whether a wheel is in use, so you know before deleting it. */
+export function wheelStatus(w: Pick<WheelSummary, "spinning" | "viewers">): { text: string; busy: boolean } {
+  if (w.spinning) return { text: "Spinning now", busy: true };
+  if (w.viewers > 0) return { text: w.viewers === 1 ? "In use: 1 open" : `In use: ${w.viewers} open`, busy: true };
+  return { text: "Not open", busy: false };
+}
+
+function WheelRow({ wheel, onDelete }: { wheel: WheelSummary; onDelete: () => Promise<void> }) {
   const now = useNow();
   const names = wheel.names.length > 0 ? wheel.names.join(", ") : "No names yet";
+  const status = wheelStatus(wheel);
   return (
     <li className="flex flex-col gap-3 py-3.5 first:pt-1 last:pb-1 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 flex-col gap-1.5">
@@ -350,14 +368,28 @@ function WheelRow({ wheel }: { wheel: WheelSummary }) {
               {wheel.control.friends.join(", ")}
             </span>
           )}
+          <span
+            data-testid="wheel-status"
+            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${status.busy ? "bg-success-dot/20 text-ink" : "bg-surface-tint"}`}
+          >
+            {status.text}
+          </span>
           <span>{wheelRuleText(wheel)}</span>
-          <span>{wheel.open_now ? "open now" : relativeTime(wheel.last_activity_at, now)}</span>
+          <span>last used {relativeTime(wheel.last_activity_at, now)}</span>
         </p>
       </div>
-      <Link to={`/admin/wheels/${wheel.id}`} aria-label={`Open controls for the wheel with ${names}`} className={`${btnSecondary} shrink-0 self-start sm:self-auto`}>
-        <SlidersHorizontal className="size-4" aria-hidden />
-        <span>Controls</span>
-      </Link>
+      <div className="flex shrink-0 items-center gap-1.5 self-start sm:self-auto">
+        <Link to={`/admin/wheels/${wheel.id}`} aria-label={`Open controls for the wheel with ${names}`} className={btnSecondary}>
+          <SlidersHorizontal className="size-4" aria-hidden />
+          <span>Controls</span>
+        </Link>
+        <DeleteWithConfirm
+          label={`Delete the wheel with ${names}`}
+          onConfirm={onDelete}
+          compact
+          warning={status.busy ? "In use right now. They'll see the developer ended it." : null}
+        />
+      </div>
     </li>
   );
 }

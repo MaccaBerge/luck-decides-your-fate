@@ -18,6 +18,8 @@ describe("what decides a wheel", () => {
     names: [],
     entry_count: 0,
     open_now: false,
+    viewers: 0,
+    spinning: false,
     created_at: "",
     last_activity_at: "",
     control: { source: "none", friends: [], matched: false },
@@ -35,5 +37,14 @@ describe("what decides a wheel", () => {
     expect(wheelRuleText(w({ mode: "never", control: { source: "own", friends: [], matched: false }, script: ["Mia", "Per"] }))).toBe(
       "Never (own rule) · Next: Mia +1",
     );
+  });
+});
+
+describe("whether a wheel is in use", () => {
+  it("says so before you delete it", async () => {
+    const { wheelStatus } = await import("./DashboardPage");
+    expect(wheelStatus({ spinning: true, viewers: 1 })).toEqual({ text: "Spinning now", busy: true });
+    expect(wheelStatus({ spinning: false, viewers: 2 })).toEqual({ text: "In use: 2 open", busy: true });
+    expect(wheelStatus({ spinning: false, viewers: 0 })).toEqual({ text: "Not open", busy: false });
   });
 });

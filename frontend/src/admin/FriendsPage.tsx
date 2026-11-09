@@ -7,7 +7,7 @@ import { errorMessage, errorStatus, parseNames } from "./adminApi";
 import type { FriendsSettings, StandingRule } from "./adminTypes";
 import { useAdminAuth } from "./auth";
 import { AlwaysOptions } from "./components/RuleExtras";
-import { btnPill, btnSecondary, card, ErrorText, fieldLabel, LogoutButton, ModeRadioGroup, page, textarea, Wordmark } from "./components/ui";
+import { btnPill, card, ErrorText, fieldLabel, ModeRadioGroup, page, SubPageHeader, textarea } from "./components/ui";
 
 /** One friend per line, the names they go by separated by commas. */
 export function friendsToText(friends: string[][]): string {
@@ -69,15 +69,7 @@ export default function FriendsPage() {
 
   return (
     <div className={page}>
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <Wordmark>Controller</Wordmark>
-        <nav className="flex items-center gap-2">
-          <button type="button" className={btnSecondary} onClick={() => navigate("/admin")}>
-            Back to dashboard
-          </button>
-          <LogoutButton onClick={logout} />
-        </nav>
-      </header>
+      <SubPageHeader onBack={() => navigate("/admin")} onLogout={logout} />
       <ErrorText>{error}</ErrorText>
       {!settings || !standing ? (
         <Loader2 className="size-6 animate-spin text-ink-muted" aria-label="Loading" />

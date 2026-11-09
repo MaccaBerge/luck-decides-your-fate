@@ -67,6 +67,8 @@ export default function GamePage() {
 
   const [game, setGame] = useState<PublicGameState | null>(null);
   const [notFound, setNotFound] = useState(false);
+  // The developer ended this game while it was open: say so, instead of "doesn't exist".
+  const [endedByOperator, setEndedByOperator] = useState(false);
   const [activeSpin, setActiveSpin] = useState<SpinStarted | null>(null);
   const [animating, setAnimating] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
@@ -134,6 +136,7 @@ export default function GamePage() {
   useEffect(() => {
     setGame(null);
     setNotFound(false);
+    setEndedByOperator(false);
     setActiveSpin(null);
     setAnimating(false);
     setResult(null);
@@ -187,6 +190,7 @@ export default function GamePage() {
           case "spin_finished":
             break; // the Wheel finishes on its own clock; a "state" follows.
           case "game_deleted":
+            if (ev.reason === "operator") setEndedByOperator(true);
             setNotFound(true);
             break;
         }
@@ -341,7 +345,7 @@ export default function GamePage() {
     if (notFound) setBigScreen(false);
   }, [notFound]);
 
-  if (notFound) return <NotFoundPage />;
+  if (notFound) return <NotFoundPage endedByOperator={endedByOperator} />;
   if (!game) return <Loading />;
 
   const active = game.entries.filter((e) => e.is_active).sort((a, b) => a.position - b.position);

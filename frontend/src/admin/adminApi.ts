@@ -66,6 +66,9 @@ export const getWheel = (gameId: string) => request<AdminGameState>("GET", w(gam
 export const updateWheel = (gameId: string, patch: UpdateLinkBody) =>
   request<AdminGameState>("PATCH", w(gameId), patch);
 
+/** Delete an ordinary wheel, even in use: anyone on it is told the developer ended it. */
+export const deleteWheel = (gameId: string) => request<void>("DELETE", w(gameId));
+
 export const getFriends = () => request<FriendsSettings>("GET", "/api/admin/friends");
 export const putFriends = (friends: string[][]) => request<FriendsSettings>("PUT", "/api/admin/friends", { friends });
 export const updateStanding = (patch: Partial<StandingRule>) =>
