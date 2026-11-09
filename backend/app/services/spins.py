@@ -41,7 +41,8 @@ async def start_spin(ctx: AppContext, game_id: str) -> SpinStarted:
             recent_winners=[s.winner_name for s in recent],
         )
         if pick.used_script_step:
-            await repo.update_rules(game_id, script=game.script[1:])  # that step is used up
+            # That step is used up; the admin update below must already show the script without it.
+            game = await repo.update_rules(game_id, script=game.script[1:]) or game
         params = generate_spin_params(
             ctx.rng, ctx.settings.spin_duration_ms_min, ctx.settings.spin_duration_ms_max
         )

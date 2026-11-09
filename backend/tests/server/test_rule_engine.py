@@ -109,3 +109,16 @@ def test_spin_payload_is_the_same_for_script_and_fair(client, admin):
     fair = client.post(f"/api/games/{gid}/spin").json()
     wait_spin()
     assert set(scripted) == set(fair)
+
+
+def test_controller_sees_the_step_used_up_as_the_spin_starts(client, admin):
+    gid = new_link(admin, client, ["Anna", "Jonas"], mode="fair")
+    admin.patch(f"/api/admin/links/{gid}", json={"script": ["Anna", "Jonas"]})
+    with admin.websocket_connect(f"/ws/admin/games/{gid}") as ws:
+        ws.receive_json()
+        client.post(f"/api/games/{gid}/spin")
+        while (m := ws.receive_json())["type"] != "admin_state":
+            pass
+        assert m["state"]["game"]["current_spin"] is not None
+        assert m["state"]["link"]["script"] == ["Jonas"]
+    wait_spin()
