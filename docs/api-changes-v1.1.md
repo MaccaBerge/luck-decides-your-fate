@@ -119,3 +119,17 @@ The server remembers why a player was removed (`kicked`, `banned`, or `timed_out
 A ban is per browser: a private window or another device isn't recognised.
 
 New error codes: `kicked` (403), `banned` (403), `game_closed` (409), `request_declined` (409), `request_not_accepted` (409), `request_not_found` (404).
+
+## v1.5: controller logins that last
+
+A controller login now lasts until it has gone **60 days unused**, and at most **1 year** after logging in. Logins are stored in the database, so a restart or deploy no longer logs the admin out. The `admin_session` cookie's `Max-Age` is one year; the server ends the session sooner when it goes unused. Only an HMAC of the token is stored, keyed with `ADMIN_PASSWORD`, so changing the password ends every session.
+
+| Method | Path | Body | Success | Errors |
+|---|---|---|---|---|
+| GET | `/api/admin/sessions` | none | 200 `{ "sessions": [{ "id", "device", "created_at", "last_used_at", "expires_at", "current" }] }`, most recently used first. `device` is a label from the user agent, such as `"iPhone · Home Screen app"`; `current` marks the session making the request. | 401 |
+| DELETE | `/api/admin/sessions/{id}` | none | 204: signs out that device (this one too, if it's this device's ID) | 401, 404 `session_not_found` |
+| POST | `/api/admin/sessions/sign-out-others` | none | 204: signs out every device except this one | 401 |
+
+New error code: `session_not_found` (404).
+
+**Home Screen web app.** `/admin/manifest.webmanifest` and the icons in `/admin/` let the controller be added to a phone's Home Screen as "LDYF Controller". Only the admin code links to them.

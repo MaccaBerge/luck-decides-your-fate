@@ -24,6 +24,10 @@ def game_not_found() -> ApiError:
     return ApiError(404, "game_not_found", "Game not found")
 
 
+def session_not_found() -> ApiError:
+    return ApiError(404, "session_not_found", "That device is already signed out")
+
+
 def entry_not_found() -> ApiError:
     return ApiError(404, "entry_not_found", "Entry not found")
 

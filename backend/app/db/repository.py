@@ -7,7 +7,7 @@ import aiosqlite
 
 from app.db.connection import connect
 from app.db.ids import new_entry_id, new_game_id, new_join_code, new_player_id, next_color
-from app.db.rows import EntryRow, GameRow, JoinRequestRow, Mode, Origin, PlayerRow, RemovalRow, SpinRow
+from app.db.rows import AdminSessionRow, EntryRow, GameRow, JoinRequestRow, Mode, Origin, PlayerRow, RemovalRow, SpinRow
 from app.timeutil import utc_iso_days_ago, utc_now_iso
 
 
@@ -654,3 +654,32 @@ async def forget_removal(game_id: str, player_id: str) -> None:
             (game_id, game_id, player_id),
         )
         await db.execute("DELETE FROM player_removals WHERE game_id = ? AND player_id = ?", (game_id, player_id))
+
+
+# ---------------------------------------------------------------- admin sessions
+async def list_admin_sessions() -> list[AdminSessionRow]:
+    async with connect() as db:
+        async with db.execute(
+            "SELECT id, token_hash, device, created_at, last_used_at FROM admin_sessions"
+        ) as cur:
+            return [AdminSessionRow(**dict(r)) for r in await cur.fetchall()]
+
+
+async def add_admin_session(session_id: str, *, token_hash: str, device: str, created_at: str,
+                            last_used_at: str) -> None:
+    async with connect() as db:
+        await db.execute(
+            "INSERT INTO admin_sessions (id, token_hash, device, created_at, last_used_at)"
+            " VALUES (?, ?, ?, ?, ?)",
+            (session_id, token_hash, device, created_at, last_used_at),
+        )
+
+
+async def touch_admin_session(session_id: str, last_used_at: str) -> None:
+    async with connect() as db:
+        await db.execute("UPDATE admin_sessions SET last_used_at = ? WHERE id = ?", (last_used_at, session_id))
+
+
+async def delete_admin_session(session_id: str) -> None:
+    async with connect() as db:
+        await db.execute("DELETE FROM admin_sessions WHERE id = ?", (session_id,))

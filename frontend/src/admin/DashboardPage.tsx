@@ -7,6 +7,7 @@ import { errorMessage, errorStatus, parseNames } from "./adminApi";
 import type { BackupStatus, Dashboard, LinkSummary } from "./adminTypes";
 import { useAdminAuth } from "./auth";
 import { useDashboardSocket } from "./useAdminSocket";
+import { DevicesCard } from "./components/DevicesCard";
 import {
   btnPrimary,
   btnSecondary,
@@ -143,6 +144,8 @@ export default function DashboardPage() {
           )}
         </section>
       </div>
+
+      <DevicesCard onUnauthorized={onUnauthorized} />
     </div>
   );
 }
