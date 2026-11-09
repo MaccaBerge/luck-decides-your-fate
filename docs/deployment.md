@@ -115,7 +115,7 @@ Don't run the smoke scripts against production. They expect short spin durations
 
 A daily copy of the SQLite file goes to a private S3-compatible bucket outside Railway. They're off until all four `BACKUP_S3_*` variables are set. Setting only some of them stops the app at startup.
 
-**What's in a copy:** wheels, names, rules, link labels and spin history. Admin sessions, live state and `ADMIN_PASSWORD` aren't in it. **Copies contain the rigging rules, so the bucket must stay private and the token must stay limited to it.**
+**What's in a copy:** wheels, names, rules, link labels, spin history and the admin sessions. A session is stored only as an HMAC of its token keyed with `ADMIN_PASSWORD`, so a copy logs nobody in. Live state and `ADMIN_PASSWORD` aren't in it. **Copies contain the rigging rules, so the bucket must stay private and the token must stay limited to it.**
 
 **Set it up with Cloudflare R2:**
 

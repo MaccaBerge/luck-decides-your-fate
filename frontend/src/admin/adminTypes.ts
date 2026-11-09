@@ -110,3 +110,14 @@ export interface AnalyticsReport {
   days: AnalyticsDays;
   sections: AnalyticsSection[];
 }
+
+/** A device logged in to the controller (GET /api/admin/sessions). */
+export interface AdminSession {
+  id: string;
+  device: string;
+  created_at: string;
+  last_used_at: string;
+  expires_at: string;
+  /** The device you're using now. */
+  current: boolean;
+}

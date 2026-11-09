@@ -8,11 +8,15 @@ import LoginPage from "./LoginPage";
 import DashboardPage from "./DashboardPage";
 import LinkControlPage from "./LinkControlPage";
 import AnalyticsPage from "./analytics/AnalyticsPage";
+import { addWebAppTags } from "./webApp";
 
 type AuthState = "checking" | "in" | "out";
 
 export default function AdminApp() {
   const [auth, setAuth] = useState<AuthState>("checking");
+
+  // Lets you add the controller to an iPhone's Home Screen as "LDYF Controller".
+  useEffect(() => addWebAppTags(), []);
 
   useEffect(() => {
     let cancelled = false;

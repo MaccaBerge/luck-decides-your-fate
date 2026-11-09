@@ -84,6 +84,7 @@ A quick pass over every feature, with `./dev.sh --fresh --seed --fast` (add `--p
 - **Two tabs on one wheel:** a spin or a name change in one shows up live in the other. Hide one tab for over 15 seconds, change something, and come back.
 - **Controller:** log in at `/admin`; open the seeded rigged link; change the mode; click names and slices to set targets (they sort to the front, numbered); spin from the link's wheel and check the result and the spin history.
 - **Analytics:** `/admin/analytics`, in 7, 30 and 90 days.
+- **Controller on a phone:** with `./dev.sh --phone`, open `/admin` in Safari on the iPhone, then Share → Add to Home Screen. It's added as "LDYF Controller" and opens full screen. Log in once inside it (a Home Screen app keeps its own cookies, separate from Safari). The dashboard's "Signed-in devices" card lists every login and can sign them out.
 - **Light and dark:** the theme button, on the wheel and in the controller.
 
 ## Production-style run (single service)
@@ -186,9 +187,10 @@ www.luckdecidesyourfate.com ─┘                                              
                                                                   (/data/luckdecidesyourfate.db)
 ```
 
-**Always run exactly 1 replica with 1 Uvicorn worker.** Live sockets, spin locks, admin sessions
-and the login rate limiter all live in memory. Every redeploy restarts the container: sockets
-reconnect by themselves, and the admin has to log in again.
+**Always run exactly 1 replica with 1 Uvicorn worker.** Live sockets, spin locks and the login
+rate limiter live in memory, and so does a copy of the admin sessions. Every redeploy restarts the
+container: sockets reconnect by themselves. The admin stays logged in, because sessions are also
+stored in the database.
 
 Production variables (see [Environment variables](#environment-variables) for all of them):
 
@@ -237,7 +239,8 @@ the form `{"error": {"code": "...", "message": "..."}}`.
   `POST /api/games/{id}/restore`, `PATCH /api/games/{id}/settings`, `POST /api/games/{id}/spin`.
 - Admin (cookie `admin_session`): `POST /api/admin/login`, `POST /api/admin/logout`,
   `GET /api/admin/me`, `GET /api/admin/dashboard`, `POST /api/admin/links`,
-  `GET|PATCH|DELETE /api/admin/links/{id}`.
+  `GET|PATCH|DELETE /api/admin/links/{id}`, `GET /api/admin/sessions`,
+  `DELETE /api/admin/sessions/{id}`, `POST /api/admin/sessions/sign-out-others`.
 - Sockets: `/ws/games/{id}` (players), `/ws/admin` (dashboard), `/ws/admin/games/{id}` (link
   control). A rejected connection is accepted and then closed with code 4401 or 4404.
 

@@ -54,11 +54,12 @@ Production: `npm run build`, then uvicorn serves `frontend/dist` (SPA fallback) 
 - `realtime/manager.py`: socket registry. Only player sockets count as players/presence; admin sockets never do. Dashboard pushes are throttled.
 - `analytics/`: admin-only statistics for `/admin/analytics`. Each statistic is one `@metric` function in `analytics/metrics/`, and the page renders by `kind`. See `docs/analytics.md`. Never use it from public routes or player sockets.
 - `context.py`: `AppContext` on `app.state.ctx`; `main.create_app(settings)` builds an isolated app (tests use one per test).
-- Live state, admin sessions and spin locks are in process memory → **always run one worker / one instance.**
+- Live state and spin locks are in process memory → **always run one worker / one instance.** Admin sessions (`auth.py`) are stored in `admin_sessions` (only an HMAC of the token, keyed with `ADMIN_PASSWORD`) and loaded into memory at startup, so a deploy doesn't log the admin out; they end after 60 days unused, 1 year at most.
 
 **Frontend** (`frontend/src/`):
 - `lib/` (`types.ts`, `api.ts`, `ws.ts`, `players.ts`, `avatars.ts`): shared clients; `players.ts` keeps this browser's player key per multiplayer game, and `api.ts` sends it on game requests; `recentGame.ts` remembers the last game for the "still going" bar (only solo wheels are saved as the last wheel `/` reopens); `ws.ts` auto-reconnects except after close codes 4401/4404 or `game_deleted`. The wheel page's socket (only) closes after its tab has been hidden for 15 s, reconnects when visible, and adds `?resume=1` to every connection after its first, so the server counts visits and visible time (`docs/analytics.md`). Hidden tabs therefore don't count as players or presence.
 - `components/wheel/Wheel.tsx`: canvas wheel. While animating it draws from the `spin.wheel_entry_ids` snapshot (the server's remove-winner update can arrive before the animation ends). A spin received more than 1.5 s after `started_at` jumps to its final position, and a `setTimeout` backs up `requestAnimationFrame` so spins finish in background/headless tabs. Deduped by `spin_id` (the WS `spin_started` usually beats the HTTP 202). StrictMode is intentionally off.
+- `admin/webApp.ts`: makes the controller a Home Screen web app ("LDYF Controller"). Its manifest and icons are in `public/admin/` and its tags are added only by the admin code, never in `index.html` (that would reveal the controller to every visitor).
 - `admin/`: the whole controller, loaded only via `lazy(() => import("./admin/AdminApp"))` in `App.tsx`, mounted at `/admin/*` with relative nested routes. Never import from `src/admin` elsewhere, and never put admin paths in `src/lib`; the main bundle must not contain `/api/admin` or `/ws/admin`.
 - Page titles: `Wheel · Luck Decides Your Fate` on every game page (public and admin-link alike), `Luck Decides Your Fate` everywhere else. Nothing in the friend UI may hint at rigging. The UI never re-implements name matching (the admin highlights X via the server's `rule_status.matched_entry_ids`, and click-to-target uses `rule_status.targets`, which lists every target with the entries the server matched to it).
 - Design ("Blend"): colours are tokens in `index.css` (use `bg-bg`, `bg-surface`, `text-ink`, `text-ink-muted`, `border-border`, `bg-primary` and so on; don't add `dark:` variants, the tokens switch themselves), with no stray hex values in components. Shared button styles are in `components/game/buttons.ts`. Fredoka (`font-display`) is for titles, the Spin button and slice labels; Inter is for everything else. Both are self-hosted, so the site makes no third-party font requests. The default slice colours live in `backend/app/db/ids.py`, mirrored in `frontend/src/lib/palette.ts`.
@@ -69,9 +70,9 @@ Production: `npm run build`, then uvicorn serves `frontend/dist` (SPA fallback) 
 
 ## Production
 
-- Railway behind Cloudflare (runbook: `docs/deployment.md`). **1 replica, 1 Uvicorn worker, always**: sockets, spin locks, admin sessions and the login rate limiter are in memory.
+- Railway behind Cloudflare (runbook: `docs/deployment.md`). **1 replica, 1 Uvicorn worker, always**: sockets, spin locks, the in-memory copy of admin sessions and the login rate limiter are in memory.
 - The database lives on a Railway volume at `/data`. The image runs as non-root; Railway needs `RAILWAY_RUN_UID=0` because its volumes are owned by root.
-- Merging to `main` deploys. A deploy restarts the container: sockets get close code 1012 and reconnect, and the admin logs in again.
+- Merging to `main` deploys. A deploy restarts the container: sockets get close code 1012 and reconnect. The admin stays logged in.
 - Never commit secrets. `ADMIN_PASSWORD` is only ever set in the environment.
 - Never run the smoke scripts against production.
 - CI (`.github/workflows/ci.yml`) runs on PRs and pushes to `main`: `backend` (pytest), `frontend` (typecheck, test, build), then `docker-smoke` (builds the image and runs both smoke scripts against the container). It needs no repository secrets.

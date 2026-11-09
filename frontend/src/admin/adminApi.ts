@@ -1,6 +1,6 @@
 import { ApiError, request } from "../lib/api";
 import type { Mode } from "../lib/types";
-import type { AdminGameState, AnalyticsDays, AnalyticsReport, Dashboard } from "./adminTypes";
+import type { AdminGameState, AdminSession, AnalyticsDays, AnalyticsReport, Dashboard } from "./adminTypes";
 
 export interface CreateLinkBody {
   label: string | null;
@@ -20,6 +20,13 @@ export const login = (password: string) =>
 export const logout = () => request<void>("POST", "/api/admin/logout");
 
 export const me = () => request<{ authenticated: boolean }>("GET", "/api/admin/me");
+
+export const getSessions = () => request<{ sessions: AdminSession[] }>("GET", "/api/admin/sessions");
+
+export const signOutDevice = (id: string) =>
+  request<void>("DELETE", `/api/admin/sessions/${encodeURIComponent(id)}`);
+
+export const signOutOthers = () => request<void>("POST", "/api/admin/sessions/sign-out-others");
 
 export const getDashboard = () => request<Dashboard>("GET", "/api/admin/dashboard");
 
