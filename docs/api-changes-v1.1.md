@@ -156,3 +156,29 @@ Controller links have three more rule settings. All are admin only: public state
 | Method | Path | Body | Success | Errors |
 |---|---|---|---|---|
 | POST | `/api/admin/links/all-fair` | none | 200 `{ "changed" }`: the panic button. Every link goes back to `"fair"` and its script is cleared; targets, `chance` and `max_streak` are kept. | 401 |
+
+## v1.7: ordinary wheels in the controller
+
+The controller can now see and decide ordinary solo wheels (made on the site, not from a link). Multiplayer games aren't included yet. None of this is visible to players: public state and player sockets never change, and changing any of it sends them nothing.
+
+**Which rule decides a wheel.**
+- A wheel follows its **own rule** once the admin has set one.
+- Otherwise, if at least two *different* friends from the **friends list** are on it (matched like targets; a friend's other names count as the same friend), it follows the **standing rule**.
+- Otherwise it's fair.
+- A wheel's script (next winners) is its own, and comes first whatever the rule.
+
+| Method | Path | Body | Success | Errors |
+|---|---|---|---|---|
+| GET | `/api/admin/wheels/{id}` | none | 200 `AdminGameState` for an ordinary solo wheel: `link.label` is null, the rule fields are the rule in effect, `link.script` is the wheel's | 401, 404 `game_not_found` (links, multiplayer games, unknown) |
+| PATCH | `/api/admin/wheels/{id}` | `{ "mode"?, "target_names"?, "chance"?, "max_streak"?, "script"?, "own_rule"? }` | 200 `AdminGameState`. Changing a rule field gives the wheel its own rule, starting from the one in effect. `"own_rule": false` hands it back (standing rule, or fair). `script` alone keeps the rule as it is. | 401, 404, 422 (empty body; `own_rule` other than false) |
+| GET | `/api/admin/friends` | none | 200 `{ "friends": [["Jonas", "Jonny"], ["Mia"]], "standing": { "mode", "target_names", "chance", "max_streak" } }` | 401 |
+| PUT | `/api/admin/friends` | `{ "friends": [[name, ...], ...] }` | 200, as GET. Blank names and friends are dropped. At most 50 friends, 5 names each, 40 characters per name. | 401, 422 |
+| PATCH | `/api/admin/standing-rule` | `{ "mode"?, "target_names"?, "chance"?, "max_streak"? }` | 200, as GET | 401, 422 |
+| POST | `/api/admin/all-fair` | none | 200 `{ "changed" }`: replaces `/api/admin/links/all-fair`. Every link and wheel with a rule or script goes fair (scripts cleared), and so does the standing rule. | 401 |
+
+`AdminGameState` has a new `control` field: `{ "source", "friends", "matched" }`.
+- `source` is `"link"`, `"own"`, `"standing"` or `"none"`.
+- `friends` are the friends on the wheel, by display name.
+- `matched` is true when at least two different friends are on it.
+
+The dashboard has a new `wheels` field: `{ "matched": [...], "others": [...] }`, listing every ordinary solo wheel, most recently used first, with friends' wheels apart. Each entry has `id`, `path`, `names`, `entry_count`, `open_now`, `created_at`, `last_activity_at`, `control`, `mode`, `chance` and `script`. `/ws/admin/games/{id}` also accepts ordinary solo wheels.

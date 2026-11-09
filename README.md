@@ -84,6 +84,7 @@ A quick pass over every feature, with `./dev.sh --fresh --seed --fast` (add `--p
 - **Two tabs on one wheel:** a spin or a name change in one shows up live in the other. Hide one tab for over 15 seconds, change something, and come back.
 - **Controller:** log in at `/admin`; open the seeded rigged link; change the mode; click names and slices to set targets (they sort to the front, numbered); spin from the link's wheel and check the result and the spin history.
 - **Analytics:** `/admin/analytics`, in 7, 30 and 90 days.
+- **Friends' wheels:** under Friends on the dashboard, add a few friends and set the standing rule. Make a wheel at `/` with two of them on it: it shows up under "Friends' wheels" and follows the standing rule. Open its controls, change the rule (it gets its own), then "Back to the standing rule".
 - **Controller on a phone:** with `./dev.sh --phone`, open `/admin` in Safari on the iPhone, then Share → Add to Home Screen. It's added as "LDYF Controller" and opens full screen. Log in once inside it (a Home Screen app keeps its own cookies, separate from Safari). The dashboard's "Signed-in devices" card lists every login and can sign them out.
 - **Light and dark:** the theme button, on the wheel and in the controller.
 
