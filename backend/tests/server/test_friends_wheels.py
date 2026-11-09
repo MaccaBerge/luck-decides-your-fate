@@ -139,3 +139,27 @@ def test_controller_watches_a_wheel_live(client, admin):
         while "spin_started" not in types or "admin_state" not in types:
             types.add(ws.receive_json()["type"])
     wait_spin()
+
+
+def test_delete_a_wheel_in_use(client, admin):
+    import pytest
+    from starlette.websockets import WebSocketDisconnect
+
+    gid = new_game(client, ["Anna", "Per"])
+    with client.websocket_connect(f"/ws/games/{gid}") as p:
+        p.receive_json()
+        w = admin.get("/api/admin/dashboard").json()["wheels"]["others"][0]
+        assert (w["id"], w["open_now"], w["viewers"], w["spinning"]) == (gid, True, 1, False)
+        client.post(f"/api/games/{gid}/spin")
+        p.receive_json()  # spin_started
+        assert admin.get("/api/admin/dashboard").json()["wheels"]["others"][0]["spinning"] is True
+        assert admin.delete(f"/api/admin/wheels/{gid}").status_code == 204  # even mid-spin
+        assert p.receive_json() == {"type": "game_deleted", "reason": "operator"}
+        with pytest.raises(WebSocketDisconnect):
+            p.receive_json()
+    assert client.get(f"/api/games/{gid}").status_code == 404
+    assert admin.get("/api/admin/dashboard").json()["wheels"]["others"] == []
+    err(admin.delete(f"/api/admin/wheels/{gid}"), 404, "game_not_found")
+    link = new_link(admin)
+    err(admin.delete(f"/api/admin/wheels/{link}"), 404, "game_not_found")  # links: /links/{id}
+    assert client.delete(f"/api/admin/wheels/{link}").status_code == 401

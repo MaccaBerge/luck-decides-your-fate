@@ -343,14 +343,28 @@ async def update_standing(body: UpdateStandingRequest, ctx: AppContext = Depends
     return await _friends_out()
 
 
-@protected.delete("/links/{game_id}", status_code=204)
-async def delete_link(game_id: str, ctx: AppContext = Depends(ctx_dep)) -> Response:
-    await load_link(game_id)
+async def _end_game(ctx: AppContext, game_id: str) -> None:
+    """Delete a game now, even mid-spin, and tell everyone on it that it was ended on purpose.
+    A link and a wheel get exactly the same message."""
     async with ctx.runtime.locked(game_id):
         await repo.delete_game(game_id)
         ctx.runtime.forget(game_id)
-    await ctx.manager.send_players(game_id, ser.GAME_DELETED_EVENT)
-    await ctx.manager.send_admins(game_id, ser.GAME_DELETED_EVENT)
+    await ctx.manager.send_players(game_id, ser.GAME_ENDED_BY_OPERATOR_EVENT)
+    await ctx.manager.send_admins(game_id, ser.GAME_ENDED_BY_OPERATOR_EVENT)
     await ctx.manager.close_game(game_id, code=1000)
     ctx.manager.request_dashboard()
+
+
+@protected.delete("/links/{game_id}", status_code=204)
+async def delete_link(game_id: str, ctx: AppContext = Depends(ctx_dep)) -> Response:
+    await load_link(game_id)
+    await _end_game(ctx, game_id)
+    return Response(status_code=204)
+
+
+@protected.delete("/wheels/{game_id}", status_code=204)
+async def delete_wheel(game_id: str, ctx: AppContext = Depends(ctx_dep)) -> Response:
+    """Delete an ordinary wheel, even one in use: anyone on it is told the developer ended it."""
+    await load_wheel(game_id)
+    await _end_game(ctx, game_id)
     return Response(status_code=204)

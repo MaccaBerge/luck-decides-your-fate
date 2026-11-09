@@ -155,6 +155,8 @@ def spin_finished_event(result: LastResult) -> dict[str, Any]:
 
 
 GAME_DELETED_EVENT: dict[str, Any] = {"type": "game_deleted"}
+# The admin deleted the game (a link or a wheel alike): its players are told it was ended on purpose.
+GAME_ENDED_BY_OPERATOR_EVENT: dict[str, Any] = {"type": "game_deleted", "reason": "operator"}
 
 
 # ---------------------------------------------------------------- admin
