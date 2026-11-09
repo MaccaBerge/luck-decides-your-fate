@@ -137,7 +137,7 @@
   }
 }
 
-/* Leaving big-screen mode: how the wheel, invite card and size button glide back to their places. */
+/* Big-screen mode (leaving it, and entering it on a phone): how the wheel, invite card and size button glide between the layouts. */
 ::view-transition-group(*) {
   animation-duration: 420ms;
   animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
