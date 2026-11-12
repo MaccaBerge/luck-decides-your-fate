@@ -182,3 +182,13 @@ The controller can now see and decide ordinary solo wheels (made on the site, no
 - `matched` is true when at least two different friends are on it.
 
 The dashboard has a new `wheels` field: `{ "matched": [...], "others": [...] }`, listing every ordinary solo wheel, most recently used first, with friends' wheels apart. Each entry has `id`, `path`, `names`, `entry_count`, `open_now`, `created_at`, `last_activity_at`, `control`, `mode`, `chance` and `script`. `/ws/admin/games/{id}` also accepts ordinary solo wheels.
+
+## v1.8: deleting wheels
+
+| Method | Path | Body | Success | Errors |
+|---|---|---|---|---|
+| DELETE | `/api/admin/wheels/{id}` | none | 204: deletes an ordinary solo wheel, even one in use or mid-spin | 401, 404 `game_not_found` |
+
+When the admin deletes a game (a wheel here, or a link with `DELETE /api/admin/links/{id}`), its player sockets get `{"type": "game_deleted", "reason": "operator"}` before they close. Their page then says the developer ended the game. Deletions by the 7-day cleanup and by the last player leaving still send `{"type": "game_deleted"}` without a reason. A link and a wheel get exactly the same event.
+
+Dashboard `wheels` entries have two more fields: `viewers` (how many have the wheel open) and `spinning` (a spin is running).

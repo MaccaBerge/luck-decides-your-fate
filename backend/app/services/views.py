@@ -85,6 +85,8 @@ async def wheel_lists(ctx: AppContext) -> WheelLists:
             names=[e.name for e in active],
             entry_count=len(active),
             open_now=ctx.manager.player_count(game.id) > 0,
+            viewers=ctx.manager.player_count(game.id),
+            spinning=ctx.runtime.current_spin(game.id) is not None,
             created_at=game.created_at,
             last_activity_at=game.last_activity_at,
             control=ser.control_out(eff),

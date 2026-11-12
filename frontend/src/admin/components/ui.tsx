@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Check, Copy, Trash2, X } from "lucide-react";
+import { Check, ChevronLeft, Copy, Trash2, X } from "lucide-react";
 import type { Mode } from "../../lib/types";
 import type { LinkStatus } from "../adminTypes";
 import { card as sharedCard, pillBtn, primaryBtn, secondaryBtn, textBtn } from "../../components/game/buttons";
@@ -152,10 +152,16 @@ export function DeleteWithConfirm({
   label,
   onConfirm,
   compact,
+  text = "Delete link",
+  warning,
 }: {
   label: string;
   onConfirm: () => Promise<void> | void;
   compact?: boolean;
+  /** The button's text (when not compact). */
+  text?: string;
+  /** Shown next to the confirm step, e.g. that someone is using it right now. */
+  warning?: string | null;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -169,12 +175,17 @@ export function DeleteWithConfirm({
         onClick={() => setConfirming(true)}
       >
         <Trash2 className="h-4 w-4" aria-hidden />
-        {!compact && <span>Delete link</span>}
+        {!compact && <span>{text}</span>}
       </button>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5">
+    <span className="inline-flex flex-wrap items-center justify-end gap-1.5">
+      {warning && (
+        <span role="alert" className="basis-full text-right text-[13px] font-medium text-danger">
+          {warning}
+        </span>
+      )}
       <button
         type="button"
         className={btnDanger}
@@ -254,4 +265,20 @@ export function clockTime(iso: string): string {
 
 export function linkTitle(label: string | null): string {
   return label && label.trim() ? label : "Untitled";
+}
+
+/**
+ * The top bar of every page under the dashboard. It stays on screen while you scroll, because the
+ * Home Screen app has no browser back button.
+ */
+export function SubPageHeader({ onBack, onLogout }: { onBack: () => void; onLogout: () => void }) {
+  return (
+    <header className="sticky top-0 z-20 -mx-4 -mt-7 flex items-center justify-between gap-4 border-b border-border bg-bg/90 px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 backdrop-blur sm:-mx-6 sm:px-6">
+      <button type="button" className={btnSecondary} onClick={onBack}>
+        <ChevronLeft className="size-4" aria-hidden />
+        Dashboard
+      </button>
+      <LogoutButton onClick={onLogout} />
+    </header>
+  );
 }

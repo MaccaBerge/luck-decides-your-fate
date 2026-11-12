@@ -231,6 +231,8 @@ class WheelSummary(BaseModel):
     names: list[str]               # active names, in wheel order
     entry_count: int
     open_now: bool                 # someone has it open
+    viewers: int                   # how many have it open (sockets)
+    spinning: bool                 # a spin is running right now
     created_at: str
     last_activity_at: str
     control: ControlOut

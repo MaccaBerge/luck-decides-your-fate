@@ -173,7 +173,7 @@ def test_delete_link_notifies_and_closes(client, admin):
         p.receive_json()
         a.receive_json()
         assert admin.delete(f"/api/admin/links/{gid}").status_code == 204
-        assert p.receive_json() == {"type": "game_deleted"}
+        assert p.receive_json() == {"type": "game_deleted", "reason": "operator"}
         with pytest.raises(WebSocketDisconnect) as exc:
             p.receive_json()
         assert exc.value.code == 1000

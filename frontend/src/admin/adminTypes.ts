@@ -75,6 +75,10 @@ export interface WheelSummary {
   names: string[];
   entry_count: number;
   open_now: boolean;
+  /** How many have it open. */
+  viewers: number;
+  /** A spin is running right now. */
+  spinning: boolean;
   created_at: string;
   last_activity_at: string;
   control: Control;

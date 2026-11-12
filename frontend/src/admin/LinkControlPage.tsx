@@ -25,13 +25,12 @@ import {
   fieldLabel,
   input,
   linkTitle,
-  LogoutButton,
   MODE_LABEL,
   ModeRadioGroup,
   page,
   StatusBadge,
   textarea,
-  Wordmark,
+  SubPageHeader,
 } from "./components/ui";
 
 /**
@@ -158,24 +157,14 @@ export default function LinkControlPage({ kind = "link" }: { kind?: "link" | "wh
   async function remove() {
     if (!gameId) return;
     try {
-      await adminApi.deleteLink(gameId);
+      await (isWheel ? adminApi.deleteWheel : adminApi.deleteLink)(gameId);
       goDashboard();
     } catch (err) {
       handleError(err);
     }
   }
 
-  const header = (
-    <header className="flex flex-wrap items-center justify-between gap-4">
-      <Wordmark>Controller</Wordmark>
-      <nav className="flex items-center gap-2">
-        <button type="button" className={btnSecondary} onClick={goDashboard}>
-          Back to dashboard
-        </button>
-        <LogoutButton onClick={logout} />
-      </nav>
-    </header>
-  );
+  const header = <SubPageHeader onBack={goDashboard} onLogout={logout} />;
 
   if (notFound) {
     return (
@@ -438,11 +427,22 @@ export default function LinkControlPage({ kind = "link" }: { kind?: "link" | "wh
             )}
           </section>
 
-          {!isWheel && (
-            <div className="flex justify-end">
+          <div className="flex justify-end">
+            {isWheel ? (
+              <DeleteWithConfirm
+                label="Delete this wheel"
+                text="Delete wheel"
+                onConfirm={remove}
+                warning={
+                  game.current_spin || link.player_count > 0
+                    ? "In use right now. They'll see the developer ended it."
+                    : null
+                }
+              />
+            ) : (
               <DeleteWithConfirm label={`Delete link ${title}`} onConfirm={remove} />
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
